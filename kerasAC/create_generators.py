@@ -20,13 +20,54 @@ def revcomp(seq):
     return ''.join(rc)
 
 
+def add_variants(bed_entries,vcf,args,ltrdict):
+    for seq_index in range(len(bed_entries)):
+        bed_entry=bed_entries[seq_index]
+        cur_start=bed_entry[1]
+        cur_end=bed_entry[2]
+        max_offset=cur_end-cur_start 
+        try:
+            variants=[i for i in vcf.query(bed_entry[0],bed_entry[1],bed_entry[2])]
+        except:
+            continue 
+        if variants!=[]:
+            for variant in variants:
+                if args.global_vcf == False:
+                    #the vcf contains personal variants for an individual 
+                    pos=float(variant[1])
+                    offset=int(pos-cur_start)
+                    if offset >= max_offset:
+                        continue 
+                    alleles=variant[3].split(',')+variant[4].split(',') 
+                    geno=[int(i) for i in variant[9].split(':')[0].split('/')]
+                    try:
+                        freqs1=np.asarray(ltrdict[alleles[geno[0]]])
+                        freqs2=np.asarray(ltrdict[alleles[geno[1]]])
+                    except:
+                        continue
+                    freqs=np.mean((freqs1,freqs2),axis=0)
+
+                else:
+                    #common allele freqs for the reference genome
+                    pos=float(variant[1])
+                    offset=int(pos-cur_start)
+                    if offset >= max_offset:
+                        continue
+                    alleles=[variant[3],variant[4][0]]
+                    try:
+                        all_freqs=[float(variant[5]),float(variant[6])]
+                    except:
+                        continue 
+                    freqs=np.asarray(ltrdict[alleles[0]])*all_freqs[0]+np.asarray(ltrdict[alleles[1]])*all_freqs[1]
+                seqs[seq_index][offset]=freqs
+    return seqs        
 
     
 #currently we have on-the-fly batch generation from hdf5 & bed files. 
 def data_generator(data_path,args):
     if data_path.endswith('.hdf5'):
         return data_generator_hdf5(data_path,args)
-    elif data_path.endswith('.bed'):
+    elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz')):
         return data_generator_bed(data_path,args) 
     else:
         raise Exception("data for generator must be in hdf5 format (.hdf5 0ending) or bed format (.bed ending). Neither is true. Exiting")
@@ -36,7 +77,16 @@ def data_generator_bed(bed_source,args):
     ref=pysam.FastaFile(args.ref_fasta)
     #load the train data as a pandas dataframe, skip the header
     data=pd.read_csv(bed_source,header=0,sep='\t',index_col=[0,1,2])
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
+    ltrdict = {'a':[1,0,0,0],
+               'c':[0,1,0,0],
+               'g':[0,0,1,0],
+               't':[0,0,0,1],
+               'n':[0,0,0,0],
+               'A':[1,0,0,0],
+               'C':[0,1,0,0],
+               'G':[0,0,1,0],
+               'T':[0,0,0,1],
+               'N':[0,0,0,0]}
     #if vcf file is provided, load the subject's variants
     vcf=None
     if (args.vcf_file!=None):
@@ -62,49 +112,10 @@ def data_generator_bed(bed_source,args):
             #add in the reverse-complemented sequences for training.
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
-        seqs=np.array([[ltrdict[x] for x in seq] for seq in seqs])
-        
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
         #add in subject-specific allele frequencies, if provided
         if vcf!=None:
-            for seq_index in range(len(bed_entries)):
-                bed_entry=bed_entries[seq_index]
-                cur_start=bed_entry[1]
-                cur_end=bed_entry[2]
-                max_offset=cur_end-cur_start 
-                try:
-                    variants=[i for i in vcf.query(bed_entry[0],bed_entry[1],bed_entry[2])]
-                except:
-                    continue 
-                if variants!=[]:
-                    for variant in variants:
-                        if args.global_vcf == False:
-                            #the vcf contains personal variants for an individual 
-                            pos=float(variant[1])
-                            offset=int(pos-cur_start)
-                            if offset >= max_offset:
-                                continue 
-                            alleles=variant[3].split(',')+variant[4].split(',') 
-                            geno=[int(i) for i in variant[9].split(':')[0].split('/')]
-                            try:
-                                freqs1=np.asarray(ltrdict[alleles[geno[0]]])
-                                freqs2=np.asarray(ltrdict[alleles[geno[1]]])
-                            except:
-                                continue
-                            freqs=np.mean((freqs1,freqs2),axis=0)
-
-                        else:
-                            #common allele freqs for the reference genome
-                            pos=float(variant[1])
-                            offset=int(pos-cur_start)
-                            if offset >= max_offset:
-                                continue
-                            alleles=[variant[3],variant[4][0]]
-                            try:
-                                all_freqs=[float(variant[5]),float(variant[6])]
-                            except:
-                                continue 
-                            freqs=np.asarray(ltrdict[alleles[0]])*all_freqs[0]+np.asarray(ltrdict[alleles[1]])*all_freqs[1]
-                        seqs[seq_index][offset]=freqs
+            seqs=add_variants(bed_entries,vcf,args,ltrdict)
         #expand dimension of 1
         x_batch=np.expand_dims(seqs,1)
         y_batch=np.asarray(data[start_index:end_index])
@@ -113,7 +124,7 @@ def data_generator_bed(bed_source,args):
         num_generated+=batch_size
         start_index=end_index
         if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
-            print("skipping!")
+            print("skipping!: hint-- is your reference (i.e. hg19) correct?")
             continue
         else:
             yield tuple([x_batch,y_batch])

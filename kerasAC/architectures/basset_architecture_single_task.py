@@ -1,7 +1,7 @@
 import numpy as np ;
 import pdb
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args):
+def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,num_tasks):
     np.random.seed(1234)
     import keras;
     from keras.models import Sequential
