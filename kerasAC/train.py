@@ -1,5 +1,6 @@
 #Raw keras model 
 import importlib
+import imp
 import argparse
 import numpy as np 
 import h5py 
@@ -26,7 +27,9 @@ def parse_args():
     parser.add_argument("--revcomp",action="store_true")
     parser.add_argument("--epochs",type=int,default=40)
     parser.add_argument("--patience",type=int,default=5)
-    parser.add_argument("--architecture_spec",type=str,default="basset_architecture_single_task.py")
+    parser.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
+    parser.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
+    parser.add_argument("--architecture_from_file",type=str,default=None)
     parser.add_argument("--tensorboard",action="store_true")
     parser.add_argument("--tensorboard_logdir",default="logs")
     
@@ -38,7 +41,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1)
     csvlogger = CSVLogger(args.model_output_file+".log", append = True)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=5, min_lr=0.00000001)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
     if args.tensorboard==True:
         from keras.callbacks import TensorBoard
@@ -81,9 +84,12 @@ def main():
         w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
     print("got weights!")
     try:
-        architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
+        if (args.architecture_spec_from_file!=None):
+            architecture_module=imp.load_source('',args.architecture_spec_from_file)
+        else:
+            architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
-        print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures?")
+        print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks)
     print("compiled the model!")
     train_generator=data_generator(args.train_path,args)

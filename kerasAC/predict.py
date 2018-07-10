@@ -1,15 +1,13 @@
+import kerasAC.metrics
+from kerasAC.accuracy_metrics import * 
 import argparse
 import yaml 
 import h5py 
-import keras
-from kerasAC.accuracy_metrics import * 
 import pickle
 import numpy as np 
-import pdb
 import keras 
 from keras.losses import *;
 import random
-
 def get_predictions_hdf5(args,model):
     data=h5py.File(args.data,'r')    
     if args.sequential==True: 
@@ -182,7 +180,11 @@ def get_model(args):
             w0=args.w0
             w1=args.w1
             loss_function=get_weighted_binary_crossentropy(w0,w1)                
-            model=load_model(args.model_hdf5,custom_objects={"weighted_binary_crossentropy":loss_function})
+            model=load_model(args.model_hdf5,custom_objects={"weighted_binary_crossentropy":loss_function,
+                                                             "positive_accuracy":kerasAC.metrics.positive_accuracy,
+                                                             "negative_accuracy":kerasAC.metrics.negative_accuracy,
+                                                             "precision":kerasAC.metrics.precision,
+                                                             "recall":kerasAC.metrics.recall})
         else:
             model=load_model(args.model_hdf5)
     return model
