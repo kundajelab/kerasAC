@@ -84,8 +84,8 @@ def main():
         w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
     print("got weights!")
     try:
-        if (args.architecture_spec_from_file!=None):
-            architecture_module=imp.load_source('',args.architecture_spec_from_file)
+        if (args.architecture_from_file!=None):
+            architecture_module=imp.load_source('',args.architecture_from_file)
         else:
             architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
