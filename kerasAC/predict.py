@@ -1,12 +1,13 @@
 import kerasAC.metrics
-from kerasAC.accuracy_metrics import * 
+from kerasAC.accuracy_metrics import *
 import argparse
 import yaml 
 import h5py 
 import pickle
 import numpy as np 
 import keras 
-from keras.losses import *;
+from keras.losses import *
+from kerasAC.custom_losses import * 
 import random
 def get_predictions_hdf5(args,model):
     data=h5py.File(args.data,'r')    
