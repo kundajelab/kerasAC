@@ -187,7 +187,10 @@ def get_model(args):
                                                              "precision":kerasAC.metrics.precision,
                                                              "recall":kerasAC.metrics.recall})
         else:
-            model=load_model(args.model_hdf5)
+            try:
+                model=load_model(args.model_hdf5)
+            except:
+                print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
     return model
 
 def get_predictions(args,model):
