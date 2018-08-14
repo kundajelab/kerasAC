@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument("--architecture_from_file",type=str,default=None)
     parser.add_argument("--tensorboard",action="store_true")
     parser.add_argument("--tensorboard_logdir",default="logs")
-    
+    parser.add_argument("--squeeze_input_for_gru",action="store_true")
     return parser.parse_args() 
         
 def fit_and_evaluate(model,train_gen,valid_gen,args):

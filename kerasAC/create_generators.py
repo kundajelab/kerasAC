@@ -116,16 +116,22 @@ def data_generator_bed(bed_source,args):
         #add in subject-specific allele frequencies, if provided
         if vcf!=None:
             seqs=add_variants(bed_entries,vcf,args,ltrdict)
-        #expand dimension of 1
-        x_batch=np.expand_dims(seqs,1)
+        #expand dimension of 1,  unless we're dealing with a GRU in recurrent network
+        if(args.squeeze_input_for_gru==False):
+            x_batch=np.expand_dims(seqs,1)
+        else:
+            x_batch=seqs
         y_batch=np.asarray(data[start_index:end_index])
         if args.revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
         num_generated+=batch_size
         start_index=end_index
-        if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
-            print("skipping!: hint-- is your reference (i.e. hg19) correct?")
-            continue
+        if (args.squeeze_input_for_gru==False):
+            if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
+                print("skipping!: hint-- is your reference (i.e. hg19) correct?")
+                continue
+            else:
+                yield tuple([x_batch,y_batch])
         else:
             yield tuple([x_batch,y_batch])
             
