@@ -20,7 +20,8 @@ def l1_block(x):
     tmp=Conv2D(filters=64,padding="same",kernel_size=(1,3))(tmp)
     tmp=BatchNormalization(axis=-1)(tmp)
     added=Add()([x,tmp])
-    return added 
+    out=Activation('relu')(added)
+    return out
 
 def l2_block(x):
     tmp=Conv2D(filters=128,kernel_size=(1,7),padding="same")(x)
@@ -29,7 +30,8 @@ def l2_block(x):
     tmp=Conv2D(filters=128,kernel_size=(1,7),padding="same")(tmp)
     tmp=BatchNormalization(axis=-1)(tmp)
     added=Add()([x,tmp])
-    return added 
+    out=Activation('relu')(added)
+    return out
 
 def l3_block(x):
     tmp=Conv2D(filters=200,kernel_size=(1,7),padding="same")(x)
@@ -41,7 +43,8 @@ def l3_block(x):
     tmp=Conv2D(filters=200,kernel_size=(1,3),padding="same")(tmp)
     tmp=BatchNormalization(axis=-1)(tmp)
     added=Add()([x,tmp])
-    return added 
+    out=Activation('relu')(added)
+    return out
 
 
 def l4_block(x):
@@ -51,7 +54,8 @@ def l4_block(x):
     tmp=Conv2D(filters=200,kernel_size=(1,7),padding="same")(tmp)
     tmp=BatchNormalization(axis=-1)(tmp)
     added=Add()([x,tmp])
-    return added 
+    out=Activation('relu')(added)
+    return out
 
 
 #note: functional model
