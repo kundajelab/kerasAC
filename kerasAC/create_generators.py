@@ -133,7 +133,11 @@ def data_generator_bed(bed_source,args):
             else:
                 yield tuple([x_batch,y_batch])
         else:
-            yield tuple([x_batch,y_batch])
+            if ((x_batch.ndim <3) or (y_batch.ndim <2)):
+                print("skipping!: hint -- is your reference (i.e. hg19) correct?")
+                continue
+            else:
+                yield tuple([x_batch,y_batch])
             
 def data_generator_hdf5(data_path,args):
     hdf5_source=h5py.File(data_path,'r')
