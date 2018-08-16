@@ -75,7 +75,7 @@ def get_predictions_bed(args,model):
     import pysam
     import pandas as pd
     num_generated=0
-    ref=pysam.FastaFile(args.ref)
+    ref=pysam.FastaFile(args.ref_fasta)
     data=pd.read_csv(args.data_bed,header=0,sep='\t',index_col=[0,1,2])
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #iterate through batches and one-hot-encode on the fly
@@ -97,7 +97,7 @@ def get_predictions_bed(args,model):
 
 def get_predictions_variant(args,model):
     import pysam
-    ref=pysam.FastaFile(args.ref)
+    ref=pysam.FastaFile(args.ref_fasta)
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #assumes the bed file has `chrom start ref alt` entries
     data=[i.split('\t') for i in open(args.variant_bed,'r').read().strip().split('\n')]
@@ -159,7 +159,7 @@ def parse_args():
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
     parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
-    parser.add_argument('--ref',default=None)
+    parser.add_argument('--ref_fasta',default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--w1',nargs="*",type=float)
     parser.add_argument('--w0',nargs="*",type=float)
