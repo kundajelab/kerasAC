@@ -1,4 +1,5 @@
 import kerasAC.metrics
+import kerasAC.activations 
 from kerasAC.accuracy_metrics import *
 import argparse
 import yaml 
@@ -82,11 +83,12 @@ def get_predictions_bed(args,model):
     bed_entries=[(data.index[i]) for i in range(num_entries)]
     seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
     seqs=np.array([[ltrdict[x] for x in seq] for seq in seqs])
-    #expand dimension of 1
-    x=np.expand_dims(seqs,1)
+    if (args.squeeze_input_for_gru==False):
+        #expand dimension of 1
+        x=np.expand_dims(seqs,1)
+    else:
+        x=seqs
     print(x.shape) 
-    #y=np.asarray(data)
-    #print(y.shape)
     try:
         predictions=model.predict(x)
     except:
@@ -162,7 +164,8 @@ def parse_args():
     parser.add_argument('--w1',nargs="*",type=float)
     parser.add_argument('--w0',nargs="*",type=float)
     parser.add_argument('--flank',default=500,type=int)
-    parser.add_argument('--mask',default=10,type=int) 
+    parser.add_argument('--mask',default=10,type=int)
+    parser.add_argument('--squeeze_input_for_gru',action='store_true')
     return parser.parse_args()
 
 def get_model(args):
@@ -185,7 +188,8 @@ def get_model(args):
                                                              "positive_accuracy":kerasAC.metrics.positive_accuracy,
                                                              "negative_accuracy":kerasAC.metrics.negative_accuracy,
                                                              "precision":kerasAC.metrics.precision,
-                                                             "recall":kerasAC.metrics.recall})
+                                                             "recall":kerasAC.metrics.recall,
+                                                             "softMaxAxis1":kerasAC.activations.softMaxAxis1})
         else:
             try:
                 model=load_model(args.model_hdf5)
