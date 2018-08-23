@@ -192,7 +192,11 @@ def get_model(args):
                                                              "softMaxAxis1":kerasAC.activations.softMaxAxis1})
         else:
             try:
-                model=load_model(args.model_hdf5)
+                model=load_model(args.model_hdf5,custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
+                                                             "negative_accuracy":kerasAC.metrics.negative_accuracy,
+                                                             "precision":kerasAC.metrics.precision,
+                                                             "recall":kerasAC.metrics.recall,
+                                                             "softMaxAxis1":kerasAC.activations.softMaxAxis1})
             except:
                 print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
     return model

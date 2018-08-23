@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--ref_fasta",default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
     parser.add_argument("--w0_file",default=None)
     parser.add_argument("--w1_file",default=None)
+    parser.add_argument("--weighted",action="store_true")
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
     parser.add_argument("--num_tasks",type=int)
@@ -26,7 +27,7 @@ def parse_args():
     parser.add_argument("--global_vcf",action="store_true")
     parser.add_argument("--revcomp",action="store_true")
     parser.add_argument("--epochs",type=int,default=40)
-    parser.add_argument("--patience",type=int,default=5)
+    parser.add_argument("--patience",type=int,default=3)
     parser.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
     parser.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
     parser.add_argument("--architecture_from_file",type=str,default=None)
@@ -77,12 +78,15 @@ def get_weights(bed_path):
 
 def main():
     args=parse_args()
-    if args.w1_file==None: 
-        w1,w0=get_weights(args.train_path)
-    else:
-        w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
-        w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
-    print("got weights!")
+    w1=None
+    w0=None
+    if (args.weighted==True):
+        if args.w1_file==None:
+            w1,w0=get_weights(args.train_path)
+        else:
+            w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
+            w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
+        print("got weights!")
     try:
         if (args.architecture_from_file!=None):
             architecture_module=imp.load_source('',args.architecture_from_file)
