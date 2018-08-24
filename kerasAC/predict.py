@@ -233,6 +233,9 @@ def main():
         with open(args.predictions_pickle,'wb') as handle:
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
+        #also as text file
+        np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
+        np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
 
     if args.accuracy_metrics_file!=None:
         print('computing accuracy metrics...')
