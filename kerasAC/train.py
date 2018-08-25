@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument("--tensorboard",action="store_true")
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
+    parser.add_argument("--seed",type=int,default=1234)
     return parser.parse_args() 
         
 def fit_and_evaluate(model,train_gen,valid_gen,args):
@@ -94,7 +95,7 @@ def main():
             architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
         print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks)
+    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
     print("compiled the model!")
     train_generator=data_generator(args.train_path,args)
     print("generated training data generator!") 

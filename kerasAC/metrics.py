@@ -1,6 +1,10 @@
 #Note: this is ugly w/ use of tf & K --> needed to avoid custom keras modifications 
 import tensorflow as tf
 import keras.backend as K
+def spearman_corr(y_true,y_pred):
+    import K.contribs.metrics.streaming_pearson_correlation
+    return K.contribs.metrics.streaming_pearson_correlation(y_pred,y_true)
+
 def positive_accuracy(y_true,y_pred):
     one_indices=tf.cast(tf.where(tf.equal(y_true,1.0)),'int32')
     y_true_subset=tf.gather_nd(y_true,one_indices)
