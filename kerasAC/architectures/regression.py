@@ -1,8 +1,8 @@
 import numpy as np ;
 from kerasAC.metrics import * 
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
-    np.random.seed(seed)
+def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks):
+    np.random.seed(1234)
     import keras;
     from keras.models import Sequential
     from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
@@ -45,7 +45,6 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         model.add(Dropout(0.3))
 
         model.add(Dense(ntasks))
-        model.add(Activation("sigmoid"))
 
     else:
         model=Sequential()
@@ -76,11 +75,8 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         model.add(Dropout(0.3))
 
         model.add(Dense(ntasks))
-        model.add(Activation("sigmoid"))
         
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    import kerasAC.custom_losses
-    loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
-    model.compile(optimizer=adam,loss=loss,metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    model.compile(optimizer=adam,loss='mse',metrics=[positive_accuracy,negative_accuracy,precision,recall])
     return model

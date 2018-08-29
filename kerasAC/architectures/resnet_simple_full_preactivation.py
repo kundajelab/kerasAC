@@ -17,10 +17,10 @@ from keras import backend as K
 def l1_block(x):
     tmp=BatchNormalization(axis=-1)(x)
     tmp=Activation('relu')(tmp)
-    tmp=Conv2D(filters=64,kernel_size=(1,3),padding="same")(tmp)
+    tmp=Conv2D(filters=300,kernel_size=(1,9),padding="same")(tmp)
     tmp=BatchNormalization(axis=-1)(tmp)
     tmp=Activation('relu')(tmp)
-    tmp=Conv2D(filters=64,padding="same",kernel_size=(1,3))(tmp)
+    tmp=Conv2D(filters=300,padding="same",kernel_size=(1,7))(tmp)
     out=Add()([x,tmp])
     return out
 
@@ -33,7 +33,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights=None,checkpoint_w
     print(K.image_data_format())
 
     inputs=Input(shape=(1,1000,4))
-    x=Conv2D(filters=48,kernel_size=(1,3))(inputs)
+    x=Conv2D(filters=300,kernel_size=(1,11))(inputs)
     #add 2 x 1st resnet blocks
     x=l1_block(x)
     x=BatchNormalization(axis=-1)(x)

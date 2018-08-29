@@ -1,8 +1,8 @@
 import numpy as np ;
 import pdb
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,seed):
+    np.random.seed(seed)
     import keras;
     from keras.models import Sequential
     from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten

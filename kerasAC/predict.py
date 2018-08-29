@@ -192,7 +192,11 @@ def get_model(args):
                                                              "softMaxAxis1":kerasAC.activations.softMaxAxis1})
         else:
             try:
-                model=load_model(args.model_hdf5)
+                model=load_model(args.model_hdf5,custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
+                                                             "negative_accuracy":kerasAC.metrics.negative_accuracy,
+                                                             "precision":kerasAC.metrics.precision,
+                                                             "recall":kerasAC.metrics.recall,
+                                                             "softMaxAxis1":kerasAC.activations.softMaxAxis1})
             except:
                 print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
     return model
@@ -229,6 +233,9 @@ def main():
         with open(args.predictions_pickle,'wb') as handle:
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
+        #also as text file
+        np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
+        np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
 
     if args.accuracy_metrics_file!=None:
         print('computing accuracy metrics...')
