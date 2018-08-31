@@ -81,7 +81,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     import kerasAC.custom_losses
     print("compiling!")
-    if args.w0!=None:
+    if w0!=None:
         loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
         loss="binary_crossentropy"
