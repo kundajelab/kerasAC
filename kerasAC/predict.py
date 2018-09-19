@@ -169,36 +169,39 @@ def parse_args():
     return parser.parse_args()
 
 def get_model(args):
-    if args.model_hdf5==None:
-        yaml_string=open(args.yaml,'r').read()
-        model_config=yaml.load(yaml_string)
-        model=Graph.from_config(model_config)
+    custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
+                    "negative_accuracy":kerasAC.metrics.negative_accuracy,
+                    "precision":kerasAC.metrics.precision,
+                    "recall":kerasAC.metrics.recall,
+                    "softMaxAxis1":kerasAC.activations.softMaxAxis1}
+    if args.w0!=None:
+        w0=args.w0
+        w1=args.w1
+        loss_function=get_weighted_binary_crossentropy(w0,w1)                
+        custom_objects["weighted_binary_crossentropy"]:loss_function
+    try:
+        if args.yaml!=None:
+            from keras.models import model_from_yaml
+            #load the model architecture from yaml
+            yaml_string=open(args.yaml,'r').read()
+            model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
+            #load the model weights
+            model.load_weights(args.weights)
+        elif args.json!=None:
+            from keras.models import model_from_json
+            #load the model architecture from json
+            json_string=open(args.json,'r').read()
+            model=model_from_json(json_string,custom_objects=custom_objects)
+            model.load_weights(args.weights)
+        elif args.model_hdf5!=None: 
+            #load from the hdf5
+            from keras.models import load_model
+            model=load_model(args.model_hdf5,custom_objects=custom_objects)
         print("got model architecture")
-        #load the model weights
-        model.load_weights(args.weights)
-        print("loaded model weights")
-    else:
-        #load from the hdf5
-        from keras.models import load_model
-        if args.w0!=None:
-            w0=args.w0
-            w1=args.w1
-            loss_function=get_weighted_binary_crossentropy(w0,w1)                
-            model=load_model(args.model_hdf5,custom_objects={"weighted_binary_crossentropy":loss_function,
-                                                             "positive_accuracy":kerasAC.metrics.positive_accuracy,
-                                                             "negative_accuracy":kerasAC.metrics.negative_accuracy,
-                                                             "precision":kerasAC.metrics.precision,
-                                                             "recall":kerasAC.metrics.recall,
-                                                             "softMaxAxis1":kerasAC.activations.softMaxAxis1})
-        else:
-            try:
-                model=load_model(args.model_hdf5,custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
-                                                             "negative_accuracy":kerasAC.metrics.negative_accuracy,
-                                                             "precision":kerasAC.metrics.precision,
-                                                             "recall":kerasAC.metrics.recall,
-                                                             "softMaxAxis1":kerasAC.activations.softMaxAxis1})
-            except:
-                print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
+        print("loaded model weights")        
+        
+    except: 
+        print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
     return model
 
 def get_predictions(args,model):
