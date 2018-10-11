@@ -177,8 +177,8 @@ def get_model(args):
     if args.w0!=None:
         w0=args.w0
         w1=args.w1
-        loss_function=get_weighted_binary_crossentropy(w0,w1)                
-        custom_objects["weighted_binary_crossentropy"]:loss_function
+        loss_function=get_weighted_binary_crossentropy(w0,w1)
+        custom_objects["weighted_binary_crossentropy"]=loss_function
     try:
         if args.yaml!=None:
             from keras.models import model_from_yaml
