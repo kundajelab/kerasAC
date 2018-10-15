@@ -1,4 +1,4 @@
-import numpy as np ;
+import numpy as np
 import pysam
 import pandas as pd
 import pdb
@@ -106,6 +106,7 @@ def data_generator_bed(bed_source,args):
         end_index=start_index+int(batch_size)
         #get seq positions
         bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
+        print(str(bed_entries))
         #get sequences
         seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
         if args.revcomp==True:
@@ -126,6 +127,7 @@ def data_generator_bed(bed_source,args):
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
         num_generated+=batch_size
         start_index=end_index
+        pdb.set_trace()
         if (args.squeeze_input_for_gru==False):
             if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
                 print("skipping!: hint-- is your reference (i.e. hg19) correct?")
