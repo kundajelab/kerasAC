@@ -80,19 +80,37 @@ def get_predictions_bed(args,model):
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #iterate through batches and one-hot-encode on the fly
     num_entries=data.shape[0]
-    bed_entries=[(data.index[i]) for i in range(num_entries)]
-    seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
-    seqs=np.array([[ltrdict[x] for x in seq] for seq in seqs])
-    if (args.squeeze_input_for_gru==False):
-        #expand dimension of 1
-        x=np.expand_dims(seqs,1)
-    else:
-        x=seqs
-    print(x.shape) 
-    try:
-        predictions=model.predict(x)
-    except:
-        pdb.set_trace()
+    predictions=None
+    while num_generated < num_entries:
+        print(str(num_generated))
+        start_index=num_generated
+        end_index=min([num_entries,start_index+args.batch_size])
+        bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
+        seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        if (args.squeeze_input_for_gru==False):
+            #expand dimension of 1
+            x=np.expand_dims(seqs,1)
+        else:
+            x=seqs
+        try:
+            predictions_batch=model.predict(x)
+        except:
+            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
+        #add the batch predictions to the full set of predictions
+        if type(predictions)==type(None):
+            predictions=predictions_batch
+        elif type(predictions)==np.ndarray:
+            predictions=np.concatenate((predictions,predictions_batch),axis=0)
+            print(predictions.shape)
+        elif type(predictions)==type({}):
+            for key in predictions_batch:
+                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
+        else:
+            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
+            pdb.set_trace() 
+        num_generated+=(end_index-start_index)
+        
     return [predictions,data]
 
 def get_predictions_variant(args,model):
