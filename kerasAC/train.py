@@ -1,10 +1,10 @@
-#Raw keras model 
+#Raw keras model
 import importlib
 import imp
 import argparse
-import numpy as np 
-import h5py 
-from kerasAC.create_generators import * 
+import numpy as np
+import h5py
+from kerasAC.create_generators import *
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -35,8 +35,9 @@ def parse_args():
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
-    return parser.parse_args() 
-        
+    parser.add_argument("--upsample_ratio", default=0.5)
+    return parser.parse_args()
+
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_output_file
     from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
@@ -67,7 +68,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf=open(args.model_output_file+".arch",'w')
     outf.write(architecture_string)
     print("complete!!")
-    
+
 def get_weights(bed_path):
     import pandas as pd
     data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
@@ -98,11 +99,11 @@ def main():
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
     print("compiled the model!")
     train_generator=data_generator(args.train_path,args)
-    print("generated training data generator!") 
+    print("generated training data generator!")
     valid_generator=data_generator(args.valid_path,args)
-    print("generated validation data generator!") 
+    print("generated validation data generator!")
     fit_and_evaluate(model,train_generator,
-                     valid_generator,args) 
+                     valid_generator,args)
 
 if __name__=="__main__":
-    main() 
+    main()
