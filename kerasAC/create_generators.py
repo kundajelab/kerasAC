@@ -112,11 +112,11 @@ def data_generator_bed(bed_source, args):
     while True:
         if (pos_num_generated >= pos_total_entries):
             pos_start_index=0
-            ones = pd.concat([ones[pos_num_generated:], ones[:pos_num_generated])
+            ones = pd.concat([ones[pos_num_generated:], ones[:pos_num_generated]])
             pos_num_generated = 0
         if (neg_num_generated >= neg_total_entries):
             neg_start_index = 0
-            zeros = pd.concat([zeros[neg_num_generated:], zeros[:neg_num_generated])
+            zeros = pd.concat([zeros[neg_num_generated:], zeros[:neg_num_generated]])
             neg_num_generated = 0
         pos_end_index = pos_start_index + int(pos_batch_size)
         neg_end_index = neg_start_index + int(neg_batch_size)
