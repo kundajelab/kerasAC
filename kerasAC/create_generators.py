@@ -3,7 +3,6 @@ import pysam
 import pandas as pd
 import pdb
 import tabix
-from random import shuffle
 
 def revcomp(seq):
     seq=seq[::-1].upper()
