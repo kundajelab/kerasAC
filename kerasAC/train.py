@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
     parser.add_argument("--upsample_ratio", default=0.5)
+    parser.add_argument("--save_weights")
     return parser.parse_args()
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
@@ -69,13 +70,18 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf.write(architecture_string)
     print("complete!!")
 
-def get_weights(bed_path):
+def get_weights(bed_path, weights_path):
     import pandas as pd
     data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
-    print(str(w1))
-    print(str(w0))
+    with open(weights_path, 'w') as weight_file:
+        weight_file.write("--w1")
+        for i in w1:
+            weight_file.write(" " + str(i))
+        weight_file.write(" \\" + "\n--w0")
+        for i in w0:
+            weight_file.write(" " + str(i))
     return w1,w0
 
 def main():
@@ -84,7 +90,7 @@ def main():
     w0=None
     if (args.weighted==True):
         if args.w1_file==None:
-            w1,w0=get_weights(args.train_path)
+            w1,w0=get_weights(args.train_path, args.save_weights)
         else:
             w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
             w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
