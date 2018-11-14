@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
-    parser.add_argument("--upsample_ratio", default=0.5)
+    parser.add_argument("--upsample_ratio", type=float, default=0.5)
     parser.add_argument("--save_weights")
     return parser.parse_args()
 
