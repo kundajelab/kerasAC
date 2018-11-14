@@ -19,7 +19,6 @@ def revcomp(seq):
             rc.append(base)
     return ''.join(rc)
 
-
 def add_variants(bed_entries,vcf,args,ltrdict):
     for seq_index in range(len(bed_entries)):
         bed_entry=bed_entries[seq_index]
@@ -62,7 +61,6 @@ def add_variants(bed_entries,vcf,args,ltrdict):
                 seqs[seq_index][offset]=freqs
     return seqs
 
-
 #currently we have on-the-fly batch generation from hdf5 & bed files.
 def data_generator(data_path,args):
     if data_path.endswith('.hdf5'):
@@ -71,7 +69,6 @@ def data_generator(data_path,args):
         return data_generator_bed(data_path,args)
     else:
         raise Exception("data for generator must be in hdf5 format (.hdf5 0ending) or bed format (.bed ending). Neither is true. Exiting")
-
 
 def data_generator_bed(bed_source, args):
     #open the reference file
