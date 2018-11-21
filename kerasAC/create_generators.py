@@ -62,15 +62,15 @@ def add_variants(bed_entries,vcf,args,ltrdict):
     return seqs
 
 #currently we have on-the-fly batch generation from hdf5 & bed files.
-def data_generator(data_path,args):
+def data_generator(data_path,args,upsample_ratio):
     if data_path.endswith('.hdf5'):
         return data_generator_hdf5(data_path,args)
     elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz')):
-        return data_generator_bed(data_path,args)
+        return data_generator_bed(data_path,args,upsample_ratio)
     else:
         raise Exception("data for generator must be in hdf5 format (.hdf5 0ending) or bed format (.bed ending). Neither is true. Exiting")
 
-def data_generator_bed(bed_source, args):
+def data_generator_bed(bed_source, args, upsample_ratio):
     #open the reference file
     ref=pysam.FastaFile(args.ref_fasta)
     #load the train data as a pandas dataframe, skip the header
@@ -82,7 +82,7 @@ def data_generator_bed(bed_source, args):
         batch_size=args.batch_size/2
     else:
         batch_size=args.batch_size
-    pos_batch_size = int(args.batch_size * args.upsample_ratio)
+    pos_batch_size = int(args.batch_size * upsample_ratio)
     neg_batch_size = args.batch_size - pos_batch_size
     ltrdict = {'a':[1,0,0,0],
                'c':[0,1,0,0],
