@@ -37,7 +37,9 @@ def parse_args():
     parser.add_argument("--seed",type=int,default=1234)
     parser.add_argument("--train_upsample", type=float, default=0.4)
     parser.add_argument("--valid_upsample", type=float, default=0.2)
-    parser.add_argument("--save_weights")
+    parser.add_argument("--save_weights", default=None)
+    parser.add_argument('--w1',nargs="*", type=float, default=None)
+    parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
@@ -76,20 +78,21 @@ def get_weights(bed_path, weights_path):
     data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
-    with open(weights_path, 'w') as weight_file:
-        weight_file.write("--w1")
-        for i in w1:
-            weight_file.write(" " + str(i))
-        weight_file.write(" \\" + "\n--w0")
-        for i in w0:
-            weight_file.write(" " + str(i))
+    if weights_path != None:
+        with open(weights_path, 'w') as weight_file:
+            weight_file.write("--w1")
+            for i in w1:
+                weight_file.write(" " + str(i))
+            weight_file.write(" \\" + "\n--w0")
+            for i in w0:
+                weight_file.write(" " + str(i))
     return w1,w0
 
 def main():
     args=parse_args()
-    w1=None
-    w0=None
-    if (args.weighted==True):
+    w1=args.w1
+    w0=args.w0
+    if (args.weighted==True and (w1==None or w0==None)):
         if args.w1_file==None:
             w1,w0=get_weights(args.train_path, args.save_weights)
         else:
