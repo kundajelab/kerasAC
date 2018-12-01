@@ -52,7 +52,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         outputs = Activation("sigmoid")(x)
 
     else:
-        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(x)
+        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(inputs)
         x = BatchNormalization(axis=-1)(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,3))(x)

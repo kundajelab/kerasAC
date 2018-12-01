@@ -62,15 +62,18 @@ def add_variants(bed_entries,vcf,args,ltrdict):
     return seqs
 
 #currently we have on-the-fly batch generation from hdf5 & bed files.
-def data_generator(data_path,args):
+def data_generator(data_path,args,upsample_ratio):
     if data_path.endswith('.hdf5'):
         return data_generator_hdf5(data_path,args)
     elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz')):
-        return data_generator_bed(data_path,args)
+        if upsample_ratio <= 0.0:
+            return data_generator_bed_original(data_path, args)
+        else:
+            return data_generator_bed_upsample(data_path, args, upsample_ratio)
     else:
         raise Exception("data for generator must be in hdf5 format (.hdf5 0ending) or bed format (.bed ending). Neither is true. Exiting")
 
-def data_generator_bed(bed_source, args):
+def data_generator_bed_upsample(bed_source, args, upsample_ratio):
     #open the reference file
     ref=pysam.FastaFile(args.ref_fasta)
     #load the train data as a pandas dataframe, skip the header
@@ -82,7 +85,7 @@ def data_generator_bed(bed_source, args):
         batch_size=args.batch_size/2
     else:
         batch_size=args.batch_size
-    pos_batch_size = int(args.batch_size * args.upsample_ratio)
+    pos_batch_size = int(args.batch_size * upsample_ratio)
     neg_batch_size = args.batch_size - pos_batch_size
     ltrdict = {'a':[1,0,0,0],
                'c':[0,1,0,0],
@@ -146,6 +149,73 @@ def data_generator_bed(bed_source, args):
         neg_num_generated += neg_batch_size
         pos_start_index = pos_end_index
         neg_start_index = neg_end_index
+        if (args.squeeze_input_for_gru==False):
+            if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
+                print("skipping!: hint-- is your reference (i.e. hg19) correct?")
+                continue
+            else:
+                yield tuple([x_batch,y_batch])
+        else:
+            if ((x_batch.ndim <3) or (y_batch.ndim <2)):
+                print("skipping!: hint -- is your reference (i.e. hg19) correct?")
+                continue
+            else:
+                yield tuple([x_batch,y_batch])
+
+def data_generator_bed_original(bed_source,args):
+    #open the reference file
+    ref=pysam.FastaFile(args.ref_fasta)
+    #load the train data as a pandas dataframe, skip the header
+    data=pd.read_csv(bed_source,header=0,sep='\t',index_col=[0,1,2])
+    ltrdict = {'a':[1,0,0,0],
+               'c':[0,1,0,0],
+               'g':[0,0,1,0],
+               't':[0,0,0,1],
+               'n':[0,0,0,0],
+               'A':[1,0,0,0],
+               'C':[0,1,0,0],
+               'G':[0,0,1,0],
+               'T':[0,0,0,1],
+               'N':[0,0,0,0]}
+    #if vcf file is provided, load the subject's variants
+    vcf=None
+    if (args.vcf_file!=None):
+        vcf=tabix.open(args.vcf_file)
+    #iterate through batches and one-hot-encode on the fly
+    start_index=0
+    num_generated=0
+    total_entries=data.shape[0]-args.batch_size
+    #decide if reverse complement should be used
+    if args.revcomp==True:
+        batch_size=args.batch_size/2
+    else:
+        batch_size=args.batch_size
+    while True:
+        if (num_generated >=total_entries):
+            start_index=0
+        end_index=start_index+int(batch_size)
+        #get seq positions
+        bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
+        #get sequences
+        seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
+        if args.revcomp==True:
+            #add in the reverse-complemented sequences for training.
+            seqs_rc=[revcomp(s) for s in seqs]
+            seqs=seqs+seqs_rc
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        #add in subject-specific allele frequencies, if provided
+        if vcf!=None:
+            seqs=add_variants(bed_entries,vcf,args,ltrdict)
+        #expand dimension of 1,  unless we're dealing with a GRU in recurrent network
+        if(args.squeeze_input_for_gru==False):
+            x_batch=np.expand_dims(seqs,1)
+        else:
+            x_batch=seqs
+        y_batch=np.asarray(data[start_index:end_index])
+        if args.revcomp==True:
+            y_batch=np.concatenate((y_batch,y_batch),axis=0)
+        num_generated+=batch_size
+        start_index=end_index
         if (args.squeeze_input_for_gru==False):
             if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
                 print("skipping!: hint-- is your reference (i.e. hg19) correct?")

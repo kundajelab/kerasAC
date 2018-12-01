@@ -35,8 +35,11 @@ def parse_args():
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
-    parser.add_argument("--upsample_ratio", type=float, default=0.5)
-    parser.add_argument("--save_weights")
+    parser.add_argument("--train_upsample", type=float, default=0.4)
+    parser.add_argument("--valid_upsample", type=float, default=0.2)
+    parser.add_argument("--save_weights", default=None)
+    parser.add_argument('--w1',nargs="*", type=float, default=None)
+    parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
@@ -75,20 +78,21 @@ def get_weights(bed_path, weights_path):
     data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
-    with open(weights_path, 'w') as weight_file:
-        weight_file.write("--w1")
-        for i in w1:
-            weight_file.write(" " + str(i))
-        weight_file.write(" \\" + "\n--w0")
-        for i in w0:
-            weight_file.write(" " + str(i))
+    if weights_path != None:
+        with open(weights_path, 'w') as weight_file:
+            weight_file.write("--w1")
+            for i in w1:
+                weight_file.write(" " + str(i))
+            weight_file.write(" \\" + "\n--w0")
+            for i in w0:
+                weight_file.write(" " + str(i))
     return w1,w0
 
 def main():
     args=parse_args()
-    w1=None
-    w0=None
-    if (args.weighted==True):
+    w1=args.w1
+    w0=args.w0
+    if (args.weighted==True and (w1==None or w0==None)):
         if args.w1_file==None:
             w1,w0=get_weights(args.train_path, args.save_weights)
         else:
@@ -104,9 +108,9 @@ def main():
         print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
     print("compiled the model!")
-    train_generator=data_generator(args.train_path,args)
+    train_generator=data_generator(args.train_path,args,args.train_upsample)
     print("generated training data generator!")
-    valid_generator=data_generator(args.valid_path,args)
+    valid_generator=data_generator(args.valid_path,args,args.valid_upsample)
     print("generated validation data generator!")
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
