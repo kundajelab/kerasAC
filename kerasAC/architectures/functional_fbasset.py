@@ -1,5 +1,5 @@
 import numpy as np ;
-from kerasAC.metrics import *
+from kerasAC.metrics import * 
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks):
     np.random.seed(1234)
@@ -17,7 +17,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     import keras.losses;
     from keras.constraints import maxnorm;
     from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1, l2
+    from keras.regularizers import l1, l2    
     from keras import backend as K
     #K.set_image_data_format('channels_last')
     print(K.image_data_format())
@@ -38,10 +38,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     dropout=(0.3, 0.3)
     final_dropout=0.0,
     trainable=1
-    if(ntasks>1):
-        final_layer_name='general'
-    else:
-        final_layer_name='tuned_i'
+    final_layer_name='tuned_i_score'
     j = 0
     for i, (nb_filter, nb_col) in enumerate(zip(num_filters, conv_width)):
         seq_preds = Conv1D(nb_filter, nb_col, kernel_initializer='he_normal', trainable = bool(trainable))(seq_preds)
@@ -64,7 +61,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         #seq_preds = Dropout(drop_rate)(seq_preds)
     #seq_preds = Dropout(final_dropout)(seq_preds)
     seq_preds = Dense(num_tasks, name=final_layer_name)(seq_preds)
-    seq_preds = Activation('sigmoid')(seq_preds)
+    seq_preds = Activation('relu')(seq_preds)
     random_weight_model = Model(inputs=list(keras_inputs.values()), outputs=seq_preds)
 
     model = random_weight_model
@@ -81,4 +78,3 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     model.compile(optimizer=adam,loss=loss, metrics=[positive_accuracy,negative_accuracy,precision,recall])
 
     return model
-

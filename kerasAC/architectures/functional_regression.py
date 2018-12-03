@@ -1,5 +1,5 @@
 import numpy as np ;
-from kerasAC.metrics import *
+from kerasAC.metrics import * 
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks):
     np.random.seed(1234)
@@ -17,7 +17,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     import keras.losses;
     from keras.constraints import maxnorm;
     from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1, l2
+    from keras.regularizers import l1, l2    
     from keras import backend as K
     #K.set_image_data_format('channels_last')
     print(K.image_data_format())
@@ -38,10 +38,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     dropout=(0.3, 0.3)
     final_dropout=0.0,
     trainable=1
-    if(ntasks>1):
-        final_layer_name='general_score'
-    else:
-        final_layer_name='tuned_j_score'
+    final_layer_name='tuned_i_score'
     j = 0
     for i, (nb_filter, nb_col) in enumerate(zip(num_filters, conv_width)):
         seq_preds = Conv1D(nb_filter, nb_col, kernel_initializer='he_normal', trainable = bool(trainable))(seq_preds)
@@ -54,7 +51,6 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
             j = j+1
 
     seq_preds = Flatten()(seq_preds)
-
 
     # fully connect, drop before fc layers
     for drop_rate, fc_layer_size in zip(dropout, fc_layer_sizes):
@@ -70,6 +66,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
 
     model = random_weight_model
 
+
     if (init_weights!=None):
         #load the weight initializations
         model.load_weights(init_weights, by_name=True)
@@ -79,4 +76,3 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     model.compile(optimizer=adam,loss='mse',metrics=[positive_accuracy,negative_accuracy,precision,recall])
 
     return model
-
