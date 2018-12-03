@@ -65,7 +65,7 @@ def add_variants(bed_entries,vcf,args,ltrdict):
 def data_generator(data_path,args,upsample_ratio):
     if data_path.endswith('.hdf5'):
         return data_generator_hdf5(data_path,args)
-    elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz')):
+    elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz') or data_path.endswith('.tsv') or data_path.endswith('.tsv.gz')):
         if upsample_ratio <= 0.0:
             return data_generator_bed_original(data_path, args)
         else:
