@@ -67,7 +67,7 @@ def add_variants(bed_entries,vcf,args,ltrdict):
 def data_generator(data_path,args):
     if data_path.endswith('.hdf5'):
         return data_generator_hdf5(data_path,args)
-    elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz')):
+    elif (data_path.endswith('.bed') or data_path.endswith('.bed.gz') or data_path.endswith('.tsv') or data_path.endswith('.tsv.gz')):
         return data_generator_bed(data_path,args) 
     else:
         raise Exception("data for generator must be in hdf5 format (.hdf5 0ending) or bed format (.bed ending). Neither is true. Exiting")
