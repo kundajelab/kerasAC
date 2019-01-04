@@ -100,9 +100,15 @@ def get_predictions_hammock(args,model):
                 summit_pos=start_val+summit_offset
                 start_val=summit_pos - args.flank
                 end_val=summit_pos+args.flank
+            if start_val<1:
+                start_val=1
+                end_val=1+2*args.flank 
             peak_name='\t'.join([str(i) for i in [chrom,start_val,end_val,peak_name]])
             names.append(peak_name)
-            seq=ref.fetch(chrom,start_val,end_val)
+            try:
+                seq=ref.fetch(chrom,start_val,end_val)
+            except:
+                continue
             seqs.append(seq)
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
         if (args.squeeze_input_for_gru==False):
