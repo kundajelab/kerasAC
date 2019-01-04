@@ -1,10 +1,10 @@
-#Raw keras model 
+#Raw keras model
 import importlib
 import imp
 import argparse
-import numpy as np 
-import h5py 
-from kerasAC.create_generators import * 
+import numpy as np
+import h5py
+from kerasAC.create_generators import *
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -35,8 +35,13 @@ def parse_args():
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
-    return parser.parse_args() 
-        
+    parser.add_argument("--train_upsample", type=float, default=0.4)
+    parser.add_argument("--valid_upsample", type=float, default=0.2)
+    parser.add_argument("--save_weights", default=None)
+    parser.add_argument('--w1',nargs="*", type=float, default=None)
+    parser.add_argument('--w0',nargs="*", type=float, default=None)
+    return parser.parse_args()
+
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_output_file
     from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
@@ -67,23 +72,29 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf=open(args.model_output_file+".arch",'w')
     outf.write(architecture_string)
     print("complete!!")
-    
-def get_weights(bed_path):
+
+def get_weights(bed_path, weights_path):
     import pandas as pd
     data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
-    print(str(w1))
-    print(str(w0))
+    if weights_path != None:
+        with open(weights_path, 'w') as weight_file:
+            weight_file.write("--w1")
+            for i in w1:
+                weight_file.write(" " + str(i))
+            weight_file.write(" \\" + "\n--w0")
+            for i in w0:
+                weight_file.write(" " + str(i))
     return w1,w0
 
 def main():
     args=parse_args()
-    w1=None
-    w0=None
-    if (args.weighted==True):
+    w1=args.w1
+    w0=args.w0
+    if (args.weighted==True and (w1==None or w0==None)):
         if args.w1_file==None:
-            w1,w0=get_weights(args.train_path)
+            w1,w0=get_weights(args.train_path, args.save_weights)
         else:
             w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
             w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
@@ -97,12 +108,12 @@ def main():
         print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
     print("compiled the model!")
-    train_generator=data_generator(args.train_path,args)
-    print("generated training data generator!") 
-    valid_generator=data_generator(args.valid_path,args)
-    print("generated validation data generator!") 
+    train_generator=data_generator(args.train_path,args,args.train_upsample)
+    print("generated training data generator!")
+    valid_generator=data_generator(args.valid_path,args,args.valid_upsample)
+    print("generated validation data generator!")
     fit_and_evaluate(model,train_generator,
-                     valid_generator,args) 
+                     valid_generator,args)
 
 if __name__=="__main__":
-    main() 
+    main()
