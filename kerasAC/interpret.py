@@ -9,7 +9,8 @@ def parse_args():
     parser.add_argument("--input_bed")
     parser.add_argument("--outf")
     parser.add_argument("--ref")
-    parser.add_argument("--flank",default=500,type=int)
+    parser.add_argument("--flank",default=None,type=int)
+    parser.add_argument("--method",choices=['gradxinput','deeplift'])
     return parser.parse_args()
 def get_predictions_bed(args,model):
     data=[i.split('\t') for i in open(args.input_bed,'r').read().strip().split('\n')]

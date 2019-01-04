@@ -128,6 +128,7 @@ def data_generator_bed(bed_source,args):
         start_index=end_index
         if (args.squeeze_input_for_gru==False):
             if ((x_batch.ndim < 4) or (y_batch.ndim <2)):
+                #pdb.set_trace() 
                 print("skipping!: hint-- is your reference (i.e. hg19) correct?")
                 continue
             else:
