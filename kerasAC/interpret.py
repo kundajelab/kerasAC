@@ -15,13 +15,13 @@ def parse_args():
     parser.add_argument("--flank",default=None,type=int)
     parser.add_argument("--method",choices=['gradxinput','deeplift'],default="deeplift")
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
-    parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
     parser.add_argument('--ref',default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     parser.add_argument('--task_id',type=int)
     parser.add_argument('--squeeze_input_for_gru',default=False,action='store_true')
     parser.add_argument('--assembly',default='hg19')
+    parser.add_argument('--chromsizes',default='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes')
     return parser.parse_args()
 
 
@@ -46,14 +46,6 @@ def get_deeplift_references(args):
 def add_bigwig_header(bw,assembly):
     if assembly=='hg19':
         bw.addHeader([('chr1',249250621),
-                      ('chr2',243199373),
-                      ('chr3',198022430),
-                      ('chr4',191154276),
-                      ('chr5',180915260),
-                      ('chr6',171115067),
-                      ('chr7',159138663),
-                      ('chr8',146364022),
-                      ('chr9',141213431),
                       ('chr10',135534747),
                       ('chr11',135006516),
                       ('chr12',133851895),
@@ -64,15 +56,30 @@ def add_bigwig_header(bw,assembly):
                       ('chr17',81195210),
                       ('chr18',78077248),
                       ('chr19',59128983),
+                      ('chr2',243199373),                      
                       ('chr20',63025520),
                       ('chr21',48129895),
                       ('chr22',51304566),
+                      ('chr3',198022430),
+                      ('chr4',191154276),
+                      ('chr5',180915260),
+                      ('chr6',171115067),
+                      ('chr7',159138663),
+                      ('chr8',146364022),
+                      ('chr9',141213431),
                       ('chrX',155270560),
-                      ('chrY',59373566)],maxZooms=0)
+                      ('chrY',59373566)])
         return bw
     else:
         raise Exception("implement bigWig header for this assembly!")
-        
+def get_chromsizes(f):
+    data=open(f,'r').read().strip().split('\n')
+    chromsize_dict=dict()
+    for line in data:
+        tokens=line.split()
+        chromsize_dict[tokens[0]]=int(tokens[1])
+    return chromsize_dict
+
 def get_deeplift_scores_bed(args,score_func,input_references):
     import pysam
     import pandas as pd
@@ -84,6 +91,7 @@ def get_deeplift_scores_bed(args,score_func,input_references):
     num_entries=data.shape[0]
     bw=pyBigWig.open(args.outf,'w')
     bw=add_bigwig_header(bw,args.assembly)
+    chromsize_dict=get_chromsizes(args.chromsizes)
     while num_generated < num_entries:
         print(str(num_generated))
         start_index=num_generated
@@ -102,9 +110,12 @@ def get_deeplift_scores_bed(args,score_func,input_references):
                 summit_pos=start_val+summit_offset
                 start_val=summit_pos - args.flank
                 end_val=summit_pos+args.flank
-                if start_val<1:
-                    start_val=1
-                    end_val=1+2*args.flank 
+            if start_val<1:
+                start_val=1
+                end_val=1+2*args.flank
+            if end_val>chromsize_dict[chrom]:
+                end_val=chromsize_dict[chrom]-1
+                start_val=end_val-2*args.flank 
             try:
                 seq=ref.fetch(chrom,start_val,end_val)
                 seqs.append(seq)
@@ -134,6 +145,7 @@ def get_deeplift_scores_bed(args,score_func,input_references):
                 continue
         num_generated+=(end_index-start_index)
     bw.close()
+    return 
 def get_gradxinput_scores_bed(args,normed_grad):
     import pysam
     import pandas as pd
