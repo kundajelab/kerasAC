@@ -12,7 +12,8 @@ config = {
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict=kerasAC.predict:main',
                                          'kerasAC_curves=kerasAC.curves:main',
-                                         'kerasAC_interpret=kerasAC.interpret:main']},
+                                         'kerasAC_interpret=kerasAC.interpret:main',
+                                         'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main']},
     'name': 'kerasAC'
 }
 
