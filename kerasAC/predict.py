@@ -71,6 +71,72 @@ def get_predictions_sequential_hdf5(hdf5_source,batch_size,individual_task_outpu
         num_generated+=(end_index-start_index)
     return [predictions,None]
 
+def get_predictions_hammock(args,model):
+    import pysam
+    import pandas as pd
+    num_generated=0
+    ref=pysam.FastaFile(args.ref_fasta) 
+    data=pd.read_csv(args.data_hammock,header=None,sep='\t')
+    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
+    #iterate through batches and one-hot-encode on the fly
+    num_entries=data.shape[0]
+    predictions=None
+    all_names=[] 
+    while num_generated < num_entries:
+        print(str(num_generated))
+        start_index=num_generated
+        end_index=min([num_entries,start_index+args.batch_size])
+        seqs=[]
+        names=[]
+        for i in range(start_index,end_index):
+            cur_row=data.iloc[i]
+            chrom=cur_row[0]
+            start_val=cur_row[1]
+            end_val=cur_row[2]
+            peak_metadata=cur_row[3].split(',') 
+            peak_name=','.join([peak_metadata[-3],peak_metadata[-2]])
+            if args.center_on_summit==True:
+                summit_offset=int(peak_metadata[-1].split('[')[1].split(']')[0])
+                summit_pos=start_val+summit_offset
+                start_val=summit_pos - args.flank
+                end_val=summit_pos+args.flank
+            if start_val<1:
+                start_val=1
+                end_val=1+2*args.flank 
+            peak_name='\t'.join([str(i) for i in [chrom,start_val,end_val,peak_name]])
+            names.append(peak_name)
+            try:
+                seq=ref.fetch(chrom,start_val,end_val)
+            except:
+                continue
+            seqs.append(seq)
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        if (args.squeeze_input_for_gru==False):
+            #expand dimension of 1
+            x=np.expand_dims(seqs,1)
+        else:
+            x=seqs
+        try:
+            predictions_batch=model.predict(x)
+        except:
+            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
+        #add the batch predictions to the full set of predictions
+        if type(predictions)==type(None):
+            predictions=predictions_batch
+        elif type(predictions)==np.ndarray:
+            predictions=np.concatenate((predictions,predictions_batch),axis=0)
+            print(predictions.shape)
+        elif type(predictions)==type({}):
+            for key in predictions_batch:
+                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
+        else:
+            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
+            pdb.set_trace()
+        all_names=all_names+names 
+        num_generated+=(end_index-start_index)
+        
+    return [predictions,data,all_names]
+
 def get_predictions_bed(args,model):
     import pysam
     import pandas as pd
@@ -80,20 +146,38 @@ def get_predictions_bed(args,model):
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #iterate through batches and one-hot-encode on the fly
     num_entries=data.shape[0]
-    bed_entries=[(data.index[i]) for i in range(num_entries)]
-    seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
-    seqs=np.array([[ltrdict[x] for x in seq] for seq in seqs])
-    if (args.squeeze_input_for_gru==False):
-        #expand dimension of 1
-        x=np.expand_dims(seqs,1)
-    else:
-        x=seqs
-    print(x.shape) 
-    try:
-        predictions=model.predict(x)
-    except:
-        pdb.set_trace()
-    return [predictions,data]
+    predictions=None
+    while num_generated < num_entries:
+        print(str(num_generated))
+        start_index=num_generated
+        end_index=min([num_entries,start_index+args.batch_size])
+        bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
+        seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        if (args.squeeze_input_for_gru==False):
+            #expand dimension of 1
+            x=np.expand_dims(seqs,1)
+        else:
+            x=seqs
+        try:
+            predictions_batch=model.predict(x)
+        except:
+            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
+        #add the batch predictions to the full set of predictions
+        if type(predictions)==type(None):
+            predictions=predictions_batch
+        elif type(predictions)==np.ndarray:
+            predictions=np.concatenate((predictions,predictions_batch),axis=0)
+            print(predictions.shape)
+        elif type(predictions)==type({}):
+            for key in predictions_batch:
+                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
+        else:
+            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
+            pdb.set_trace() 
+        num_generated+=(end_index-start_index)
+    #TODO: implement functionality to store peak coordinates as the "names" output 
+    return [predictions,data,None]
 
 def get_predictions_variant(args,model):
     import pysam
@@ -112,9 +196,7 @@ def get_predictions_variant(args,model):
         start_pos=int(entry[1])-(args.flank)
         end_pos=int(entry[1])+args.flank
         seq=ref.fetch(entry[0],start_pos,end_pos)
-        seqs.append(seq)
-    
-        
+        seqs.append(seq)        
         alt_allele=entry[3]
         if alt_allele=="NA":
             #randomly insert another base
@@ -151,8 +233,9 @@ def parse_args():
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_hdf5',help='hdf5 file that stores the data -- validation hdf5 file')
+    parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
     parser.add_argument('--data_bed')
+    parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
     parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics',default=None)
@@ -166,6 +249,7 @@ def parse_args():
     parser.add_argument('--flank',default=500,type=int)
     parser.add_argument('--mask',default=10,type=int)
     parser.add_argument('--squeeze_input_for_gru',action='store_true')
+    parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     return parser.parse_args()
 
 def get_model(args):
@@ -177,8 +261,8 @@ def get_model(args):
     if args.w0!=None:
         w0=args.w0
         w1=args.w1
-        loss_function=get_weighted_binary_crossentropy(w0,w1)                
-        custom_objects["weighted_binary_crossentropy"]:loss_function
+        loss_function=get_weighted_binary_crossentropy(w0,w1)
+        custom_objects["weighted_binary_crossentropy"]=loss_function
     try:
         if args.yaml!=None:
             from keras.models import model_from_yaml
@@ -211,8 +295,10 @@ def get_predictions(args,model):
         predictions=get_predictions_bed(args,model)
     elif args.variant_bed!=None:
         predictions=get_predictions_variant(args,model)
+    elif args.data_hammock!=None:
+        predictions=get_predictions_hammock(args,model) 
     else:
-        raise Exception("input data must be specified by data_hdf5, data_bed, or data_variant")
+        raise Exception("input data must be specified by data_hdf5, data_bed, data_variant, or data_hammock")
     print('got model predictions')
     return predictions
 
@@ -237,8 +323,10 @@ def main():
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
         #also as text file
-        np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
-        np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
+        #np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
+        #np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
+        #if predictions[2]!=None:
+        #    np.savetxt(args.predictions_pickle+".names.txt",predictions[2],delimiter='\t')
 
     if args.accuracy_metrics_file!=None:
         print('computing accuracy metrics...')
