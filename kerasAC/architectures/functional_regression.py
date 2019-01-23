@@ -1,8 +1,8 @@
 import numpy as np ;
 from kerasAC.metrics import * 
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks, seed=1234):
+    np.random.seed(seed)
     import keras;
     from keras.layers import (
         Activation, AveragePooling1D, BatchNormalization,
