@@ -10,66 +10,9 @@ import keras
 from keras.losses import *
 from kerasAC.custom_losses import * 
 import random
-def get_predictions_hdf5(args,model):
-    data=h5py.File(args.data,'r')    
-    if args.sequential==True: 
-        inputs=data['X']['default_input_mode_name']
-        outputs=data['Y']['default_output_mode_name']
-        output_task_names=None
-        individual_task_output_shape=outputs.shape
-        predictions=get_predictions_hdf5_sequenctial(data,args.batch_size,individual_task_output_shape,output_task_names,model)[0]
-    else:
-        inputs=data['X']
-        outputs=data['Y'] 
-        output_task_names=outputs.keys()
-        individual_task_output_shape=outputs.values()[0].shape
-        predictions= get_preditions_hdf5_functional(data,args.batch_size,individual_task_output_shape,output_task_names,model)[0]
-    return [predictions,outputs]
+from .generators import *
+from .config import args_object_from_args_dict
 
-def get_predictions_hdf5_functional(hdf5_source,batch_size,individual_task_output_shape,output_task_names,model):
-    if output_task_names==None:
-        return get_predictions_sequential(hdf5_source,batch_size,individual_task_output_shape,model)
-    num_generated=0
-    total_entries=hdf5_source.values()[0].shape[0]
-
-    input_modes=hdf5_source.keys() 
-    print("total entries:"+str(total_entries))
-    predictions={}
-    for task in output_task_names:
-        predictions[task]=np.zeros(individual_task_output_shape)
-    print("initialized output dictionary for predictions")    
-    while num_generated < total_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([total_entries,start_index+batch_size])
-        x_batch={}  
-        for input_mode in input_modes: 
-            x_batch[input_mode] = hdf5_source[input_mode][start_index:end_index,:,:,500:1500]
-            x_batch=np.transpose(x_batch,axes=(0,1,3,2))
-        predictions_batch=model.predict(x_batch)
-        #add the predictions to the dictionary
-        for task in output_task_names:
-            predictions[task][start_index:end_index]=predictions_batch[task]
-        num_generated+=(end_index-start_index)
-    return [predictions,None]
-
-def get_predictions_sequential_hdf5(hdf5_source,batch_size,individual_task_output_shape,model):
-    num_generated=0
-    total_entries=hdf5_source.shape[0]
-    print("total entries:"+str(total_entries))
-    predictions=np.zeros(individual_task_output_shape)
-    print("initialized output dictionary for predictions")    
-    while num_generated < total_entries:
-        print(str(num_generated)) 
-        start_index=num_generated
-        end_index=min([total_entries,start_index+batch_size])
-        x_batch=hdf5_source[start_index:end_index,:,:,500:1500]
-        x_batch=np.transpose(x_batch,axes=(0,1,3,2))
-        predictions_batch=model.predict(x_batch)
-        #add the predictions to the dictionary
-        predictions[start_index:end_index]=predictions_batch
-        num_generated+=(end_index-start_index)
-    return [predictions,None]
 
 def get_predictions_hammock(args,model):
     import pysam
@@ -137,47 +80,16 @@ def get_predictions_hammock(args,model):
         
     return [predictions,data,all_names]
 
-def get_predictions_bed(args,model):
+def get_predictions(args,model):
     import pysam
     import pandas as pd
-    num_generated=0
-    ref=pysam.FastaFile(args.ref_fasta)
-    data=pd.read_csv(args.data_bed,header=0,sep='\t',index_col=[0,1,2])
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
-    #iterate through batches and one-hot-encode on the fly
-    num_entries=data.shape[0]
-    predictions=None
-    while num_generated < num_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([num_entries,start_index+args.batch_size])
-        bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
-        seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
-        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        if (args.squeeze_input_for_gru==False):
-            #expand dimension of 1
-            x=np.expand_dims(seqs,1)
-        else:
-            x=seqs
-        try:
-            predictions_batch=model.predict(x)
-        except:
-            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
-        #add the batch predictions to the full set of predictions
-        if type(predictions)==type(None):
-            predictions=predictions_batch
-        elif type(predictions)==np.ndarray:
-            predictions=np.concatenate((predictions,predictions_batch),axis=0)
-            print(predictions.shape)
-        elif type(predictions)==type({}):
-            for key in predictions_batch:
-                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
-        else:
-            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
-            pdb.set_trace() 
-        num_generated+=(end_index-start_index)
-    #TODO: implement functionality to store peak coordinates as the "names" output 
-    return [predictions,data,None]
+    test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms)
+    test_predictions=model.predict_generator(test_generator,
+                                             max_queue_size=args.max_queue_size,
+                                             workers=args.workers,
+                                             use_multiprocessing=True,
+                                             verbose=1)
+    return [predictions,test_generator.data,None]
 
 def get_predictions_variant(args,model):
     import pysam
@@ -234,7 +146,8 @@ def parse_args():
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
     parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
-    parser.add_argument('--data_bed')
+    parser.add_argument('--data_path')
+    parser.add_argument('--predict_chroms') 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
@@ -289,21 +202,18 @@ def get_model(args):
     return model
 
 def get_predictions(args,model):
-    if args.data_hdf5!=None:
-        predictions=get_predictions_hdf5(args,model)
-    elif args.data_bed!=None:
-        predictions=get_predictions_bed(args,model)
-    elif args.variant_bed!=None:
+    if args.variant_bed!=None:
         predictions=get_predictions_variant(args,model)
     elif args.data_hammock!=None:
         predictions=get_predictions_hammock(args,model) 
     else:
-        raise Exception("input data must be specified by data_hdf5, data_bed, data_variant, or data_hammock")
+        predictions=get_predictions(args,model) 
     print('got model predictions')
     return predictions
 
-def main():
-    args=parse_args()
+def predict(args):
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args) 
     
     #get the predictions
     if args.predictions_pickle_to_load!=None:
@@ -322,11 +232,6 @@ def main():
         with open(args.predictions_pickle,'wb') as handle:
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
-        #also as text file
-        #np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
-        #np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
-        #if predictions[2]!=None:
-        #    np.savetxt(args.predictions_pickle+".names.txt",predictions[2],delimiter='\t')
 
     if args.accuracy_metrics_file!=None:
         print('computing accuracy metrics...')
@@ -393,6 +298,12 @@ def main():
             outf.write('num_positive_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_positive_vals[key]])+'\n')
         for key in num_negative_vals.keys():
             outf.write('num_negative_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_negative_vals[key]])+'\n')
+
+
+def main():
+    args=parse_args()
+    predict(args) 
+
     
 
 if __name__=="__main__":

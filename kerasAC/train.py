@@ -4,13 +4,17 @@ import imp
 import argparse
 import numpy as np
 import h5py
-from kerasAC.create_generators import *
+from .generators import *
+from .config import args_object_from_args_dict
 
 def parse_args():
     parser=argparse.ArgumentParser()
+    parser.add_argument("--data_path")
+    parser.add_argument("--train_chroms",nargs="*",default=None)
+    parser.add_argument("--validation_chroms",nargs="*",default=None) 
     parser.add_argument("--train_path")
     parser.add_argument("--valid_path")
-    parser.add_argument("--model_output_file")
+    parser.add_argument("--model_hdf5")
     parser.add_argument("--batch_size",type=int,default=1000)
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--num_train",type=int,default=700000)
@@ -35,26 +39,34 @@ def parse_args():
     parser.add_argument("--tensorboard_logdir",default="logs")
     parser.add_argument("--squeeze_input_for_gru",action="store_true")
     parser.add_argument("--seed",type=int,default=1234)
-    parser.add_argument("--train_upsample", type=float, default=0.4)
-    parser.add_argument("--valid_upsample", type=float, default=0.2)
+    parser.add_argument("--train_upsample", type=float, default=None)
+    parser.add_argument("--valid_upsample", type=float, default=None)
+    parser.add_argument("--threads",type=int,default=1)
+    parser.add_argument("--max_queue_size",type=int,default=100)
     parser.add_argument("--save_weights", default=None)
     parser.add_argument('--w1',nargs="*", type=float, default=None)
     parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
 
+def args_object_from_args_dict(args_dict):
+    #create an argparse.Namespace from the dictionary of inputs 
+    args_object=argparse.Namespace()
+    #set the defaults
+    
+
 def fit_and_evaluate(model,train_gen,valid_gen,args):
-    model_output_path = args.model_output_file
+    model_output_path = args.model_hdf5
     from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
     checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1)
-    csvlogger = CSVLogger(args.model_output_file+".log", append = True)
+    csvlogger = CSVLogger(args.model_hdf5+".log", append = True)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
     if args.tensorboard==True:
         from keras.callbacks import TensorBoard
         #create the specified logdir
         import os
-        cur_logdir='/'.join([args.tensorboard_logdir,args.model_output_file+'.tb'])
+        cur_logdir='/'.join([args.tensorboard_logdir,args.model_hdf5+'.tb'])
         if not os.path.exists(cur_logdir):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
@@ -66,10 +78,13 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         validation_steps=args.num_valid/args.batch_size,
                         epochs=args.epochs,
                         verbose=1,
+                        multiprocessing=True,
+                        workers=args.threads,
+                        max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks)
     model.save_weights(model_output_path+".weights")
     architecture_string=model.to_json()
-    outf=open(args.model_output_file+".arch",'w')
+    outf=open(args.model_hdf5+".arch",'w')
     outf.write(architecture_string)
     print("complete!!")
 
@@ -88,8 +103,9 @@ def get_weights(bed_path, weights_path):
                 weight_file.write(" " + str(i))
     return w1,w0
 
-def main():
-    args=parse_args()
+def train(args):
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args)     
     w1=args.w1
     w0=args.w0
     if (args.weighted==True and (w1==None or w0==None)):
@@ -108,12 +124,24 @@ def main():
         print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
     print("compiled the model!")
-    train_generator=data_generator(args.train_path,args,args.train_upsample)
+    #train_generator=data_generator(args.train_path,args,args.train_upsample)
+    if args.train_upsample==None:
+        upsample=False
+        upsample_ratio=0
+    else:
+        upsample=True
+        upsample_ratio=args.upsample 
+    train_generator=DataGenerator(args.train_path,args.ref_fasta,upsample=upsample,upsample_ratio=upsample_ratio,chroms_to_use=args.train_chroms)
     print("generated training data generator!")
-    valid_generator=data_generator(args.valid_path,args,args.valid_upsample)
+    valid_generator=data_generator(args.valid_path,args.ref_fasta,upsample=upsample,upsample_ratio=upsample_ratio,chroms_to_use=args.validation_chroms)
     print("generated validation data generator!")
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
+
+def main():
+    args=parse_args()
+    train(args)
+    
 
 if __name__=="__main__":
     main()

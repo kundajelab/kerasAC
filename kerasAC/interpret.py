@@ -4,18 +4,20 @@ import pdb
 from deeplift.conversion import kerasapi_conversion as kc
 import numpy as np
 import pyBigWig
+from .config import args_object_from_args_dict
 
 def parse_args():
     parser=argparse.ArgumentParser(description="get gradient x input for a model")
     parser.add_argument("--model_hdf5")
     parser.add_argument("--w0",nargs="+",type=float)
     parser.add_argument("--w1",nargs="+",type=float)
-    parser.add_argument("--input_bed")
-    parser.add_argument("--outf")
+    parser.add_argument("--data_path")
+    parser.add_argument("--interpret_chroms",nargs="*") 
+    parser.add_argument("--interpretation_outf")
     parser.add_argument("--flank",default=None,type=int)
     parser.add_argument("--method",choices=['gradxinput','deeplift'],default="deeplift")
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
-    parser.add_argument('--ref',default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
+    parser.add_argument('--ref_fasta',default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     parser.add_argument('--task_id',type=int)
@@ -84,12 +86,12 @@ def get_deeplift_scores_bed(args,score_func,input_references):
     import pysam
     import pandas as pd
     num_generated=0
-    ref=pysam.FastaFile(args.ref) 
-    data=pd.read_csv(args.input_bed,header=None,sep='\t')
+    ref=pysam.FastaFile(args.ref_fasta) 
+    data=pd.read_csv(args.data_path,header=None,sep='\t')
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #iterate through batches and one-hot-encode on the fly
     num_entries=data.shape[0]
-    bw=pyBigWig.open(args.outf,'w')
+    bw=pyBigWig.open(args.interpretation_outf,'w')
     bw=add_bigwig_header(bw,args.assembly)
     chromsize_dict=get_chromsizes(args.chromsizes)
     while num_generated < num_entries:
@@ -155,7 +157,7 @@ def get_gradxinput_scores_bed(args,normed_grad):
     ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
     #iterate through batches and one-hot-encode on the fly
     num_entries=data.shape[0]
-    outf=open(args.outf,'w')
+    outf=open(args.interpretation_outf,'w')
     while num_generated < num_entries:
         print(str(num_generated))
         start_index=num_generated
@@ -197,9 +199,11 @@ def get_gradxinput_scores_bed(args,normed_grad):
             entry=[chroms[i],start_vals[i],end_vals[i],cur_scores[i]]
             outf.write('\t'.join([str(j) for j in entry])+'\n')
         num_generated+=(end_index-start_index)
-        
-def main():
-    args=parse_args()
+
+
+def interpret(args):
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args)
     if args.method=="deeplift":
         # get deeplift scores
         score_func=get_deeplift_function(args)
@@ -218,6 +222,10 @@ def main():
         normed_grad_times_inp = normed_gradient*inputs
     else:
         raise Exception("method must be one of 'deeplift' or 'gradxinput'")
+        
+def main():
+    args=parse_args()
+    interpret(args) 
     
 if __name__=="__main__":
     main()
