@@ -13,7 +13,8 @@ config = {
                                          'kerasAC_predict=kerasAC.predict:main',
                                          'kerasAC_curves=kerasAC.curves:main',
                                          'kerasAC_interpret=kerasAC.interpret:main',
-                                         'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main']},
+                                         'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main',
+                                         'kerasAC_cross_validate=kerasAC.cross_validate:main']},
     'name': 'kerasAC'
 }
 
