@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--num_train",type=int,default=700000)
     parser.add_argument("--num_valid",type=int,default=150000)
-    parser.add_argument("--ref_fasta",default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
+    parser.add_argument("--ref_fasta",default="/mnt/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     parser.add_argument("--w0_file",default=None)
     parser.add_argument("--w1_file",default=None)
     parser.add_argument("--weighted",action="store_true")
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument("--valid_upsample", type=float, default=None)
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument("--save_weights", default=None)
+    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
     parser.add_argument('--w1',nargs="*", type=float, default=None)
     parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
@@ -85,51 +85,19 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf.write(architecture_string)
     print("complete!!")
 
-def get_weights(bed_path, weights_path):
-    import pandas as pd
-    data=pd.read_csv(bed_path,header=0,sep='\t',index_col=[0,1,2])
-    w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
-    w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
-    if weights_path != None:
-        with open(weights_path, 'w') as weight_file:
-            weight_file.write("--w1")
-            for i in w1:
-                weight_file.write(" " + str(i))
-            weight_file.write(" \\" + "\n--w0")
-            for i in w0:
-                weight_file.write(" " + str(i))
-    return w1,w0
 
 def train(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args)
+
     w1=args.w1
     w0=args.w0
+
     if args.train_path==None:
         args.train_path=args.data_path
     if args.valid_path==None:
-        args.valid_path=args.data_path 
-    if (args.weighted==True and (w1==None or w0==None)):
-        if args.w1_file==None:
-            w1,w0=get_weights(args.train_path, args.save_weights)
-        else:
-            w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
-            w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
-        print("got weights!")
-    try:
-        if (args.architecture_from_file!=None):
-            architecture_module=imp.load_source('',args.architecture_from_file)
-        else:
-            architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
-    except:
-        print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,
-                                                                      w1,
-                                                                      args.init_weights,
-                                                                      args.from_checkpoint_weights,
-                                                                      args.from_checkpoint_arch,
-                                                                      args.num_tasks,args.seed)
-    print("compiled the model!")
+        args.valid_path=args.data_path
+
     if args.train_upsample==None:
         train_upsample=False
         train_upsample_ratio=0
@@ -140,7 +108,8 @@ def train(args):
                                   args.ref_fasta,
                                   upsample=train_upsample,
                                   upsample_ratio=train_upsample_ratio,
-                                  chroms_to_use=args.train_chroms)
+                                  chroms_to_use=args.train_chroms,
+                                  get_w1_w0=args.weighted)
     print("generated training data generator!")
     if args.valid_upsample==None:
         valid_upsample=False
@@ -154,6 +123,38 @@ def train(args):
                                    upsample_ratio=valid_upsample_ratio,
                                    chroms_to_use=args.validation_chroms)
     print("generated validation data generator!")
+        
+    if (args.weighted==True and (w1==None or w0==None)):
+        if args.w1_file==None:
+            w1=train_generator.w1
+            w0=train_generator.w0        
+            assert args.save_w1_w0 !=None
+            with open(args.save_w1_w0, 'w') as weight_file:
+                weight_file.write("--w1")
+                for i in w1:
+                    weight_file.write(" " + str(i))
+                weight_file.write(" \\" + "\n--w0")
+                for i in w0:
+                    weight_file.write(" " + str(i))
+        else:
+            w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
+            w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
+        print("got weights!")
+    
+    try:
+        if (args.architecture_from_file!=None):
+            architecture_module=imp.load_source('',args.architecture_from_file)
+        else:
+            architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
+    except:
+        raise Exception("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
+    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,
+                                                                      w1,
+                                                                      args.init_weights,
+                                                                      args.from_checkpoint_weights,
+                                                                      args.from_checkpoint_arch,
+                                                                      args.num_tasks,args.seed)
+    print("compiled the model!")
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
 

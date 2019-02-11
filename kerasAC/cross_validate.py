@@ -10,7 +10,7 @@ def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("--assembly",default="hg19")
     parser.add_argument("--data_path",help="path that stores training/validation/test data")
-    parser.add_argument("--model_hdf5")
+    parser.add_argument("--model_hdf5",required=True)
     parser.add_argument("--batch_size",type=int,default=1000)
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--ref_fasta",default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument("--weighted",action="store_true")
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
-    parser.add_argument("--num_tasks",type=int)
+    parser.add_argument("--num_tasks",required=True,type=int)
     parser.add_argument("--num_train",type=int,default=700000)
     parser.add_argument("--num_valid",type=int,default=150000)
 
@@ -40,14 +40,13 @@ def parse_args():
     parser.add_argument("--valid_upsample", type=float, default=None)
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument("--save_weights", default=None)
+    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
     parser.add_argument('--w1',nargs="*", type=float, default=None)
     parser.add_argument('--w0',nargs="*", type=float, default=None)
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
-    parser.add_argument('--predict_chroms') 
+    parser.add_argument('--predict_chroms',default=None) 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
@@ -58,7 +57,7 @@ def parse_args():
     parser.add_argument('--mask',default=10,type=int)
     parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     parser.add_argument("--interpret_chroms",nargs="*") 
-    parser.add_argument("--interpretation_outf")
+    parser.add_argument("--interpretation_outf",default=None)
     parser.add_argument("--method",choices=['gradxinput','deeplift'],default="deeplift")
     parser.add_argument('--task_id',type=int)
     parser.add_argument('--chromsizes',default='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes')    
@@ -74,9 +73,9 @@ def cross_validate(args):
         raise Exception("Unsupported genome assembly:"+args.assembly+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
     args_dict=vars(args)
     print(args_dict) 
-    base_model_file=args_dict['model_hdf5']
-    base_accuracy_file=args_dict['accuracy_metrics_file']
-    base_interpretation=args_dict['interpretation_outf'] 
+    base_model_file=str(args_dict['model_hdf5'])
+    base_accuracy_file=str(args_dict['accuracy_metrics_file'])
+    base_interpretation=str(args_dict['interpretation_outf'])
 
 
     for split in splits[args.assembly]:

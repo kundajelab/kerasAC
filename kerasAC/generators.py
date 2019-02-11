@@ -8,6 +8,12 @@ import pysam
 from kerasAC.util import ltrdict
 import threading 
 
+def get_weights(data):
+    w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
+    w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
+    return w1,w0
+    
+
 def dinuc_shuffle(seq):
     #get list of dinucleotides
     nucs=[]
@@ -53,12 +59,12 @@ def open_data_file(data_path,tasks,chroms_to_use):
     print("loaded labels") 
     if chroms_to_use!=None:
         data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
-    print("filtered on chroms_to_use") 
+    print("filtered on chroms_to_use")
     return data 
 
 #use wrappers for keras Sequence generator class to allow batch shuffling upon epoch end
 class DataGenerator(Sequence):
-    def __init__(self,data_path,ref_fasta,batch_size=128,add_revcomp=True,tasks=None,shuffled_ref_negatives=False,upsample=True,upsample_ratio=0.1,chroms_to_use=None):
+    def __init__(self,data_path,ref_fasta,batch_size=128,add_revcomp=True,tasks=None,shuffled_ref_negatives=False,upsample=True,upsample_ratio=0.1,chroms_to_use=None,get_w1_w0=False):
         self.lock = threading.Lock()        
         self.batch_size=batch_size
         #decide if reverse complement should be used
@@ -77,7 +83,11 @@ class DataGenerator(Sequence):
         self.ref_fasta=ref_fasta
 
         self.data=open_data_file(data_path,tasks,chroms_to_use)
-        
+        if get_w1_w0==True:
+            w1,w0=get_weights(self.data)
+            self.w1=w1
+            self.w0=w0
+            print(self.w1)
         self.indices=np.arange(self.data.shape[0])
         num_indices=self.indices.shape[0]
         self.add_revcomp=add_revcomp

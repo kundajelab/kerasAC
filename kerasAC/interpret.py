@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument("--w1",nargs="+",type=float)
     parser.add_argument("--data_path")
     parser.add_argument("--interpret_chroms",nargs="*") 
-    parser.add_argument("--interpretation_outf")
+    parser.add_argument("--interpretation_outf",default=None)
     parser.add_argument("--flank",default=None,type=int)
     parser.add_argument("--method",choices=['gradxinput','deeplift'],default="deeplift")
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
