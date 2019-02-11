@@ -4,6 +4,7 @@ from .train import *
 from .predict import *
 from .interpret import * 
 import argparse
+import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -19,6 +20,9 @@ def parse_args():
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
     parser.add_argument("--num_tasks",type=int)
+    parser.add_argument("--num_train",type=int,default=700000)
+    parser.add_argument("--num_valid",type=int,default=150000)
+
     #add functionality to train on individuals' allele frequencies
     parser.add_argument("--vcf_file",default=None)
     parser.add_argument("--global_vcf",action="store_true")
@@ -69,6 +73,7 @@ def cross_validate(args):
     if args.assembly not in splits:
         raise Exception("Unsupported genome assembly:"+args.assembly+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
     args_dict=vars(args)
+    print(args_dict) 
     base_model_file=args_dict['model_hdf5']
     base_accuracy_file=args_dict['accuracy_metrics_file']
     base_interpretation=args_dict['interpretation_outf'] 

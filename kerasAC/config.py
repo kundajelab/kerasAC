@@ -1,5 +1,5 @@
 import argparse
-
+import pdb 
 def args_object_from_args_dict(args_dict):
     #create an argparse.Namespace from the dictionary of inputs
     args_object=argparse.Namespace()
@@ -25,6 +25,8 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['architecture_from_file']=None
     vars(args_object)['tensorborad_logdir']='logs'
     vars(args_object)['seed']=1234
+    vars(args_object)['train_path']=None
+    vars(args_object)['valid_path']=None 
     vars(args_object)['train_upsample']=None
     vars(args_object)['valid_upsample']=None
     vars(args_object)['threads']=1
@@ -34,7 +36,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['w0']=None    
     
     #prediction
-    vars(args_boject)['predict_chroms']=None
+    vars(args_object)['predict_chroms']=None
     vars(args_object)['prediction_pickle']=None
     vars(args_object)['accuracy_metrics_file']=None
     vars(args_object)['predictions_pickle_to_load']=None
@@ -51,7 +53,6 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['method']='deeplift'
     vars(args_object)['background_freqs']=None
     vars(args_object)['chromsizes']="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes"
-    
     for key in args_dict:
         vars(args_object)[key]=args_dict[key]
     args=args_object

@@ -6,6 +6,7 @@ import numpy as np
 import h5py
 from .generators import *
 from .config import args_object_from_args_dict
+import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -48,10 +49,6 @@ def parse_args():
     parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
 
-def args_object_from_args_dict(args_dict):
-    #create an argparse.Namespace from the dictionary of inputs 
-    args_object=argparse.Namespace()
-    #set the defaults
     
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
@@ -78,7 +75,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         validation_steps=args.num_valid/args.batch_size,
                         epochs=args.epochs,
                         verbose=1,
-                        multiprocessing=True,
+                        use_multiprocessing=True,
                         workers=args.threads,
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks)
@@ -105,9 +102,13 @@ def get_weights(bed_path, weights_path):
 
 def train(args):
     if type(args)==type({}):
-        args=args_object_from_args_dict(args)     
+        args=args_object_from_args_dict(args)
     w1=args.w1
     w0=args.w0
+    if args.train_path==None:
+        args.train_path=args.data_path
+    if args.valid_path==None:
+        args.valid_path=args.data_path 
     if (args.weighted==True and (w1==None or w0==None)):
         if args.w1_file==None:
             w1,w0=get_weights(args.train_path, args.save_weights)
@@ -122,18 +123,36 @@ def train(args):
             architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
         print("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,w1,args.init_weights,args.from_checkpoint_weights,args.from_checkpoint_arch,args.num_tasks,args.seed)
+    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,
+                                                                      w1,
+                                                                      args.init_weights,
+                                                                      args.from_checkpoint_weights,
+                                                                      args.from_checkpoint_arch,
+                                                                      args.num_tasks,args.seed)
     print("compiled the model!")
-    #train_generator=data_generator(args.train_path,args,args.train_upsample)
     if args.train_upsample==None:
-        upsample=False
-        upsample_ratio=0
+        train_upsample=False
+        train_upsample_ratio=0
     else:
-        upsample=True
-        upsample_ratio=args.upsample 
-    train_generator=DataGenerator(args.train_path,args.ref_fasta,upsample=upsample,upsample_ratio=upsample_ratio,chroms_to_use=args.train_chroms)
+        train_upsample=True
+        train_upsample_ratio=args.train_upsample 
+    train_generator=DataGenerator(args.train_path,
+                                  args.ref_fasta,
+                                  upsample=train_upsample,
+                                  upsample_ratio=train_upsample_ratio,
+                                  chroms_to_use=args.train_chroms)
     print("generated training data generator!")
-    valid_generator=data_generator(args.valid_path,args.ref_fasta,upsample=upsample,upsample_ratio=upsample_ratio,chroms_to_use=args.validation_chroms)
+    if args.valid_upsample==None:
+        valid_upsample=False
+        valid_upsample_ratio=0
+    else:
+        valid_upsample=True
+        valid_upsample_ratio=args.valid_upsample
+    valid_generator=DataGenerator(args.valid_path,
+                                   args.ref_fasta,
+                                   upsample=valid_upsample,
+                                   upsample_ratio=valid_upsample_ratio,
+                                   chroms_to_use=args.validation_chroms)
     print("generated validation data generator!")
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)

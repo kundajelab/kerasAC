@@ -1,4 +1,5 @@
 from keras.utils import Sequence
+import pdb 
 import pandas as pd
 import numpy as np
 import random
@@ -51,7 +52,7 @@ def open_data_file(data_path,tasks,chroms_to_use):
             data=pd.read_csv(data_path,header=0,sep='\t',usecols=[chrom_col,start_col,end_col]+tasks,index_col=[0,1,2])
     print("loaded labels") 
     if chroms_to_use!=None:
-        data=data[data['CHR'] in chroms_to_use]
+        data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
     print("filtered on chroms_to_use") 
     return data 
 
