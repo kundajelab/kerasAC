@@ -1,5 +1,6 @@
 import numpy as np ;
 from kerasAC.metrics import * 
+from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,num_tasks,seed):
     np.random.seed(seed)
@@ -85,5 +86,5 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
         loss="binary_crossentropy"
-    model.compile(optimizer=adam,loss=loss,metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    model.compile(optimizer=adam,loss=loss,metrics=[tpr, tnr, fpr, fnr, precision, f1])
     return model
