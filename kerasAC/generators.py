@@ -5,7 +5,7 @@ import numpy as np
 import random
 import math 
 import pysam
-from kerasAC.util import ltrdict
+from .util import ltrdict
 import threading 
 
 def get_weights(data):

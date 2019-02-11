@@ -1,6 +1,10 @@
-import kerasAC.metrics
-import kerasAC.activations 
-from kerasAC.accuracy_metrics import *
+from .metrics import positive_accuracy, negative_accuracy, precision, recall
+from .activations import softMaxAxis1
+from .generators import *
+from .config import args_object_from_args_dict
+from .accuracy_metrics import *
+from .custom_losses import *
+from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
 import argparse
 import yaml 
 import h5py 
@@ -8,11 +12,21 @@ import pickle
 import numpy as np 
 import keras 
 from keras.losses import *
-from kerasAC.custom_losses import * 
-import random
-from .generators import *
-from .config import args_object_from_args_dict
 
+import random
+
+def get_weights(args):
+    w1=None
+    w0=None
+    if args.w1_w0_file!=None:
+        w1_w0=np.loadtxt(args.w1_w0_file)
+        w1=w1_w0[:,0]
+        w0=w1_w0[:,1]
+    if args.w1!=None:
+        w1=args.w1
+    if args.w0!=None:
+        w0=args.w0 
+    return w1,w0
 
 def get_predictions_hammock(args,model):
     import pysam
@@ -80,13 +94,13 @@ def get_predictions_hammock(args,model):
         
     return [predictions,data,all_names]
 
-def get_predictions(args,model):
+def get_predictions_basic(args,model):
     import pysam
     import pandas as pd
     test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms)
     test_predictions=model.predict_generator(test_generator,
                                              max_queue_size=args.max_queue_size,
-                                             workers=args.workers,
+                                             workers=args.threads,
                                              use_multiprocessing=True,
                                              verbose=1)
     return [predictions,test_generator.data,None]
@@ -159,6 +173,7 @@ def parse_args():
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--w1',nargs="*",type=float)
     parser.add_argument('--w0',nargs="*",type=float)
+    parser.add_argument("--w1_w0_file",default=None)
     parser.add_argument('--flank',default=500,type=int)
     parser.add_argument('--mask',default=10,type=int)
     parser.add_argument('--squeeze_input_for_gru',action='store_true')
@@ -166,39 +181,44 @@ def parse_args():
     return parser.parse_args()
 
 def get_model(args):
-    custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
-                    "negative_accuracy":kerasAC.metrics.negative_accuracy,
-                    "precision":kerasAC.metrics.precision,
-                    "recall":kerasAC.metrics.recall,
-                    "softMaxAxis1":kerasAC.activations.softMaxAxis1}
-    if args.w0!=None:
-        w0=args.w0
-        w1=args.w1
+    custom_objects={"positive_accuracy":positive_accuracy,
+                    "negative_accuracy":negative_accuracy,
+                    "precision":precision,
+                    "recall":recall,
+                    "softMaxAxis1":softMaxAxis1,
+                    "tpr":tpr,
+                    "tnr":tnr,
+                    "fpr":fpr,
+                    "fnr":fnr,
+                    "precision":precision,
+                    "f1":f1}
+    w1,w0=get_weights(args)
+    if type(w1)==np.ndarray: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)
         custom_objects["weighted_binary_crossentropy"]=loss_function
-    try:
-        if args.yaml!=None:
-            from keras.models import model_from_yaml
-            #load the model architecture from yaml
-            yaml_string=open(args.yaml,'r').read()
-            model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
-            #load the model weights
-            model.load_weights(args.weights)
-        elif args.json!=None:
-            from keras.models import model_from_json
-            #load the model architecture from json
-            json_string=open(args.json,'r').read()
-            model=model_from_json(json_string,custom_objects=custom_objects)
-            model.load_weights(args.weights)
-        elif args.model_hdf5!=None: 
-            #load from the hdf5
-            from keras.models import load_model
-            model=load_model(args.model_hdf5,custom_objects=custom_objects)
-        print("got model architecture")
-        print("loaded model weights")        
+#    try:
+    if args.yaml!=None:
+        from keras.models import model_from_yaml
+        #load the model architecture from yaml
+        yaml_string=open(args.yaml,'r').read()
+        model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
+        #load the model weights
+        model.load_weights(args.weights)
+    elif args.json!=None:
+        from keras.models import model_from_json
+        #load the model architecture from json
+        json_string=open(args.json,'r').read()
+        model=model_from_json(json_string,custom_objects=custom_objects)
+        model.load_weights(args.weights)
+    elif args.model_hdf5!=None: 
+        #load from the hdf5
+        from keras.models import load_model
+        model=load_model(args.model_hdf5,custom_objects=custom_objects)
+    print("got model architecture")
+    print("loaded model weights")        
         
-    except: 
-        print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
+#    except: 
+#        print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
     return model
 
 def get_predictions(args,model):
@@ -207,7 +227,7 @@ def get_predictions(args,model):
     elif args.data_hammock!=None:
         predictions=get_predictions_hammock(args,model) 
     else:
-        predictions=get_predictions(args,model) 
+        predictions=get_predictions_basic(args,model) 
     print('got model predictions')
     return predictions
 

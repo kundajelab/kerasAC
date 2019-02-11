@@ -14,9 +14,12 @@ def parse_args():
     parser.add_argument("--batch_size",type=int,default=1000)
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
-    parser.add_argument("--w0_file",default=None)
-    parser.add_argument("--w1_file",default=None)
+    parser.add_argument("--w1_w0_file",default=None)
+    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
     parser.add_argument("--weighted",action="store_true")
+    parser.add_argument('--w1',nargs="*", type=float, default=None)
+    parser.add_argument('--w0',nargs="*", type=float, default=None)
+
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
     parser.add_argument("--num_tasks",required=True,type=int)
@@ -40,9 +43,6 @@ def parse_args():
     parser.add_argument("--valid_upsample", type=float, default=None)
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
-    parser.add_argument('--w1',nargs="*", type=float, default=None)
-    parser.add_argument('--w0',nargs="*", type=float, default=None)
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
@@ -92,10 +92,12 @@ def cross_validate(args):
            
         #set the training arguments specific to this fold 
         args_dict['model_hdf5']=base_model_file+"."+str(split)
-        print("Training model") 
-        train(args_dict)
-
+        #print("Training model") 
+        #train(args_dict)
+        
         #set the prediction arguments specific to this fold
+        if args.save_w1_w0!=None:
+            args_dict["w1_w0_file"]=args.save_w1_w0 
         args_dict['accuracy_metric_file']=base_accuracy_file+"."+str(split)
         args_dict['predict_chroms']=test_chroms
         print("Calculating predictions on the test fold") 

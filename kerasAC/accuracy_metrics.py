@@ -1,7 +1,7 @@
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score
 import numpy as np
-import kerasAC.util 
+import .util import enum 
 from collections import OrderedDict, defaultdict
 import sys 
 import pdb
@@ -199,7 +199,7 @@ def recall_at_fdr_function(predictions,true_y,thresh):
     return recall_at_fdr_vals
 
 
-AccuracyStats = kerasAC.util.enum(
+AccuracyStats = enum(
     auROC="auROC",
     auPRC="auPRC",
     balanced_accuracy="balanced_accuracy",

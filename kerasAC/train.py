@@ -21,8 +21,10 @@ def parse_args():
     parser.add_argument("--num_train",type=int,default=700000)
     parser.add_argument("--num_valid",type=int,default=150000)
     parser.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
-    parser.add_argument("--w0_file",default=None)
-    parser.add_argument("--w1_file",default=None)
+    parser.add_argument('--w1',nargs="*", type=float, default=None)
+    parser.add_argument('--w0',nargs="*", type=float, default=None)
+    parser.add_argument("--w1_w0_file",default=None)
+    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
     parser.add_argument("--weighted",action="store_true")
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
@@ -44,12 +46,26 @@ def parse_args():
     parser.add_argument("--valid_upsample", type=float, default=None)
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
-    parser.add_argument('--w1',nargs="*", type=float, default=None)
-    parser.add_argument('--w0',nargs="*", type=float, default=None)
     return parser.parse_args()
 
-    
+def get_weights(args,train_generator):
+    w1=args.w1
+    w0=args.w0
+    w1_w0_file=args.w1_w0_file
+    if (args.weighted==True and (w1==None or w0==None) ):
+        if args.w1_w0_file==None:
+            w1=train_generator.w1
+            w0=train_generator.w0        
+            assert args.save_w1_w0 !=None
+            with open(args.save_w1_w0, 'w') as weight_file:
+                for i in range(len(w1)):
+                    weight_file.write(str(w1[i])+'\t'+str(w0[i])+'\n')
+        else:
+            w1_w0=np.loadtxt(args.w1_w0_file)
+            w1=list(w1_w0[:,0])
+            w0=list(w1_w0[:,1]) 
+        print("got weights!")
+    return w1,w0
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_hdf5
@@ -90,9 +106,6 @@ def train(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args)
 
-    w1=args.w1
-    w0=args.w0
-
     if args.train_path==None:
         args.train_path=args.data_path
     if args.valid_path==None:
@@ -123,23 +136,7 @@ def train(args):
                                    upsample_ratio=valid_upsample_ratio,
                                    chroms_to_use=args.validation_chroms)
     print("generated validation data generator!")
-        
-    if (args.weighted==True and (w1==None or w0==None)):
-        if args.w1_file==None:
-            w1=train_generator.w1
-            w0=train_generator.w0        
-            assert args.save_w1_w0 !=None
-            with open(args.save_w1_w0, 'w') as weight_file:
-                weight_file.write("--w1")
-                for i in w1:
-                    weight_file.write(" " + str(i))
-                weight_file.write(" \\" + "\n--w0")
-                for i in w0:
-                    weight_file.write(" " + str(i))
-        else:
-            w0=[float(i) for i in open(args.w0_file,'r').read().strip().split('\n')]
-            w1=[float(i) for i in open(args.w1_file,'r').read().strip().split('\n')]
-        print("got weights!")
+    w1,w0=get_weights(args,train_generator)
     
     try:
         if (args.architecture_from_file!=None):
