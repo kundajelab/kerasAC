@@ -61,7 +61,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['batch_size']=1000
     vars(args_object)['num_train']=700000
     vars(args_object)['num_valid']=150000
-    vars(args_object)['ref_fasta']='/mnt/annotations/by_release/hg19.GRCh37/hg19.genome.fa'
+    vars(args_object)['ref_fasta']='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa'
     vars(args_object)['init_weights']=None
     vars(args_object)['w0_file']=None
     vars(args_object)['w1_file']=None

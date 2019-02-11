@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--num_train",type=int,default=700000)
     parser.add_argument("--num_valid",type=int,default=150000)
-    parser.add_argument("--ref_fasta",default="/mnt/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
+    parser.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     parser.add_argument("--w0_file",default=None)
     parser.add_argument("--w1_file",default=None)
     parser.add_argument("--weighted",action="store_true")

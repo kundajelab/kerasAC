@@ -155,7 +155,7 @@ def parse_args():
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
     parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
-    parser.add_argument('--ref_fasta',default="/mnt/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
+    parser.add_argument('--ref_fasta',default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--w1',nargs="*",type=float)
     parser.add_argument('--w0',nargs="*",type=float)
