@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument("--model_hdf5",required=True)
     parser.add_argument("--batch_size",type=int,default=1000)
     parser.add_argument("--init_weights",default=None)
-    parser.add_argument("--ref_fasta",default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
+    parser.add_argument("--ref_fasta",default="/mnt/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     parser.add_argument("--w0_file",default=None)
     parser.add_argument("--w1_file",default=None)
     parser.add_argument("--weighted",action="store_true")
