@@ -98,11 +98,11 @@ def get_predictions_basic(args,model):
     import pysam
     import pandas as pd
     test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms)
-    test_predictions=model.predict_generator(test_generator,
-                                             max_queue_size=args.max_queue_size,
-                                             workers=args.threads,
-                                             use_multiprocessing=True,
-                                             verbose=1)
+    predictions=model.predict_generator(test_generator,
+                                        max_queue_size=args.max_queue_size,
+                                        workers=args.threads,
+                                        use_multiprocessing=True,
+                                        verbose=1)
     return [predictions,test_generator.data,None]
 
 def get_predictions_variant(args,model):
@@ -193,7 +193,7 @@ def get_model(args):
                     "precision":precision,
                     "f1":f1}
     w1,w0=get_weights(args)
-    if type(w1)==np.ndarray: 
+    if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)
         custom_objects["weighted_binary_crossentropy"]=loss_function
 #    try:

@@ -1,7 +1,7 @@
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score
 import numpy as np
-import .util import enum 
+from .util import enum 
 from collections import OrderedDict, defaultdict
 import sys 
 import pdb

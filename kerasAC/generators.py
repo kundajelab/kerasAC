@@ -1,12 +1,13 @@
 from keras.utils import Sequence
-import pdb 
 import pandas as pd
 import numpy as np
 import random
 import math 
 import pysam
 from .util import ltrdict
-import threading 
+import threading
+import pickle
+import pdb
 
 def get_weights(data):
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
@@ -39,7 +40,23 @@ def revcomp(seq):
             rc.append(base)
     return ''.join(rc)
 
-
+def get_probability_thresh_for_precision(truth,predictions,precision_thresh):
+    from sklearn.metrics import precision_recall_curve
+    num_tasks=truth.shape[1]
+    precision_thresholds=[] 
+    for task_index in range(num_tasks):
+        truth_task=truth.iloc[:,task_index]
+        pred_task=predictions[:,task_index]
+        non_ambig=truth_task!=-1        
+        precision,recall,threshold=precision_recall_curve(truth_task[non_ambig],pred_task[non_ambig])
+        threshold=np.insert(threshold,threshold.shape[0],1)
+        merged_prc=pd.DataFrame({'precision':precision,
+                                 'recall':recall,
+                                 'threshold':threshold})
+        precision_thresholds.append(np.min(merged_prc[merged_prc['precision']>=precision_thresh]['threshold']))
+    print(precision_thresholds) 
+    return precision_thresholds
+    
 def open_data_file(data_path,tasks,chroms_to_use):
     if data_path.endswith('.hdf5'):
         if tasks==None:
@@ -61,6 +78,47 @@ def open_data_file(data_path,tasks,chroms_to_use):
         data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
     print("filtered on chroms_to_use")
     return data 
+
+class TruePosGenerator(Sequence):
+    def __init__(self,data_pickle,ref_fasta,batch_size=128,precision_thresh=0.9):
+        f=open(data_pickle,'rb')
+        data=pickle.load(f)
+        self.predictions=data[0]
+        self.labels=data[1]
+        self.columns=self.labels.columns
+        #calculate prediction probability cutoff to achieve the specified precision threshold
+        self.prob_thresholds=get_probability_thresh_for_precision(self.labels,self.predictions,precision_thresh)
+        truth_pred_product=self.labels*(self.predictions>=self.prob_thresholds)
+        true_pos_rows=truth_pred_product[truth_pred_product.max(axis=1)>0]
+        self.data=true_pos_rows
+        self.indices=np.arange(self.data.shape[0])
+        self.add_revcomp=False
+        self.ref_fasta=ref_fasta
+        self.lock=threading.Lock()
+        self.batch_size=batch_size
+
+        
+    def __len__(self):
+        return math.ceil(self.data.shape[0]/self.batch_size)
+
+    def __getitem__(self,idx):
+        with self.lock:
+            self.ref=pysam.FastaFile(self.ref_fasta)
+            return self.get_basic_batch(idx)
+        
+    def get_basic_batch(self,idx):
+        #get seq positions
+        inds=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
+        bed_entries=self.data.index[inds]
+        #get sequences
+        seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
+        #one-hot-encode the fasta sequences 
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=np.expand_dims(seqs,1)
+        #extract the labels at the current batch of indices 
+        y_batch=np.asarray(self.data.iloc[inds])
+        return (bed_entries,x_batch,y_batch)    
+
 
 #use wrappers for keras Sequence generator class to allow batch shuffling upon epoch end
 class DataGenerator(Sequence):
@@ -112,7 +170,7 @@ class DataGenerator(Sequence):
             np.random.shuffle(self.neg_indices)
             
     def __len__(self):
-        return math.floor(self.data.shape[0]/self.batch_size)
+        return math.ceil(self.data.shape[0]/self.batch_size)
 
     def __getitem__(self,idx):
         with self.lock:
@@ -199,7 +257,7 @@ class DataGenerator(Sequence):
         #add in the labels for the reverse complement sequences, if used 
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
-        return (x_batch,y_batch)    
+        return (x_batch,y_batch)
     
     def on_epoch_end(self):
         #if upsampling is being used, shuffle the positive and negative indices 

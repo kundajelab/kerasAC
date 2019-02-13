@@ -71,7 +71,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_hdf5
     from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
     checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
-    earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1)
+    earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
     csvlogger = CSVLogger(args.model_hdf5+".log", append = True)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]

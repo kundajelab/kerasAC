@@ -12,8 +12,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['validation_chroms']=None 
     vars(args_object)['ref_fasta']='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa'
     vars(args_object)['init_weights']=None
-    vars(args_object)['w0_file']=None
-    vars(args_object)['w1_file']=None
+    vars(args_object)['w1_w0_file']=None
     vars(args_object)['squeeze_input_for_gru']=False 
     vars(args_object)['from_checkpoint_weights']=None
     vars(args_object)['from_checkpoint_arch']=None
@@ -33,7 +32,10 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['max_queue_size']=100
     vars(args_object)['save_weights']=None
     vars(args_object)['w1']=None
-    vars(args_object)['w0']=None    
+    vars(args_object)['w0']=None
+    vars(args_object)['yaml']=None
+    vars(args_object)['json']=None
+    
     
     #prediction
     vars(args_object)['predict_chroms']=None
@@ -45,7 +47,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['flank']=500
     vars(args_object)['mask']=10
     vars(args_object)['center_on_summit']=False
-    
+
     #cross-validation
     vars(args_object)['assembly']='hg19'
 
@@ -53,6 +55,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['method']='deeplift'
     vars(args_object)['background_freqs']=None
     vars(args_object)['chromsizes']="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes"
+    vars(args_object)['precision_thresh']=0.90
     for key in args_dict:
         vars(args_object)[key]=args_dict[key]
     args=args_object

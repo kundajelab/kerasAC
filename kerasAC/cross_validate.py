@@ -7,7 +7,7 @@ import argparse
 import pdb
 
 def parse_args():
-    parser=argparse.ArgumentParser()
+    parser=argparse.ArgumentParser(add_help=True)
     parser.add_argument("--assembly",default="hg19")
     parser.add_argument("--data_path",help="path that stores training/validation/test data")
     parser.add_argument("--model_hdf5",required=True)
@@ -76,6 +76,7 @@ def cross_validate(args):
     base_model_file=str(args_dict['model_hdf5'])
     base_accuracy_file=str(args_dict['accuracy_metrics_file'])
     base_interpretation=str(args_dict['interpretation_outf'])
+    base_predictions_pickle=str(args_dict['predictions_pickle'])
 
 
     for split in splits[args.assembly]:
@@ -92,13 +93,14 @@ def cross_validate(args):
            
         #set the training arguments specific to this fold 
         args_dict['model_hdf5']=base_model_file+"."+str(split)
-        #print("Training model") 
-        #train(args_dict)
+        print("Training model") 
+        train(args_dict)
         
         #set the prediction arguments specific to this fold
         if args.save_w1_w0!=None:
             args_dict["w1_w0_file"]=args.save_w1_w0 
-        args_dict['accuracy_metric_file']=base_accuracy_file+"."+str(split)
+        args_dict['accuracy_metrics_file']=base_accuracy_file+"."+str(split)
+        args_dict['predictions_pickle']=base_predictions_pickle+"."+str(split) 
         args_dict['predict_chroms']=test_chroms
         print("Calculating predictions on the test fold") 
         predict(args_dict)
