@@ -61,7 +61,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         #seq_preds = Dropout(drop_rate)(seq_preds)
     #seq_preds = Dropout(final_dropout)(seq_preds)
     seq_preds = Dense(num_tasks, name=final_layer_name)(seq_preds)
-    seq_preds = Activation('relu')(seq_preds)
+    seq_preds = Activation('sigmoid')(seq_preds)
     random_weight_model = Model(inputs=list(keras_inputs.values()), outputs=seq_preds)
 
     model = random_weight_model
