@@ -4,7 +4,8 @@ def args_object_from_args_dict(args_dict):
     #create an argparse.Namespace from the dictionary of inputs
     args_object=argparse.Namespace()
     #set the defaults for training/prediction/interpretation/cross-validation
-    #training 
+    #training
+    vars(args_object)['multigpu']=False
     vars(args_object)['batch_size']=1000
     vars(args_object)['num_train']=700000
     vars(args_object)['num_valid']=150000

@@ -10,6 +10,7 @@ import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser()
+    parser.add_argument("--multi_gpu",action="store_true",default=False) 
     parser.add_argument("--data_path")
     parser.add_argument("--train_chroms",nargs="*",default=None)
     parser.add_argument("--validation_chroms",nargs="*",default=None) 
@@ -70,6 +71,7 @@ def get_weights(args,train_generator):
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_hdf5
     from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
+    from keras.utils import multi_gpu_model
     checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
     csvlogger = CSVLogger(args.model_hdf5+".log", append = True)
@@ -151,6 +153,12 @@ def train(args):
                                                                       args.from_checkpoint_weights,
                                                                       args.from_checkpoint_arch,
                                                                       args.num_tasks,args.seed)
+    if args.multi_gpu==True:
+        try:
+            model=multi_gpu_model(model)
+            print("Training on all available GPU's. Set args.multi_gpu = False to avoid this") 
+        except:
+            pass 
     print("compiled the model!")
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)

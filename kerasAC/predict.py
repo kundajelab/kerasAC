@@ -155,13 +155,15 @@ def get_predictions_variant(args,model):
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model yaml & weights files & a dataset, get model predictions and accuracy metrics')
+    parser.add_argument("--threads",type=int,default=1)
+    parser.add_argument("--max_queue_size",type=int,default=100)
     parser.add_argument('--model_hdf5',help='hdf5 file that stores the model')
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
     parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
     parser.add_argument('--data_path',required=True)
-    parser.add_argument('--predict_chroms',default=None) 
+    parser.add_argument('--predict_chroms',nargs="*",default=None) 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',required=True)

@@ -7,7 +7,7 @@ hg19_splits[0]={'test':['chr1'],
 hg19_splits[1]={'test':['chr19','chr2'],
            'valid':['chr1']}
 hg19_splits[2]={'test':['chr3','chr20'],
-           'valid':['chr1']}
+           'valid':['chr19','chr2']}
 hg19_splits[3]={'test':['chr13','chr6'],
            'valid':['chr3','chr20']}
 hg19_splits[4]={'test':['chr5','chr16','chrY'],

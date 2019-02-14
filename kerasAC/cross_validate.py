@@ -8,6 +8,7 @@ import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--multi_gpu",action="store_true",default=False)
     parser.add_argument("--assembly",default="hg19")
     parser.add_argument("--data_path",help="path that stores training/validation/test data")
     parser.add_argument("--model_hdf5",required=True)
@@ -60,7 +61,8 @@ def parse_args():
     parser.add_argument("--interpretation_outf",default=None)
     parser.add_argument("--method",choices=['gradxinput','deeplift'],default="deeplift")
     parser.add_argument('--task_id',type=int)
-    parser.add_argument('--chromsizes',default='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes')    
+    parser.add_argument('--chromsizes',default='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes')
+    parser.add_argument("--interpret",action="store_true",default=False)
     return parser.parse_args()
 
 
@@ -104,11 +106,12 @@ def cross_validate(args):
         args_dict['predict_chroms']=test_chroms
         print("Calculating predictions on the test fold") 
         predict(args_dict)
-        
-        args_dict['interpret_chroms']=test_chroms
-        args_dict['interpretation_outf']=base_interpretation+'.'+str(split)
-        print("Running interpretation on the test fold") 
-        interpret(args_dict)
+
+        if args.interpret==True:
+            args_dict['interpret_chroms']=test_chroms
+            args_dict['interpretation_outf']=base_interpretation+'.'+str(split)
+            print("Running interpretation on the test fold") 
+            interpret(args_dict)
         
         
 def main():
