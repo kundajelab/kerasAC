@@ -24,8 +24,10 @@ hg19_splits[9]={'test':['chr10','chr8'],
            'valid':['chr12','chr9']}
 
 
+#Note: the splits for hg19 and hg38 are the same, as are the chromosomes used for training models. 
 splits=dict()
 splits['hg19']=hg19_splits 
-
+splits['hg38']=hg19_splits
 chroms=dict()
 chroms['hg19']=hg19_chroms
+chroms['hg38']=hg38_chroms
