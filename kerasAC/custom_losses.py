@@ -13,4 +13,10 @@ def get_weighted_binary_crossentropy(w0_weights, w1_weights):
         return K.mean(K.binary_crossentropy(y_pred, y_true)*nonAmbigTimesWeightsPerTask, axis=-1);
     return weighted_binary_crossentropy; 
 
+def get_ambig_binary_crossentropy(ambig_val=-1):
+    def ambig_binary_crossentropy(y_true,y_pred):
+        nonAmbig = K.cast((y_true != ambig_val),'float32')
+        return K.mean(K.binary_crossentropy(y_pred, y_true)*nonAmbig, axis=-1);
+    return ambig_binary_crossentropy; 
+
 
