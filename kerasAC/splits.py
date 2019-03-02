@@ -30,4 +30,4 @@ splits['hg19']=hg19_splits
 splits['hg38']=hg19_splits
 chroms=dict()
 chroms['hg19']=hg19_chroms
-chroms['hg38']=hg38_chroms
+chroms['hg38']=hg19_chroms

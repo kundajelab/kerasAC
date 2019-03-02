@@ -14,7 +14,7 @@ def auprc(y_pred,y_true):
     K.get_session().run(tf.local_variables_initializer())
     with tf.control_dependencies([update_op]):
         value = tf.identity(value)
-    return value
+    return value.eval() 
 
 def remove_ambiguous_peaks(predictions, true_y): 
     indices_to_remove = np.where(true_y < 0)
@@ -52,7 +52,8 @@ def auprc_func(predictions, true_y,thresh=None):
         predictions_for_task_filtered,true_y_for_task_filtered = \
          remove_ambiguous_peaks(predictions_for_task, true_y_for_task)
         try:
-            task_auprc = auprc(true_y_for_task_filtered, predictions_for_task_filtered);
+            #task_auprc = auprc(true_y_for_task_filtered, predictions_for_task_filtered);
+            task_auprc=average_precision_score(true_y_for_task_filtered, predictions_for_task_filtered)
         except:
             print("Could not calculated auPRC:")
             print(sys.exc_info()[0])
