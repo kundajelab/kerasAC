@@ -75,10 +75,10 @@ def cross_validate(args):
         raise Exception("Unsupported genome assembly:"+args.assembly+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
     args_dict=vars(args)
     print(args_dict) 
-    base_model_file=str(args_dict['model_hdf5'])
-    base_accuracy_file=str(args_dict['accuracy_metrics_file'])
-    base_interpretation=str(args_dict['interpretation_outf'])
-    base_predictions_pickle=str(args_dict['predictions_pickle'])
+    base_model_file=args_dict['model_hdf5']
+    base_accuracy_file=args_dict['accuracy_metrics_file']
+    base_interpretation=args_dict['interpretation_outf']
+    base_predictions_pickle=args_dict['predictions_pickle']
 
 
     for split in splits[args.assembly]:
@@ -100,9 +100,11 @@ def cross_validate(args):
         
         #set the prediction arguments specific to this fold
         if args.save_w1_w0!=None:
-            args_dict["w1_w0_file"]=args.save_w1_w0 
-        args_dict['accuracy_metrics_file']=base_accuracy_file+"."+str(split)
-        args_dict['predictions_pickle']=base_predictions_pickle+"."+str(split) 
+            args_dict["w1_w0_file"]=args.save_w1_w0
+        if base_accuracy_file!=None:
+            args_dict['accuracy_metrics_file']=base_accuracy_file+"."+str(split)
+        if base_predictions_pickle!=None:
+            args_dict['predictions_pickle']=base_predictions_pickle+"."+str(split) 
         args_dict['predict_chroms']=test_chroms
         print("Calculating predictions on the test fold") 
         predict(args_dict)
