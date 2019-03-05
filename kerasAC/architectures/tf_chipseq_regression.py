@@ -2,7 +2,6 @@ import numpy as np ;
 from kerasAC.metrics import *
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy, get_ambig_mean_squared_error
 from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
-np.random.seed(seed)
 import keras;
 from keras.models import Sequential
 from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
@@ -17,6 +16,7 @@ K.set_image_data_format('channels_last')
 print(K.image_data_format())
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
+    np.random.seed(seed)
     model=Sequential()
     model.add(Conv2D(filters=50,kernel_size=(1,15),padding="same", kernel_constraint=max_norm(7.0,axis=-1),input_shape=(1,1000,4)))
     model.add(BatchNormalization(axis=-1))
