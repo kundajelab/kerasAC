@@ -1,5 +1,6 @@
 import numpy as np ;
 from kerasAC.metrics import *
+from keras.constraints import max_norm
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy, get_ambig_mean_squared_error
 from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
 import keras;
