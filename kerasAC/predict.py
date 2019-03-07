@@ -168,7 +168,7 @@ def parse_args():
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',required=True)
-    parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics',required=True)
+    parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
     parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
