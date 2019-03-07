@@ -1,5 +1,7 @@
 import numpy as np ;
+from keras.constraints import max_norm
 from kerasAC.metrics import *
+from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
 from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
 
 
@@ -82,11 +84,10 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    if w0!=None:
-        import kerasAC.custom_losses
-        loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
+        if w0!=None:
+        loss=get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
-        loss="binary_crossentropy"
+        loss=get_ambig_binary_crossentropy() 
     model.compile(optimizer=adam,
                   loss=loss,
                   metrics=[tpr,tnr,fpr,fnr,precision,f1])

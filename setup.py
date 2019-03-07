@@ -7,7 +7,7 @@ config = {
     'version': '0.1',
     'packages': ['kerasAC'],
     'setup_requires': [],
-    'install_requires': ['numpy>=1.9', 'keras>=2.2', 'h5py', 'pandas','pybigwig','deeplift'],
+    'install_requires': ['numpy>=1.9', 'keras>=2.2', 'h5py', 'pandas','pybigwig','deeplift','abstention'],
     'scripts': [],
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict=kerasAC.predict:main',

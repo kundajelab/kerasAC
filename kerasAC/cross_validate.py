@@ -51,8 +51,9 @@ def parse_args():
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
-    parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics',default=None)
-    parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
+    parser.add_argument('--performance_metrics_classification_file',help='file name to save classification performance metrics',default=None)
+    parser.add_argument('--performance_metrics_regression_file',help='file name to save regression performance metrics',default=None)
+    parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the performance metrics",default=None)
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--flank',default=500,type=int)
     parser.add_argument('--mask',default=10,type=int)
@@ -76,7 +77,8 @@ def cross_validate(args):
     args_dict=vars(args)
     print(args_dict) 
     base_model_file=args_dict['model_hdf5']
-    base_accuracy_file=args_dict['accuracy_metrics_file']
+    base_performance_classification_file=args_dict['performance_metrics_classification_file']
+    base_performance_regression_file=args_dict['performance_metrics_regression_file']
     base_interpretation=args_dict['interpretation_outf']
     base_predictions_pickle=args_dict['predictions_pickle']
 
@@ -101,8 +103,10 @@ def cross_validate(args):
         #set the prediction arguments specific to this fold
         if args.save_w1_w0!=None:
             args_dict["w1_w0_file"]=args.save_w1_w0
-        if base_accuracy_file!=None:
-            args_dict['accuracy_metrics_file']=base_accuracy_file+"."+str(split)
+        if base_performance_classification_file!=None:
+            args_dict['performance_metrics_classification_file']=base_performance_classification_file+"."+str(split)
+        if base_performance_regression_file!=None:
+            args_dict['performance_metrics_regression_file']=base_performance_regression_file+"."+str(split)
         if base_predictions_pickle!=None:
             args_dict['predictions_pickle']=base_predictions_pickle+"."+str(split) 
         args_dict['predict_chroms']=test_chroms

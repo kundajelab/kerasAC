@@ -41,19 +41,23 @@ def args_object_from_args_dict(args_dict):
     #prediction
     vars(args_object)['predict_chroms']=None
     vars(args_object)['prediction_pickle']=None
-    vars(args_object)['accuracy_metrics_file']=None
+    vars(args_object)['performance_metrics_classification_file']=None
+    vars(args_object)['performance_metrics_regression_file']=None
     vars(args_object)['predictions_pickle_to_load']=None
     vars(args_object)['sequential']=False
     vars(args_object)['background_freqs']=None
     vars(args_object)['flank']=500
     vars(args_object)['mask']=10
     vars(args_object)['center_on_summit']=False
+    vars(args_object)['calibrate_classifiation']=False
+    vars(args_object)['calibrate_regression']=False     
 
     #cross-validation
     vars(args_object)['assembly']='hg19'
 
     #interpret
     vars(args_object)['method']='deeplift'
+    vars(args_object)['deeplift_ref']='shuffled_ref' 
     vars(args_object)['background_freqs']=None
     vars(args_object)['chromsizes']="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes"
     vars(args_object)['precision_thresh']=0.90

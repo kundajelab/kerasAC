@@ -1,9 +1,9 @@
-from .metrics import positive_accuracy, negative_accuracy, precision, recall
-from .activations import softMaxAxis1
-from .generators import *
-from .config import args_object_from_args_dict
-from .accuracy_metrics import *
-from .custom_losses import *
+from kerasAC.metrics import positive_accuracy, negative_accuracy, precision, recall
+from kerasAC.activations import softMaxAxis1
+from kerasAC.generators import *
+from kerasAC.config import args_object_from_args_dict
+from kerasAC.performance_metrics import *
+from kerasAC.custom_losses import *
 from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
 import argparse
 import yaml 
@@ -13,8 +13,10 @@ import numpy as np
 import keras 
 from keras.losses import *
 from kerasAC.custom_losses import *
-
+from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
+from scipy.special import logit,expit
+
 
 def get_weights(args):
     w1=None
@@ -162,16 +164,16 @@ def parse_args():
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
     parser.add_argument('--data_path',required=True)
     parser.add_argument('--predict_chroms',nargs="*",default=None) 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
     parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',required=True)
-    parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
-    parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
+    parser.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
     parser.add_argument('--ref_fasta',default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     parser.add_argument('--background_freqs',default=None)
     parser.add_argument('--w1',nargs="*",type=float)
@@ -181,6 +183,8 @@ def parse_args():
     parser.add_argument('--mask',default=10,type=int)
     parser.add_argument('--squeeze_input_for_gru',action='store_true')
     parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
+    parser.add_argument("--calibrate_classification",action="store_true",default=False)
+    parser.add_argument("--calibrate_regression",action="store_true",default=False) 
     return parser.parse_args()
 
 def get_model(args):
@@ -236,6 +240,32 @@ def get_predictions(args,model):
     print('got model predictions')
     return predictions
 
+def calibrate(predictions,args):
+    if args.calibrate_classification == True:
+        #calibrate classification predictions
+        logits=logit(predictions[0])
+        labels=predictions[1].values
+        non_nan_labels=labels[~np.isnan(labels)]
+        non_nan_logits=logits[~np.isnan(logits)]
+        
+        classification_calibration_func = PlattScaling()(
+                                        valid_preacts=non_nan_logits,
+                                        valid_labels=non_nan_labels)
+        calibrated_predictions=classification_calibration_func(logits)
+        predictions.append(logits)
+        predictions.append(calibrated_predictions)        
+        print("predictions calibrated with Platt scaling")
+
+    elif args.calibration_regression==True:
+        regression_calibration_func=IsotonicRegression()(
+            valid_preacts=predictions[0],
+            valid_labels=predictions[1].values)
+        calibrated_predictions=regression_calibration_func(predictions[0])
+        predictions.append(None)
+        predictions.append(calibrated_predictions)
+        print("predictions calibrated with Isotonic Regression")
+    return predictions
+
 def predict(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args) 
@@ -249,82 +279,40 @@ def predict(args):
         #get the model
         model=get_model(args)
         predictions=get_predictions(args,model)
-        
-        
-    if args.predictions_pickle!=None:
-        #pickle the predictions in case an error occurs downstream
-        #this will allow for easy recovery of model predictions without having to regenerate them
-        with open(args.predictions_pickle,'wb') as handle:
-            pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
-        print("pickled the model predictions to file:"+str(args.predictions_pickle))
+        assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
+        predictions=calibrate(predictions,args)        
+        if args.predictions_pickle!=None:
+            #pickle the predictions in case an error occurs downstream
+            #this will allow for easy recovery of model predictions without having to regenerate them
+            with open(args.predictions_pickle,'wb') as handle:
+                pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
+            print("pickled the model predictions to file:"+str(args.predictions_pickle))
 
-    if args.accuracy_metrics_file!=None:
-        print('computing accuracy metrics...')
-        recallAtFDR50=dict()
-        recallAtFDR20=dict()
-        auroc_vals=dict()
-        auprc_vals=dict()
-        unbalanced_accuracy_vals=dict()
-        balanced_accuracy_vals=dict()
-        positives_accuracy_vals=dict()
-        negatives_accuracy_vals=dict()
-        num_positive_vals=dict()
-        num_negative_vals=dict()
-        
-        outputs=np.asarray(predictions[1])
-        predictions=predictions[0]
-        if not(isinstance(predictions,dict)):
-            predictions={'output':predictions}
-        if not(isinstance(outputs,dict)):
-            outputs={'output':outputs} 
-        for output_mode in predictions: 
-            #compute the accuracy metrics
-            recallAtFDR50[output_mode]=recall_at_fdr_function(predictions[output_mode],outputs[output_mode],50)
-            print('got recall at FDR50!') 
-            recallAtFDR20[output_mode]=recall_at_fdr_function(predictions[output_mode],outputs[output_mode],20)
-            print('got recall at FDR20!')
-            auroc_vals[output_mode]=auroc_func(predictions[output_mode],outputs[output_mode])
-            print('got auROC vals!')
-            auprc_vals[output_mode]=auprc_func(predictions[output_mode],outputs[output_mode])
-            print('got auPRC vals!')
-            unbalanced_accuracy_vals[output_mode]=unbalanced_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got unbalanced accuracy')
-            balanced_accuracy_vals[output_mode]=balanced_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got balanced accuracy')
-            positives_accuracy_vals[output_mode]=positives_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got positives accuracy')
-            negatives_accuracy_vals[output_mode]=negatives_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got negative accuracy vals')
-            num_positive_vals[output_mode]=num_positives(predictions[output_mode],outputs[output_mode])
-            print('got number of positive values')
-            num_negative_vals[output_mode]=num_negatives(predictions[output_mode],outputs[output_mode])
-            print('got number of negative values')
-
-        #write accuracy metrics to output file: 
-        print('writing accuracy metrics to file...')
-        outf=open(args.accuracy_metrics_file,'w')
-        for key in recallAtFDR50.keys():
-            outf.write('recallAtFDR50\t'+str(key)+'\t'+'\t'.join([str(i) for i in recallAtFDR50[key]])+'\n')
-        for key in recallAtFDR20.keys():
-            outf.write('recallAtFDR20\t'+str(key)+'\t'+'\t'.join([str(i) for i in recallAtFDR20[key]])+'\n')
-        for key in auroc_vals.keys():
-            outf.write('auroc_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in auroc_vals[key]])+'\n')
-        for key in auprc_vals.keys():
-            outf.write('auprc_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in auprc_vals[key]])+'\n')
-        for key in unbalanced_accuracy_vals.keys():
-            outf.write('unbalanced_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in unbalanced_accuracy_vals[key]])+'\n')
-        for key in balanced_accuracy_vals.keys():
-            outf.write('balanced_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in balanced_accuracy_vals[key]])+'\n')
-        for key in positives_accuracy_vals.keys():
-            outf.write('positives_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in positives_accuracy_vals[key]])+'\n')
-        for key in negatives_accuracy_vals.keys():
-            outf.write('negatives_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in negatives_accuracy_vals[key]])+'\n')    
-        for key in num_positive_vals.keys():
-            outf.write('num_positive_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_positive_vals[key]])+'\n')
-        for key in num_negative_vals.keys():
-            outf.write('num_negative_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_negative_vals[key]])+'\n')
-
-
+    if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)):
+        labels=np.asarray(predictions[1])
+        tasks=predictions[1].columns 
+        #if calibration has been used, we want accuracy metrics on the calibrated predictions (last entry in predictions list) 
+        if ((args.calibrate_classification==True) or (args.calibrate_regression==True)): 
+            predictions=predictions[-1]
+        else:
+            predictions=predictions[0]
+            
+        if args.performance_metrics_classification_file==True:
+            print("calculating classification performance metrics...")
+            performance_metrics_classification=get_performance_metrics_classification(predictions,labels)
+            print("writing classification performance metrics to file...") 
+            write_performance_metrics(args.performance_metrics_classification_file,performance_metrics_classification,tasks) 
+        elif args.performance_metrics_regression_file==True:
+            print("calculating regression performance metrics...") 
+            performance_metrics_regression=get_performance_metrics_regression(predictions,labels)
+            print("writing regression performance metrics to file...") 
+            write_performance_metrics(args.performance_metrics_regression_file,performance_metrics_regression,tasks)
+            
+#write performance metrics to output file: 
+def write_performance_metrics(output_file,metrics_dict,tasks):
+    metrics_df=pd.DataFrame(metrics_dict,columns=tasks)
+    metrics_df.to_csv(output_file,sep='\t',header=True,index=True)
+    
 def main():
     args=parse_args()
     predict(args) 
