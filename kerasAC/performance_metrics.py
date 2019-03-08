@@ -10,7 +10,7 @@ import tensorflow as tf
 import keras.backend as K 
 
 def remove_ambiguous_peaks(predictions, true_y,ambig_val=np.nan): 
-    indices_to_remove = np.where(true_y ==ambig_val)
+    indices_to_remove = np.nonzero(np.isnan(true_y))
     true_y_filtered = np.delete(true_y, indices_to_remove)
     predictions_filtered = np.delete(predictions, indices_to_remove)
     return predictions_filtered, true_y_filtered
@@ -33,7 +33,7 @@ def auprc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     try:
         task_auprc=average_precision_score(true_y_for_task_filtered, predictions_for_task_filtered)
     except:
-        print("Could not calculated auPRC:")
+        print("Could not calculate auPRC:")
         print(sys.exc_info()[0])
         task_auprc=None 
     return task_auprc
@@ -49,11 +49,11 @@ def get_accuracy_stats_for_task(predictions_for_task_filtered, true_y_for_task_f
 
     accuratePredictions_positives = np.sum(accuratePredictions*(true_y_for_task_filtered==1),axis=0);
     accuratePredictions_negatives = np.sum(accuratePredictions*(true_y_for_task_filtered==0),axis=0);
-    unbalancedAccuracy_forTask = (r['accuratePredictions_positives'] + r['accuratePredictions_negatives'])/(r['numPositives_forTask']+r['numNegatives_forTask']).astype("float");
+    unbalancedAccuracy_forTask = (accuratePredictions_positives + accuratePredictions_negatives)/(numPositives_forTask + numNegatives_forTask)
 
-    positiveAccuracy_forTask = float(r['accuratePredictions_positives'])/float(r['numPositives_forTask'])
-    negativeAccuracy_forTask = float(r['accuratePredictions_negatives'])/float(r['numNegatives_forTask'])
-    balancedAccuracy_forTask= (positivesAccuracy_forTask+negativesAccuracy_forTask)/2;
+    positiveAccuracy_forTask = accuratePredictions_positives/numPositives_forTask
+    negativeAccuracy_forTask = accuratePredictions_negatives/numNegatives_forTask
+    balancedAccuracy_forTask= (positiveAccuracy_forTask+negativeAccuracy_forTask)/2;
     returnDict={'unbalanced_accuracy':unbalancedAccuracy_forTask,
                 'positive_accuracy':positiveAccuracy_forTask,
                 'negative_accuracy':negativeAccuracy_forTask,
@@ -85,7 +85,7 @@ def recall_at_fdr_function(predictions_for_task_filtered,true_y_for_task_filtere
     data=data[data[:,2].argsort()]
 
     #get the recall, fdr at each thresh
-    recall_thresholded=[]
+    recall_thresholds=[]
     class_thresholds=[]
     for fdr_thresh in fdr_thresh_list:
         try:
@@ -100,7 +100,7 @@ def recall_at_fdr_function(predictions_for_task_filtered,true_y_for_task_filtere
     return recall_thresholds, class_thresholds
 
 
-def get_performance_stats_classification(predictions,true_y):
+def get_performance_metrics_classification(predictions,true_y):
     assert predictions.shape==true_y.shape;
     assert len(predictions.shape)==2;
     [num_rows, num_cols]=true_y.shape 
@@ -116,26 +116,27 @@ def get_performance_stats_classification(predictions,true_y):
         recall,class_thresh=recall_at_fdr_function(predictions_for_task_filtered,true_y_for_task_filtered,[50,20,10])
                 
         if performance_stats==None:
-            performance_stats=accuracy_stats_task
+            performance_stats=dict()
+            for key in accuracy_stats_task:
+                performance_stats[key]=[accuracy_stats_task[key]]
             performance_stats['auprc']=[auprc_task]
             performance_stats['auroc']=[auroc_task]
             performance_stats['recall_at_fdr_50']=[recall[0]]
             performance_stats['recall_at_fdr_20']=[recall[1]]
-            performance_stats['recall_at_fdr_10']=[recall[2]]
-            
-            
+            performance_stats['recall_at_fdr_10']=[recall[2]]            
         else:
             for key in accuracy_stats_task:
-                accuracy_stats[key].append(accuracy_stats_task[key])
+                performance_stats[key].append(accuracy_stats_task[key])
             performance_stats['auprc'].append(auprc_task)
             performance_stats['auroc'].append(auroc_task)
             performance_stats['recall_at_fdr_50'].append(recall[0])
             performance_stats['recall_at_fdr_20'].append(recall[1])
             performance_stats['recall_at_fdr_10'].append(recall[2])
+    print(str(performance_stats))
     return performance_stats  
 
 
-def get_performance_stats_regression(predictions,true_y):
+def get_performance_metrics_regression(predictions,true_y):
     assert predictions.shape==true_y.shape;
     assert len(predictions.shape)==2;
     [num_rows, num_cols]=true_y.shape 

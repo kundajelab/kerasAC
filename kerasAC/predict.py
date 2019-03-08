@@ -16,7 +16,7 @@ from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
 from scipy.special import logit,expit
-
+import pdb 
 
 def get_weights(args):
     w1=None
@@ -168,7 +168,7 @@ def parse_args():
     parser.add_argument('--predict_chroms',nargs="*",default=None) 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
-    parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',required=True)
+    parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
     parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
@@ -243,15 +243,26 @@ def get_predictions(args,model):
 def calibrate(predictions,args):
     if args.calibrate_classification == True:
         #calibrate classification predictions
-        logits=logit(predictions[0])
+        #avoid -inf values and inf values:
+        pseudocount=1e-5
+        logit_input=predictions[0]
+        logit_input[logit_input<=0]+=pseudocount
+        logit_input[logit_input>=1]-=pseudocount 
+        logits=logit(logit_input)
         labels=predictions[1].values
-        non_nan_labels=labels[~np.isnan(labels)]
-        non_nan_logits=logits[~np.isnan(logits)]
-        
-        classification_calibration_func = PlattScaling()(
-                                        valid_preacts=non_nan_logits,
-                                        valid_labels=non_nan_labels)
-        calibrated_predictions=classification_calibration_func(logits)
+        #perform calibration for each task!
+        calibrated_predictions=None
+        for i in range(logits.shape[1]):
+            #don't calibrate on nan inputs
+            nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
+            classification_calibration_func = PlattScaling()(
+                valid_preacts=logits[nonambiguous_indices,i],
+                valid_labels=labels[nonambiguous_indices,i])
+            calibrated_predictions_task=classification_calibration_func(logits[:,i])
+            if calibrated_predictions is None:
+                calibrated_predictions=np.expand_dims(calibrated_predictions_task,axis=1)
+            else:
+                calibrated_predictions=np.concatenate((calibrated_predictions,np.expand_dims(calibrated_predictions_task,axis=1)),axis=1)
         predictions.append(logits)
         predictions.append(calibrated_predictions)        
         print("predictions calibrated with Platt scaling")
@@ -275,21 +286,22 @@ def predict(args):
         #load the pickled predictions
         with open(args.predictions_pickle_to_load,'rb') as handle:
             predictions=pickle.load(handle)
+        print("loaded predictions from pickle") 
     else:
         #get the model
         model=get_model(args)
         predictions=get_predictions(args,model)
         assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
-        predictions=calibrate(predictions,args)        
         if args.predictions_pickle!=None:
             #pickle the predictions in case an error occurs downstream
             #this will allow for easy recovery of model predictions without having to regenerate them
             with open(args.predictions_pickle,'wb') as handle:
                 pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
             print("pickled the model predictions to file:"+str(args.predictions_pickle))
-
+        predictions=calibrate(predictions,args)
+    
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)):
-        labels=np.asarray(predictions[1])
+        labels=predictions[1].values 
         tasks=predictions[1].columns 
         #if calibration has been used, we want accuracy metrics on the calibrated predictions (last entry in predictions list) 
         if ((args.calibrate_classification==True) or (args.calibrate_regression==True)): 
@@ -297,12 +309,12 @@ def predict(args):
         else:
             predictions=predictions[0]
             
-        if args.performance_metrics_classification_file==True:
+        if args.performance_metrics_classification_file!=None:
             print("calculating classification performance metrics...")
             performance_metrics_classification=get_performance_metrics_classification(predictions,labels)
             print("writing classification performance metrics to file...") 
             write_performance_metrics(args.performance_metrics_classification_file,performance_metrics_classification,tasks) 
-        elif args.performance_metrics_regression_file==True:
+        elif args.performance_metrics_regression_file!=None:
             print("calculating regression performance metrics...") 
             performance_metrics_regression=get_performance_metrics_regression(predictions,labels)
             print("writing regression performance metrics to file...") 
@@ -310,7 +322,7 @@ def predict(args):
             
 #write performance metrics to output file: 
 def write_performance_metrics(output_file,metrics_dict,tasks):
-    metrics_df=pd.DataFrame(metrics_dict,columns=tasks)
+    metrics_df=pd.DataFrame(metrics_dict,index=tasks).transpose()
     metrics_df.to_csv(output_file,sep='\t',header=True,index=True)
     
 def main():
