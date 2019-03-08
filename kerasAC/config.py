@@ -49,7 +49,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['flank']=500
     vars(args_object)['mask']=10
     vars(args_object)['center_on_summit']=False
-    vars(args_object)['calibrate_classifiation']=False
+    vars(args_object)['calibrate_classification']=False
     vars(args_object)['calibrate_regression']=False     
 
     #cross-validation
