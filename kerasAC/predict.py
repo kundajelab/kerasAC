@@ -267,7 +267,7 @@ def calibrate(predictions,args):
         predictions.append(calibrated_predictions)        
         print("predictions calibrated with Platt scaling")
 
-    elif args.calibration_regression==True:
+    elif args.calibrate_regression==True:
         regression_calibration_func=IsotonicRegression()(
             valid_preacts=predictions[0],
             valid_labels=predictions[1].values)
