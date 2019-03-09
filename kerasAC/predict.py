@@ -3,7 +3,7 @@ from kerasAC.generators import *
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
-from kerasAC.metrics import tpr, tnr, fpr, fnr, precision, f1
+from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 import argparse
 import yaml 
 import h5py 

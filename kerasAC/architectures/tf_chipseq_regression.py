@@ -2,7 +2,7 @@ import numpy as np ;
 from kerasAC.metrics import *
 from keras.constraints import max_norm
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy, get_ambig_mean_squared_error
-from kerasAC.metrics import tpr, tnr, fpr, fnr, precision, f1
+from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 import keras
 from keras.models import Sequential
 from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
@@ -40,5 +40,5 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     loss=get_ambig_mean_squared_error() 
     model.compile(optimizer=adam,
                   loss=loss,
-                  metrics=[tpr,tnr,fpr,fnr,precision,f1])
+                  metrics=[recall, specificity, fpr, fnr, precision, f1])
     return model
