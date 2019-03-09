@@ -187,13 +187,12 @@ def parse_args():
     return parser.parse_args()
 
 def get_model(args):
-    custom_objects={"positive_accuracy":positive_accuracy,
-                    "negative_accuracy":negative_accuracy,
-                    "precision":precision,
-                    "recall":recall,
-                    "softMaxAxis1":softMaxAxis1,
-                    "tpr":tpr,
-                    "tnr":tnr,
+
+    from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
+    
+    custom_objects={"recall":recall,
+                    "sensitivity":recall,
+                    "specificity":specificity,
                     "fpr":fpr,
                     "fnr":fnr,
                     "precision":precision,
