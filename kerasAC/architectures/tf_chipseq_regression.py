@@ -2,8 +2,8 @@ import numpy as np ;
 from kerasAC.metrics import *
 from keras.constraints import max_norm
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy, get_ambig_mean_squared_error
-from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
-import keras;
+from kerasAC.metrics import tpr, tnr, fpr, fnr, precision, f1
+import keras
 from keras.models import Sequential
 from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
 from keras.layers.convolutional import Conv2D, MaxPooling2D

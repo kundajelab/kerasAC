@@ -2,7 +2,7 @@ import numpy as np ;
 from keras.constraints import max_norm
 from kerasAC.metrics import *
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
-from concise.metrics import tpr, tnr, fpr, fnr, precision, f1
+from kerasAC.metrics import tpr, tnr, fpr, fnr, precision, f1
 
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
