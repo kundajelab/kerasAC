@@ -105,7 +105,6 @@ def get_performance_metrics_classification(predictions,true_y):
     assert len(predictions.shape)==2;
     [num_rows, num_cols]=true_y.shape 
     performance_stats=None
-    pdb.set_trace() 
     for c in range(num_cols):
         true_y_for_task=np.squeeze(true_y[:,c])
         predictions_for_task=np.squeeze(predictions[:,c])
