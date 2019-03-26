@@ -80,7 +80,7 @@ def open_data_file(data_path,tasks,chroms_to_use):
     return data 
 
 class TruePosGenerator(Sequence):
-    def __init__(self,data_pickle,ref_fasta,batch_size=128,precision_thresh=0.9):
+    def __init__(self,data_pickle,ref_fasta,batch_size=128,precision_thresh=0.9,expand_dims=True):
         f=open(data_pickle,'rb')
         data=pickle.load(f)
         self.predictions=data[0]
@@ -96,6 +96,7 @@ class TruePosGenerator(Sequence):
         self.ref_fasta=ref_fasta
         self.lock=threading.Lock()
         self.batch_size=batch_size
+        self.expand_dims=expand_dims
 
         
     def __len__(self):
@@ -114,7 +115,8 @@ class TruePosGenerator(Sequence):
         seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        x_batch=np.expand_dims(seqs,1)
+        if (self.expand_dims==True):
+            x_batch=np.expand_dims(seqs,1)
         #extract the labels at the current batch of indices 
         y_batch=np.asarray(self.data.iloc[inds])
         return (bed_entries,x_batch,y_batch)    
@@ -122,7 +124,7 @@ class TruePosGenerator(Sequence):
 
 #use wrappers for keras Sequence generator class to allow batch shuffling upon epoch end
 class DataGenerator(Sequence):
-    def __init__(self,data_path,ref_fasta,batch_size=128,add_revcomp=True,tasks=None,shuffled_ref_negatives=False,upsample=True,upsample_ratio=0.1,chroms_to_use=None,get_w1_w0=False):
+    def __init__(self,data_path,ref_fasta,batch_size=128,add_revcomp=True,tasks=None,shuffled_ref_negatives=False,upsample=True,upsample_ratio=0.1,chroms_to_use=None,get_w1_w0=False,expand_dims=True):
         self.lock = threading.Lock()        
         self.batch_size=batch_size
         #decide if reverse complement should be used
@@ -168,7 +170,8 @@ class DataGenerator(Sequence):
             np.random.shuffle(self.pos_indices)
             self.neg_indices=np.repeat(self.neg_indices,num_neg_wraps)[0:num_indices]
             np.random.shuffle(self.neg_indices)
-            
+        self.expand_dims=expand_dims
+        
     def __len__(self):
         return math.ceil(self.data.shape[0]/self.batch_size)
 
@@ -199,7 +202,8 @@ class DataGenerator(Sequence):
         seqs=seqs+seqs_shuffled
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        x_batch=np.expand_dims(seqs,1)
+        if (self.expand_dims==True):
+            x_batch=np.expand_dims(seqs,1)
         y_batch=np.asarray(self.data.iloc[inds])
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
@@ -228,7 +232,8 @@ class DataGenerator(Sequence):
             
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        x_batch=np.expand_dims(seqs,1)
+        if (self.expand_dims==True):
+            x_batch=np.expand_dims(seqs,1)
         
         #extract the positive and negative labels at the current batch of indices
         y_batch_pos=self.ones.iloc[pos_inds]
@@ -251,7 +256,8 @@ class DataGenerator(Sequence):
             seqs=seqs+seqs_rc
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        x_batch=np.expand_dims(seqs,1)
+        if(self.expand_dims==True):
+            x_batch=np.expand_dims(seqs,1)
         #extract the labels at the current batch of indices 
         y_batch=np.asarray(self.data.iloc[inds])
         #add in the labels for the reverse complement sequences, if used 
@@ -269,8 +275,8 @@ class DataGenerator(Sequence):
 
 #generate batches of SNP data with specified allele column name and flank size 
 class SNPGenerator(DataGenerator):
-    def __init__(self,data_path,ref_fasta,allele_col,flank_size=500,batch_size=128):
-        DataGenerator.__init__(self,data_path,ref_fasta,batch_size,add_revcomp=False,upsample=False)
+    def __init__(self,data_path,ref_fasta,allele_col,flank_size=500,batch_size=128,expand_dims=True):
+        DataGenerator.__init__(self,data_path,ref_fasta,batch_size,add_revcomp=False,upsample=False,expand_dims=expand_dims)
         self.allele_col=allele_col
         self.flank_size=flank_size 
 
@@ -297,6 +303,7 @@ class SNPGenerator(DataGenerator):
             
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        x_batch=np.expand_dims(seqs,1)
+        if (self.expand_dims==True):
+            x_batch=np.expand_dims(seqs,1)
         return x_batch
     

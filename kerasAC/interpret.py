@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument("--precision_thresh",type=float,default=0.9,help="threshold for precision that is used in determining the probability cutoff to use in calling positive predictions")
     parser.add_argument("--yaml",default=None)
     parser.add_argument("--json",default=None)
-    
+    parser.add_argument("--expand_dims",default=True)     
     return parser.parse_args()
 
 
@@ -111,9 +111,10 @@ def interpret(args):
         raise Exception("method must be one of 'deeplift' or 'gradxinput'")
     
     data_generator=TruePosGenerator(args.predictions_pickle,
-                                        args.ref_fasta,
-                                        batch_size=args.batch_size,
-                                        precision_thresh=args.precision_thresh)
+                                    args.ref_fasta,
+                                    batch_size=args.batch_size,
+                                    precision_thresh=args.precision_thresh,
+                                    expand_dims=args.expand_dims)
     print("made data generator!") 
     tasks=list(data_generator.columns)
     bigwigs={}

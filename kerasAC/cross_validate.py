@@ -65,7 +65,8 @@ def parse_args():
     parser.add_argument('--chromsizes',default='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes')
     parser.add_argument("--interpret",action="store_true",default=False)
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
-    parser.add_argument("--calibrate_regression",action="store_true",default=False) 
+    parser.add_argument("--calibrate_regression",action="store_true",default=False)
+    parser.add_argument("--expand_dims",default=True) 
 
     return parser.parse_args()
 

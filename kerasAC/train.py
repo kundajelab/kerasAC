@@ -48,7 +48,8 @@ def parse_args():
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
-    parser.add_argument("--calibrate_regression",action="store_true",default=False) 
+    parser.add_argument("--calibrate_regression",action="store_true",default=False)
+    parser.add_argument("--expand_dims",default=True) 
     return parser.parse_args()
 
 def get_weights(args,train_generator):
@@ -126,7 +127,8 @@ def train(args):
                                   upsample=train_upsample,
                                   upsample_ratio=train_upsample_ratio,
                                   chroms_to_use=args.train_chroms,
-                                  get_w1_w0=args.weighted)
+                                  get_w1_w0=args.weighted,
+                                  expand_dims=args.expand_dims)
     print("generated training data generator!")
     if args.valid_upsample==None:
         valid_upsample=False
@@ -135,10 +137,11 @@ def train(args):
         valid_upsample=True
         valid_upsample_ratio=args.valid_upsample
     valid_generator=DataGenerator(args.valid_path,
-                                   args.ref_fasta,
-                                   upsample=valid_upsample,
-                                   upsample_ratio=valid_upsample_ratio,
-                                   chroms_to_use=args.validation_chroms)
+                                  args.ref_fasta,
+                                  upsample=valid_upsample,
+                                  upsample_ratio=valid_upsample_ratio,
+                                  chroms_to_use=args.validation_chroms,
+                                  expand_dims=args.expand_dims)
     print("generated validation data generator!")
     w1,w0=get_weights(args,train_generator)
     

@@ -99,7 +99,7 @@ def get_predictions_hammock(args,model):
 def get_predictions_basic(args,model):
     import pysam
     import pandas as pd
-    test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms)
+    test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms,expand_dims=args.expand_dims)
     predictions=model.predict_generator(test_generator,
                                         max_queue_size=args.max_queue_size,
                                         workers=args.threads,
@@ -183,7 +183,8 @@ def parse_args():
     parser.add_argument('--squeeze_input_for_gru',action='store_true')
     parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
-    parser.add_argument("--calibrate_regression",action="store_true",default=False) 
+    parser.add_argument("--calibrate_regression",action="store_true",default=False)
+    parser.add_argument("--expand_dims",default=True) 
     return parser.parse_args()
 
 def get_model(args):
