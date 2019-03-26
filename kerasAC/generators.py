@@ -115,8 +115,9 @@ class TruePosGenerator(Sequence):
         seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=seqs
         if (self.expand_dims==True):
-            x_batch=np.expand_dims(seqs,1)
+            x_batch=np.expand_dims(x_batch,1)
         #extract the labels at the current batch of indices 
         y_batch=np.asarray(self.data.iloc[inds])
         return (bed_entries,x_batch,y_batch)    
@@ -202,8 +203,9 @@ class DataGenerator(Sequence):
         seqs=seqs+seqs_shuffled
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=seqs
         if (self.expand_dims==True):
-            x_batch=np.expand_dims(seqs,1)
+            x_batch=np.expand_dims(x_batch,1)
         y_batch=np.asarray(self.data.iloc[inds])
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
@@ -232,8 +234,9 @@ class DataGenerator(Sequence):
             
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=seqs 
         if (self.expand_dims==True):
-            x_batch=np.expand_dims(seqs,1)
+            x_batch=np.expand_dims(x_batch,1)
         
         #extract the positive and negative labels at the current batch of indices
         y_batch_pos=self.ones.iloc[pos_inds]
@@ -256,8 +259,9 @@ class DataGenerator(Sequence):
             seqs=seqs+seqs_rc
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=seqs
         if(self.expand_dims==True):
-            x_batch=np.expand_dims(seqs,1)
+            x_batch=np.expand_dims(x_batch,1)
         #extract the labels at the current batch of indices 
         y_batch=np.asarray(self.data.iloc[inds])
         #add in the labels for the reverse complement sequences, if used 
@@ -303,7 +307,8 @@ class SNPGenerator(DataGenerator):
             
         #one-hot-encode the fasta sequences 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        x_batch=seqs
         if (self.expand_dims==True):
-            x_batch=np.expand_dims(seqs,1)
+            x_batch=np.expand_dims(x_batch,1)
         return x_batch
     

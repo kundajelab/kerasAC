@@ -265,12 +265,22 @@ def calibrate(predictions,args):
         predictions.append(logits)
         predictions.append(calibrated_predictions)        
         print("predictions calibrated with Platt scaling")
-
     elif args.calibrate_regression==True:
-        regression_calibration_func=IsotonicRegression()(
-            valid_preacts=predictions[0],
-            valid_labels=predictions[1].values)
-        calibrated_predictions=regression_calibration_func(predictions[0])
+        preacts=predictions[0]
+        labels=predictions[1].values
+        #perform calibration for each task!
+        calibrated_predictions=None
+        for i in range(preacts.shape[1]):
+            #don't calibrate on nan inputs
+            nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
+            regression_calibration_func=IsotonicRegression()(
+                valid_preacts=preacts[nonambiguous_indices,i].squeeze(),
+                valid_labels=labels[nonambiguous_indices,i].squeeze())
+            calibrated_predictions_task=regression_calibration_func(preacts[:,i])
+        if calibrated_predictions is None:
+            calibrated_predictions=np.expand_dims(calibrated_predictions_task,axis=1)
+        else:
+            calibrated_predictions=np.concatenate((calibrated_predictions,np.expand_dims(calibrated_predictions_task,axis=1)),axis=1)
         predictions.append(None)
         predictions.append(calibrated_predictions)
         print("predictions calibrated with Isotonic Regression")
@@ -290,16 +300,14 @@ def predict(args):
         #get the model
         model=get_model(args)
         predictions=get_predictions(args,model)
-        assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
-        predictions=calibrate(predictions,args)
-        if args.predictions_pickle!=None:
-            #pickle the predictions in case an error occurs downstream
-            #this will allow for easy recovery of model predictions without having to regenerate them
-            with open(args.predictions_pickle,'wb') as handle:
-                pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
-            print("pickled the model predictions to file:"+str(args.predictions_pickle))
-
-    
+    assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
+    predictions=calibrate(predictions,args)
+    if args.predictions_pickle!=None:
+        #pickle the predictions in case an error occurs downstream
+        #this will allow for easy recovery of model predictions without having to regenerate them
+        with open(args.predictions_pickle,'wb') as handle:
+            pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
+        print("pickled the model predictions to file:"+str(args.predictions_pickle))    
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)):
         labels=predictions[1].values 
         tasks=predictions[1].columns 
