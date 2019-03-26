@@ -37,7 +37,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['yaml']=None
     vars(args_object)['json']=None
     vars(args_object)['expand_dims']=True
-    
+    vars(args_object)['tasks']=None
     
     #prediction
     vars(args_object)['predict_chroms']=None

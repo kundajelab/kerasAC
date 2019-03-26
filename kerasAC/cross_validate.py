@@ -66,7 +66,8 @@ def parse_args():
     parser.add_argument("--interpret",action="store_true",default=False)
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
     parser.add_argument("--calibrate_regression",action="store_true",default=False)
-    parser.add_argument("--expand_dims",default=True) 
+    parser.add_argument("--expand_dims",default=True)
+    parser.add_argument("--tasks",nargs="*",default=None) 
 
     return parser.parse_args()
 

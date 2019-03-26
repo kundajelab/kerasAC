@@ -49,7 +49,8 @@ def parse_args():
     parser.add_argument("--max_queue_size",type=int,default=100)
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
     parser.add_argument("--calibrate_regression",action="store_true",default=False)
-    parser.add_argument("--expand_dims",default=True) 
+    parser.add_argument("--expand_dims",default=True)
+    parser.add_argument("--tasks",nargs="*",default=None)
     return parser.parse_args()
 
 def get_weights(args,train_generator):
@@ -128,7 +129,8 @@ def train(args):
                                   upsample_ratio=train_upsample_ratio,
                                   chroms_to_use=args.train_chroms,
                                   get_w1_w0=args.weighted,
-                                  expand_dims=args.expand_dims)
+                                  expand_dims=args.expand_dims,
+                                  tasks=args.tasks)
     print("generated training data generator!")
     if args.valid_upsample==None:
         valid_upsample=False
@@ -141,7 +143,8 @@ def train(args):
                                   upsample=valid_upsample,
                                   upsample_ratio=valid_upsample_ratio,
                                   chroms_to_use=args.validation_chroms,
-                                  expand_dims=args.expand_dims)
+                                  expand_dims=args.expand_dims,
+                                  tasks=args.tasks)
     print("generated validation data generator!")
     w1,w0=get_weights(args,train_generator)
     
