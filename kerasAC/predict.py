@@ -290,13 +290,14 @@ def predict(args):
         model=get_model(args)
         predictions=get_predictions(args,model)
         assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
+        predictions=calibrate(predictions,args)
         if args.predictions_pickle!=None:
             #pickle the predictions in case an error occurs downstream
             #this will allow for easy recovery of model predictions without having to regenerate them
             with open(args.predictions_pickle,'wb') as handle:
                 pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
             print("pickled the model predictions to file:"+str(args.predictions_pickle))
-        predictions=calibrate(predictions,args)
+
     
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)):
         labels=predictions[1].values 

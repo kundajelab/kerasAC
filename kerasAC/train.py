@@ -47,6 +47,8 @@ def parse_args():
     parser.add_argument("--valid_upsample", type=float, default=None)
     parser.add_argument("--threads",type=int,default=1)
     parser.add_argument("--max_queue_size",type=int,default=100)
+    parser.add_argument("--calibrate_classification",action="store_true",default=False)
+    parser.add_argument("--calibrate_regression",action="store_true",default=False) 
     return parser.parse_args()
 
 def get_weights(args,train_generator):
