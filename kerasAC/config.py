@@ -55,6 +55,7 @@ def args_object_from_args_dict(args_dict):
 
     #cross-validation
     vars(args_object)['assembly']='hg19'
+    vars(args_object)['splits']=None
 
     #interpret
     vars(args_object)['method']='deeplift'

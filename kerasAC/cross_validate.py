@@ -67,7 +67,9 @@ def parse_args():
     parser.add_argument("--calibrate_classification",action="store_true",default=False)
     parser.add_argument("--calibrate_regression",action="store_true",default=False)
     parser.add_argument("--expand_dims",default=True)
-    parser.add_argument("--tasks",nargs="*",default=None) 
+    parser.add_argument("--tasks",nargs="*",default=None)
+    parser.add_argument("--splits",nargs="+",default=None)
+    
 
     return parser.parse_args()
 
@@ -87,8 +89,10 @@ def cross_validate(args):
     base_interpretation=args_dict['interpretation_outf']
     base_predictions_pickle=args_dict['predictions_pickle']
 
-
-    for split in splits[args.assembly]:
+    all_splits=splits[args.assembly]
+    if args.splits!=None:
+        all_splits=args.splits 
+    for split in all_splits: 
         print("Starting split:"+str(split))
         test_chroms=splits[args.assembly][split]['test']
         validation_chroms=splits[args.assembly][split]['valid']

@@ -58,6 +58,9 @@ def get_probability_thresh_for_precision(truth,predictions,precision_thresh):
     return precision_thresholds
     
 def open_data_file(data_path,tasks,chroms_to_use):
+    print("data_path:"+str(data_path))
+    print("tasks:"+str(tasks))
+    print("chroms_to_use:"+str(chroms_to_use))
     if data_path.endswith('.hdf5'):
         if tasks==None:
             data=pd.read_hdf(data_path)
@@ -77,6 +80,7 @@ def open_data_file(data_path,tasks,chroms_to_use):
     if chroms_to_use!=None:
         data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
     print("filtered on chroms_to_use")
+    print("data.shape:"+str(data.shape))
     return data 
 
 class TruePosGenerator(Sequence):
@@ -144,6 +148,7 @@ class DataGenerator(Sequence):
         self.ref_fasta=ref_fasta
 
         self.data=open_data_file(data_path,tasks,chroms_to_use)
+        print(self.data.shape) 
         if get_w1_w0==True:
             w1,w0=get_weights(self.data)
             self.w1=w1
