@@ -240,15 +240,28 @@ def get_predictions(args,model):
     print('got model predictions')
     return predictions
 
-def calibrate(predictions,args):
+
+def get_model_layer_functor(model,target_layer_idx):
+    from keras import backend as K
+    inp=model.input
+    outputs=model.layers[target_layer_idx].output
+    functor=K.function([inp], [outputs])
+    return functor 
+
+def get_layer_outputs(functor,X):
+    return functor([X])
+
+
+def calibrate(predictions,args,model):
     if args.calibrate_classification == True:
         #calibrate classification predictions
         #avoid -inf values and inf values:
         pseudocount=1e-5
         logit_input=predictions[0]
         logit_input[logit_input<=0]+=pseudocount
-        logit_input[logit_input>=1]-=pseudocount 
-        logits=logit(logit_input)
+        logit_input[logit_input>=1]-=pseudocount
+        logit_functor=get_model_layer_functor(model,target_layer_idx=-2)
+        logits=get_layer_outputs(logit_functor,logit_input)
         labels=predictions[1].values
         #perform calibration for each task!
         calibrated_predictions=None
@@ -267,8 +280,10 @@ def calibrate(predictions,args):
         predictions.append(calibrated_predictions)        
         print("predictions calibrated with Platt scaling")
     elif args.calibrate_regression==True:
-        preacts=predictions[0]
+        predictions_after_relu=predictions[0]
         labels=predictions[1].values
+        preact_functor=get_model_layer_functor(model,target_layer_idx=-1)
+        preacts=get_layer_outputs(preact_functor,predictions_after_relu)
         #perform calibration for each task!
         calibrated_predictions=None
         for i in range(preacts.shape[1]):
@@ -302,7 +317,7 @@ def predict(args):
         model=get_model(args)
         predictions=get_predictions(args,model)
     assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
-    predictions=calibrate(predictions,args)
+    predictions=calibrate(predictions,args,model)
     if args.predictions_pickle!=None:
         #pickle the predictions in case an error occurs downstream
         #this will allow for easy recovery of model predictions without having to regenerate them
