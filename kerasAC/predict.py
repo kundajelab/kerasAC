@@ -11,6 +11,7 @@ import pickle
 import numpy as np 
 import keras 
 from keras.losses import *
+from keras.models import Model 
 from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
@@ -105,7 +106,25 @@ def get_predictions_basic(args,model):
                                         workers=args.threads,
                                         use_multiprocessing=True,
                                         verbose=1)
-    return [predictions,test_generator.data,None]
+    print("got predictions")
+    perform_calibration=args.calibrate_classification or args.calibrate_regression
+    preacts=None
+    if perform_calibration==True:
+        if args.calibrate_classification==True:
+            print("getting logits")
+            preact_model=Model(inputs=model.input,
+                               outputs=model.layers[-2].output)
+        elif args.calibrate_regression==True:
+            print("getting pre-relu outputs (preacts)")
+            preact_model=Model(inputs=model.input,
+                              outputs=model.layers[-1].output)
+        preacts=preact_model.predict_generator(test_generator,
+                                               max_queue_size=args.max_queue_size,
+                                               workers=args.threads,
+                                               use_multiprocessing=True,
+                                               verbose=1)
+        print("preactivation shape:"+str(preacts.shape))    
+    return [predictions,test_generator.data,preacts]
 
 def get_predictions_variant(args,model):
     import pysam
@@ -251,55 +270,26 @@ def get_model_layer_functor(model,target_layer_idx):
 def get_layer_outputs(functor,X):
     return functor([X])
 
-
 def calibrate(predictions,args,model):
-    if args.calibrate_classification == True:
-        #calibrate classification predictions
-        #avoid -inf values and inf values:
-        pseudocount=1e-5
-        logit_input=predictions[0]
-        logit_input[logit_input<=0]+=pseudocount
-        logit_input[logit_input>=1]-=pseudocount
-        logit_functor=get_model_layer_functor(model,target_layer_idx=-2)
-        logits=get_layer_outputs(logit_functor,logit_input)
-        labels=predictions[1].values
-        #perform calibration for each task!
-        calibrated_predictions=None
-        for i in range(logits.shape[1]):
-            #don't calibrate on nan inputs
-            nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
-            classification_calibration_func = PlattScaling()(
-                valid_preacts=logits[nonambiguous_indices,i],
-                valid_labels=labels[nonambiguous_indices,i])
-            calibrated_predictions_task=classification_calibration_func(logits[:,i])
-            if calibrated_predictions is None:
-                calibrated_predictions=np.expand_dims(calibrated_predictions_task,axis=1)
-            else:
-                calibrated_predictions=np.concatenate((calibrated_predictions,np.expand_dims(calibrated_predictions_task,axis=1)),axis=1)
-        predictions.append(logits)
-        predictions.append(calibrated_predictions)        
-        print("predictions calibrated with Platt scaling")
-    elif args.calibrate_regression==True:
-        predictions_after_relu=predictions[0]
-        labels=predictions[1].values
-        preact_functor=get_model_layer_functor(model,target_layer_idx=-1)
-        preacts=get_layer_outputs(preact_functor,predictions_after_relu)
-        #perform calibration for each task!
-        calibrated_predictions=None
-        for i in range(preacts.shape[1]):
-            #don't calibrate on nan inputs
-            nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
-            regression_calibration_func=IsotonicRegression()(
-                valid_preacts=preacts[nonambiguous_indices,i].squeeze(),
-                valid_labels=labels[nonambiguous_indices,i].squeeze())
-            calibrated_predictions_task=regression_calibration_func(preacts[:,i])
+    preacts=predictions[2]
+    labels=predictions[1].values
+    #perform calibration for each task!
+    calibrated_predictions=None
+    for i in range(preacts.shape[1]):
+        #don't calibrate on nan inputs
+        nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
+        if args.calibrate_classification==True:
+            calibration_func = PlattScaling()(valid_preacts=preacts[nonambiguous_indices,i],
+                                                             valid_labels=labels[nonambiguous_indices,i])
+        elif args.calibrate_regression==True:
+            calibration_func=IsotonicRegression()(valid_preacts=preacts[nonambiguous_indices,i].squeeze(),
+                                                  valid_labels=labels[nonambiguous_indices,i].squeeze())
+        calibrated_predictions_task=calibration_func(preacts[:,i])
         if calibrated_predictions is None:
             calibrated_predictions=np.expand_dims(calibrated_predictions_task,axis=1)
         else:
             calibrated_predictions=np.concatenate((calibrated_predictions,np.expand_dims(calibrated_predictions_task,axis=1)),axis=1)
-        predictions.append(None)
-        predictions.append(calibrated_predictions)
-        print("predictions calibrated with Isotonic Regression")
+    predictions.append(calibrated_predictions)        
     return predictions
 
 def predict(args):
