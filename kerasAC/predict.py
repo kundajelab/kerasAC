@@ -103,8 +103,8 @@ def get_predictions_basic(args,model):
     test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms,expand_dims=args.expand_dims,tasks=args.tasks)
     predictions=model.predict_generator(test_generator,
                                         max_queue_size=args.max_queue_size,
-                                        workers=args.threads,
-                                        use_multiprocessing=True,
+                                        workers=0,
+                                        use_multiprocessing=False,
                                         verbose=1)
     print("got predictions")
     perform_calibration=args.calibrate_classification or args.calibrate_regression
@@ -120,8 +120,8 @@ def get_predictions_basic(args,model):
                               outputs=model.layers[-1].output)
         preacts=preact_model.predict_generator(test_generator,
                                                max_queue_size=args.max_queue_size,
-                                               workers=args.threads,
-                                               use_multiprocessing=True,
+                                               workers=0,
+                                               use_multiprocessing=False,
                                                verbose=1)
         print("preactivation shape:"+str(preacts.shape))    
     return [predictions,test_generator.data,preacts]
