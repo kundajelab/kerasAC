@@ -195,7 +195,6 @@ def get_predictions_basic(args,model):
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
                                   use_multiprocessing=True,
-                                  max_queue_size=args.max_queue_size,
                                   verbose=1)
     print("got predictions")
     perform_calibration=args.calibrate_classification or args.calibrate_regression
@@ -214,7 +213,6 @@ def get_predictions_basic(args,model):
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
                                   use_multiprocessing=True,
-                                  max_queue_size=args.max_queue_size,
                                   verbose=1)
         print("preactivation shape:"+str(preacts.shape))    
     return [predictions,test_generator.data,preacts]
