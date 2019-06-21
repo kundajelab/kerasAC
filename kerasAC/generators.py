@@ -58,9 +58,9 @@ def get_probability_thresh_for_precision(truth,predictions,precision_thresh):
     return precision_thresholds
     
 def open_data_file(data_path,tasks,chroms_to_use):
-    print("data_path:"+str(data_path))
-    print("tasks:"+str(tasks))
-    print("chroms_to_use:"+str(chroms_to_use))
+    #print("data_path:"+str(data_path))
+    #print("tasks:"+str(tasks))
+    #print("chroms_to_use:"+str(chroms_to_use))
     if data_path.endswith('.hdf5'):
         if tasks==None:
             data=pd.read_hdf(data_path)
@@ -148,12 +148,12 @@ class DataGenerator(Sequence):
         self.ref_fasta=ref_fasta
 
         self.data=open_data_file(data_path,tasks,chroms_to_use)
-        print(self.data.shape) 
+        #print(self.data.shape) 
         if get_w1_w0==True:
             w1,w0=get_weights(self.data)
             self.w1=w1
             self.w0=w0
-            print(self.w1)
+            #print(self.w1)
         self.indices=np.arange(self.data.shape[0])
         num_indices=self.indices.shape[0]
         self.add_revcomp=add_revcomp
@@ -291,7 +291,8 @@ class SNPGenerator(DataGenerator):
 
     #override the get_basic_batch definition to extract flanks around the bQTL
     # and insert the specified allele 
-    def get_basic_batch(self,idx): 
+    def get_basic_batch(self,idx):
+        print("generator idx:"+str(idx))
         #get seq positions
         inds=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
         
