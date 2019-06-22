@@ -15,14 +15,10 @@ def get_weighted_binary_crossentropy(w0_weights, w1_weights,ambig_val=np.nan):
         return K.mean(K.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig),tf.boolean_mask(y_pred,nonAmbig))*nonAmbigTimesWeightsPerTask, axis=-1);
     return weighted_binary_crossentropy; 
 
-def get_ambig_binary_crossentropy():
-    def ambig_binary_crossentropy(y_true,y_pred):
-        nonAmbig=tf.math.logical_not(tf.is_nan(y_true))
-        return K.mean(K.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)), axis=-1);
-    return ambig_binary_crossentropy; 
+def ambig_binary_crossentropy(y_true,y_pred):
+    nonAmbig=tf.math.logical_not(tf.is_nan(y_true))
+    return K.mean(K.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)), axis=-1);
 
-def get_ambig_mean_squared_error(ambig_val=np.nan): 
-    def ambig_mean_squared_error(y_true, y_pred):
-        nonAmbig=tf.math.logical_not(tf.is_nan(y_true))
-        return K.mean(K.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
-    return ambig_mean_squared_error
+def ambig_mean_squared_error(y_true, y_pred):
+    nonAmbig=tf.math.logical_not(tf.is_nan(y_true))
+    return K.mean(K.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
