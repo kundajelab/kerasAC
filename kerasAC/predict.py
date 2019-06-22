@@ -229,8 +229,8 @@ def get_model(args):
                     "fnr":fnr,
                     "precision":precision,
                     "f1":f1,
-                    "ambig_binary_crossentropy":get_ambig_binary_crossentropy(),
-                    "ambig_mean_squared_error":get_ambig_mean_squared_error()}
+                    "ambig_binary_crossentropy":ambig_binary_crossentropy,
+                    "ambig_mean_squared_error":ambig_mean_squared_error}
     w1,w0=get_weights(args)
     if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)
