@@ -1,5 +1,6 @@
 import numpy as np ;
 from kerasAC.metrics import * 
+from kerasAC.custom_losses import *
 
 def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
     np.random.seed(1234)
@@ -78,5 +79,6 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    model.compile(optimizer=adam,loss='mse',metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    loss=ambig_mean_squared_error
+    model.compile(optimizer=adam,loss=loss,metrics=[tpr,tnr, spearman_corr])
     return model

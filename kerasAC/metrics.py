@@ -33,6 +33,19 @@ def recall(y, z):
     tp, tn, fp, fn = contingency_table(y, z)
     return tp / (tp + fn+pseudocount)
 
+def tpr(y, z):
+    """
+    True positive rate `tp / (tp + fn)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tp / (tp + fn)
+
+def tnr(y, z):
+    """
+    True negative rate `tn / (tn + fp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tn / (tn + fp)
 
 def specificity(y, z):
     """True negative rate `tn / (tn + fp)`
