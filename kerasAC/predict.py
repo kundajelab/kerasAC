@@ -154,8 +154,8 @@ def get_predictions_basic(args,model):
                                   workers=args.threads,
                                   use_multiprocessing=True,
                                   verbose=1)
-        print("preactivation shape:"+str(preacts.shape))    
-    return [predictions,test_generator.data,preacts]
+        print("preactivation shape:"+str(preacts.shape))
+    return [predictions,test_generator.get_labels(),preacts]
 
 def get_predictions_variant(args,model):
     import pysam

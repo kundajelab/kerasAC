@@ -13,7 +13,7 @@ def get_weights(data):
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
     return w1,w0
-    
+
 
 def dinuc_shuffle(seq):
     #get list of dinucleotides
@@ -302,7 +302,7 @@ class DataGenerator(Sequence):
         else:
             pos_inds=inds[inds<self.universal_negative_offset]
             neg_inds=inds[inds>=self.universal_negative_offset]
-            bed_entries=np.concatenate((self.nonzero_bins.index[pos_inds],self.universal_negatives.index[neg_inds]),axis=0)
+            bed_entries=np.concatenate((self.nonzero_bins.index[pos_inds],self.universal_negatives.index[neg_inds-self.universal_negative_offset]),axis=0)
         #get sequences
         seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
         if self.add_revcomp==True:
@@ -334,7 +334,19 @@ class DataGenerator(Sequence):
                 np.random.shuffle(self.neg_indices)
             else:
                 np.random.shuffle(self.indices)
-
+    def get_labels(self):
+        if self.data_path is not None:
+            return self.data
+        else:
+            labels_nonzero=self.nonzero_bins
+            labels_universal_negatives=self.universal_negatives 
+            for task in labels_nonzero.columns:
+                if task in ['CHROM','START','END']:
+                    continue
+                labels_universal_negatives[task]=np.zeros(labels_universal_negatives.shape[0])
+            labels=pd.concat([labels_nonzero,labels_universal_negatives])
+            return labels
+        
 #generate batches of SNP data with specified allele column name and flank size 
 class SNPGenerator(DataGenerator):
     def __init__(self,data_path,ref_fasta,allele_col,flank_size=500,batch_size=128,expand_dims=True):
