@@ -5,6 +5,9 @@ def args_object_from_args_dict(args_dict):
     args_object=argparse.Namespace()
     #set the defaults for training/prediction/interpretation/cross-validation
     #training
+    vars(args_object)['data_path']=None
+    vars(args_object)['nonzero_bin_path']=None
+    vars(args_object)['universal_negative_path']=None 
     vars(args_object)['multigpu']=False
     vars(args_object)['batch_size']=1000
     vars(args_object)['num_train']=700000

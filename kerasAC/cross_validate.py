@@ -10,7 +10,9 @@ def parse_args():
     parser=argparse.ArgumentParser(add_help=True)
     parser.add_argument("--multi_gpu",action="store_true",default=False)
     parser.add_argument("--assembly",default="hg19")
-    parser.add_argument("--data_path",help="path that stores training/validation/test data")
+    parser.add_argument("--data_path",default=None,help="path that stores training/validation/test data")
+    parser.add_argument("--nonzero_bin_path",default=None)
+    parser.add_argument("--universal_negative_path",default=None) 
     parser.add_argument("--model_hdf5",required=True)
     parser.add_argument("--batch_size",type=int,default=1000)
     parser.add_argument("--init_weights",default=None)
@@ -20,7 +22,6 @@ def parse_args():
     parser.add_argument("--weighted",action="store_true")
     parser.add_argument('--w1',nargs="*", type=float, default=None)
     parser.add_argument('--w0',nargs="*", type=float, default=None)
-
     parser.add_argument("--from_checkpoint_weights",default=None)
     parser.add_argument("--from_checkpoint_arch",default=None)
     parser.add_argument("--num_tasks",required=True,type=int)

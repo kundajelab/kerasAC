@@ -11,7 +11,9 @@ import pdb
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("--multi_gpu",action="store_true",default=False) 
-    parser.add_argument("--data_path")
+    parser.add_argument("--data_path",default=None)
+    parser.add_argument("--nonzero_bin_path",default=None)
+    parser.add_argument("--universal_negative_path",default=None) 
     parser.add_argument("--train_chroms",nargs="*",default=None)
     parser.add_argument("--validation_chroms",nargs="*",default=None) 
     parser.add_argument("--train_path")
@@ -107,11 +109,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf.write(architecture_string)
     print("complete!!")
 
-
-def train(args):
-    if type(args)==type({}):
-        args=args_object_from_args_dict(args)
-
+def initialize_generators(args):
     if args.train_path==None:
         args.train_path=args.data_path
     if args.valid_path==None:
@@ -122,9 +120,14 @@ def train(args):
         train_upsample_ratio=0
     else:
         train_upsample=True
-        train_upsample_ratio=args.train_upsample 
-    train_generator=DataGenerator(args.train_path,
-                                  args.ref_fasta,
+        train_upsample_ratio=args.train_upsample
+        
+    train_generator=DataGenerator(data_path=args.train_path,
+                                  nonzero_bin_path=args.nonzero_bin_path,
+                                  universal_negative_path=args.universal_negative_path,
+                                  ref_fasta=args.ref_fasta,
+                                  batch_size=args.batch_size,
+                                  add_revcomp=args.revcomp,
                                   upsample=train_upsample,
                                   upsample_ratio=train_upsample_ratio,
                                   chroms_to_use=args.train_chroms,
@@ -138,16 +141,27 @@ def train(args):
     else:
         valid_upsample=True
         valid_upsample_ratio=args.valid_upsample
-    valid_generator=DataGenerator(args.valid_path,
-                                  args.ref_fasta,
+    valid_generator=DataGenerator(data_path=args.valid_path,
+                                  nonzero_bin_path=args.nonzero_bin_path,
+                                  universal_negative_path=args.universal_negative_path,
+                                  ref_fasta=args.ref_fasta,
+                                  batch_size=args.batch_size,
+                                  add_revcomp=args.revcomp,                        
                                   upsample=valid_upsample,
                                   upsample_ratio=valid_upsample_ratio,
                                   chroms_to_use=args.validation_chroms,
                                   expand_dims=args.expand_dims,
                                   tasks=args.tasks)
     print("generated validation data generator!")
-    w1,w0=get_weights(args,train_generator)
+    return train_generator, valid_generator 
     
+def train(args):
+    
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args)
+
+    train_generator,valid_generator=initialize_generators(args)   
+    w1,w0=get_weights(args,train_generator)
     try:
         if (args.architecture_from_file!=None):
             architecture_module=imp.load_source('',args.architecture_from_file)

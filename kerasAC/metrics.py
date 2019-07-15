@@ -89,5 +89,3 @@ def f1(y, z):
     _prec = precision(y, z)
     return 2 * (_prec * _recall) / (_prec + _recall+pseudocount)
 
-def spearman_corr(y_true,y_pred):
-    return tf.contrib.metrics.streaming_pearson_correlation(y_pred,y_true)

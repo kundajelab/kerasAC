@@ -103,14 +103,23 @@ def get_predictions_hammock(args,model):
             print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
             pdb.set_trace()
         all_names=all_names+names 
-        num_generated+=(end_index-start_index)
-        
+        num_generated+=(end_index-start_index)        
     return [predictions,data,all_names]
 
 def get_predictions_basic(args,model):
     import pysam
     import pandas as pd
-    test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms,expand_dims=args.expand_dims,tasks=args.tasks)
+    test_generator=DataGenerator(data_path=args.data_path,
+                                 nonzero_bin_path=args.nonzero_bin_path,
+                                 universal_negative_path=args.universal_negative_path,
+                                 ref_fasta=args.ref_fasta,
+                                 batch_size=args.batch_size,
+                                 upsample=False,
+                                 add_revcomp=False,
+                                 chroms_to_use=args.predict_chroms,
+                                 expand_dims=args.expand_dims,
+                                 tasks=args.tasks,
+                                 shuffle=False)
     predictions=model.predict_generator(test_generator,
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
@@ -127,8 +136,19 @@ def get_predictions_basic(args,model):
         elif args.calibrate_regression==True:
             print("getting pre-relu outputs (preacts)")
             preact_model=Model(inputs=model.input,
-                              outputs=model.layers[-1].output)
-        test_generator=DataGenerator(args.data_path,args.ref_fasta,upsample=False,add_revcomp=False,batch_size=1000,chroms_to_use=args.predict_chroms,expand_dims=args.expand_dims,tasks=args.tasks)
+                              outputs=model.layers[-1].output) 
+        test_generator=DataGenerator(args.data_path,
+                                     nonzero_bin_path=args.nonzero_bin_path,
+                                     universal_negative_path=args.universal_negative_path,
+                                     ref_fasta=args.ref_fasta,
+                                     upsample=False,
+                                     add_revcomp=False,
+                                     batch_size=args.batch_size,
+                                     chroms_to_use=args.predict_chroms,
+                                     expand_dims=args.expand_dims,
+                                     tasks=args.tasks,
+                                     shuffle=False)
+        
         preacts=preact_model.predict_generator(test_generator,
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
@@ -193,7 +213,9 @@ def parse_args():
     parser.add_argument('--weights',help='weights file for the model')
     parser.add_argument('--yaml',help='yaml file for the model')
     parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_path',required=True)
+    parser.add_argument('--data_path',default=None)
+    parser.add_argument("--nonzero_bin_path",default=None)
+    parser.add_argument("--universal_negative_path",default=None) 
     parser.add_argument('--predict_chroms',nargs="*",default=None) 
     parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
     parser.add_argument('--variant_bed')
@@ -318,7 +340,8 @@ def predict(args):
         model=get_model(args)
         predictions=get_predictions(args,model)
     assert not ((args.calibrate_classification==True) and (args.calibrate_regression==True))
-    predictions=calibrate(predictions,args,model)
+    if ((args.calibrate_classification==True) or (args.calibrate_regression==True)):
+        predictions=calibrate(predictions,args,model)
     if args.predictions_pickle!=None:
         #pickle the predictions in case an error occurs downstream
         #this will allow for easy recovery of model predictions without having to regenerate them
@@ -352,7 +375,7 @@ def write_performance_metrics(output_file,metrics_dict,tasks):
     
 def main():
     args=parse_args()
-    predict(args) 
+    predict(args)
 
     
 
