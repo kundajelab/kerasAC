@@ -63,3 +63,14 @@ def multi_method_interpret(model,
         plot_all_interpretations([outputs],X)    
     return outputs 
 
+
+def format_snps(old_df, alt_col):
+    multirow = old_df[alt_col].str.split(',').apply(Series, 1).stack()
+    multirow.index = multirow.index.droplevel(-1)
+    multirow.name = alt_col
+    x = old_df.columns
+    del old_df[alt_col]
+    new_df = old_df.join(multirow)
+    new_df = new_df[x]
+    return new_df
+
