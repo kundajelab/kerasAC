@@ -372,6 +372,7 @@ def predict(args):
 def write_performance_metrics(output_file,metrics_dict,tasks):
     metrics_df=pd.DataFrame(metrics_dict,index=tasks).transpose()
     metrics_df.to_csv(output_file,sep='\t',header=True,index=True)
+    print(metrics_df)
     
 def main():
     args=parse_args()
