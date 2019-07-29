@@ -4,7 +4,7 @@ import numpy as np
 import random
 import math 
 import pysam
-from .util import ltrdict
+from .util import *
 import threading
 import pickle
 import pdb
@@ -14,31 +14,6 @@ def get_weights(data):
     w0=[float(data.shape[0])/sum(data.iloc[:,i]==0) for i in range(data.shape[1])]
     return w1,w0
 
-
-def dinuc_shuffle(seq):
-    #get list of dinucleotides
-    nucs=[]
-    for i in range(0,len(seq),2):
-        nucs.append(seq[i:i+2])
-    #generate a random permutation
-    random.shuffle(nucs)
-    return ''.join(nucs) 
-
-
-def revcomp(seq):
-    seq=seq[::-1].upper()
-    comp_dict=dict()
-    comp_dict['A']='T'
-    comp_dict['T']='A'
-    comp_dict['C']='G'
-    comp_dict['G']='C'
-    rc=[]
-    for base in seq:
-        if base in comp_dict:
-            rc.append(comp_dict[base])
-        else:
-            rc.append(base)
-    return ''.join(rc)
 
 def get_probability_thresh_for_precision(truth,predictions,precision_thresh):
     from sklearn.metrics import precision_recall_curve
@@ -362,7 +337,7 @@ class SNPGenerator(DataGenerator):
         entries=self.data.iloc[inds]
         seqs=[]
         for index,row in entries.iterrows():
-            allele=row[self.allele_col]
+            allele=row[self.allele_col].split(',')[0] 
             chrom=index[0]
             pos=index[1]
             start=pos-self.flank_size
