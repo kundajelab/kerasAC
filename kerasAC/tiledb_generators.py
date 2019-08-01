@@ -39,6 +39,7 @@ def get_upsampled_indices(data_arrays,
         upsampled_chrom_name_array=[chrom]*upsampled_indices_chrom.shape[0]
         non_upsampled_chrom_name_array=[chrom]*non_upsampled_indices_chrom.shape[0]
 
+        print("upsampled_chrom_name_array ", upsampled_chrom_name_array.shape, "non_upsampled_chrom_name_array ", non_upsampled_chrom_name_array.shape)
         cur_upsampled_df=pd.DataFrame.from_dict({'chrom':upsampled_chrom_name_array,
                                                'indices':upsampled_indices_chrom})
         cur_non_upsampled_df=pd.DataFrame.from_dict({'chrom':non_upsampled_chrom_name_array,
