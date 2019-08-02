@@ -7,6 +7,7 @@ import pysam
 from .util import *
 import tiledb
 import pdb 
+import time
 
 def get_upsampled_indices(data_arrays,
                           partition_attribute_for_upsample,
@@ -20,6 +21,7 @@ def get_upsampled_indices(data_arrays,
         upsampled_indices_chrom=None
         non_upsampled_indices_chrom=None
         chrom_size=None
+        t1 = time.time()
         for task in data_arrays[chrom]:
             cur_vals=data_arrays[chrom][task][:][partition_attribute_for_upsample]
             if chrom_size is None:
@@ -31,20 +33,26 @@ def get_upsampled_indices(data_arrays,
                 upsampled_indices_chrom=upsampled_indices_task_chrom
             else:
                 upsampled_indices_chrom=np.union1d(upsampled_indices_chrom,upsampled_indices_task_chrom)
+        t2 = time.time()
         print("got indices to upsample for chrom:"+str(chrom))
+        print(t2-t1)
         non_upsampled_indices_chrom=np.setdiff1d(np.array(range(chrom_size)),
                                            upsampled_indices_chrom)
+        t3 = time.time()
         print("got indices to NOT upsampled for chrom:"+str(chrom))
-        
+        print(t3-t2)
         upsampled_chrom_name_array=[chrom]*upsampled_indices_chrom.shape[0]
         non_upsampled_chrom_name_array=[chrom]*non_upsampled_indices_chrom.shape[0]
-
-        print("upsampled_chrom_name_array ", upsampled_chrom_name_array.shape, "non_upsampled_chrom_name_array ", non_upsampled_chrom_name_array.shape)
+	
+        print(len(upsampled_chrom_name_array), upsampled_chrom_name_array[0:20])
+        print(upsampled_indices_chrom.shape, upsampled_indices_chrom[0:20])
         cur_upsampled_df=pd.DataFrame.from_dict({'chrom':upsampled_chrom_name_array,
-                                               'indices':upsampled_indices_chrom})
+                                               'indices':upsampled_indices_chrom.flatten()})
         cur_non_upsampled_df=pd.DataFrame.from_dict({'chrom':non_upsampled_chrom_name_array,
-                                                   'indices':non_upsampled_indices_chrom})
+                                                   'indices':non_upsampled_indices_chrom.flatten()})
         print("generated coord dataframes for chrom:"+str(chrom))
+        t4 = time.time()
+        print(t4-t3)
         if upsampled_indices is None:
             upsampled_indices=cur_upsampled_df
             non_upsampled_indices=cur_non_upsampled_df
@@ -52,12 +60,16 @@ def get_upsampled_indices(data_arrays,
             upsampled_indices=pd.concat([upsampled_indices,cur_upsampled_df],axis=0)
             non_upsampled_indices=pd.concat([non_upsampled_indices,cur_non_upsampled_df],axis=0)
         print("added chrom coords to master list")
+        t5 = time.time()
+        print(t5-t4)
         
     if shuffle==True:
         print("shuffling upsampled and non-upsampled dataframes prior to start of training")
         upsampled_indices.apply(np.random.shuffle,axis=0)
         non_upsampled_indices.apply(np.random.shuffle,axis=0)
-        
+        t6 = time.time()
+        print(t6-t5)
+
     print("finished generator init")
     return upsampled_indices,non_upsampled_indices 
 
