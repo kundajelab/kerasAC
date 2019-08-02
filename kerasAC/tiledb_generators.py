@@ -38,9 +38,21 @@ def get_upsampled_indices(data_arrays,
         print(t2-t1)
         non_upsampled_indices_chrom=np.setdiff1d(np.array(range(chrom_size)),
                                            upsampled_indices_chrom)
-        t3 = time.time()
+        t3_1 = time.time()
+        print(t3_1 - t2)
+        non_upsampled_indices_chrom_=np.delete(np.array(range(chrom_size)),
+                                           upsampled_indices_chrom)
+        t3_2 = time.time()
+        print(t3_2 - t3_1)
+        mask = np.zeros(chrom_size,dtype=bool)
+        mask[upsampled_indices_chrom] = True
+        non_upsampled_indices_chrom__ = np.array(range(chrom_size))[~mask]
+        t3_3 = time.time()
         print("got indices to NOT upsampled for chrom:"+str(chrom))
-        print(t3-t2)
+        print(t3_3-t3_2)
+        print(non_upsampled_indices_chrom.shape, non_upsampled_indices_chrom_.shape, non_upsampled_indices_chrom__.shape)
+        print(np.array_equal(non_upsampled_indices_chrom, non_upsampled_indices_chrom_))
+        print(np.array_equal(non_upsampled_indices_chrom, non_upsampled_indices_chrom__))
         upsampled_chrom_name_array=[chrom]*upsampled_indices_chrom.shape[0]
         non_upsampled_chrom_name_array=[chrom]*non_upsampled_indices_chrom.shape[0]
 	
@@ -52,7 +64,7 @@ def get_upsampled_indices(data_arrays,
                                                    'indices':non_upsampled_indices_chrom.flatten()})
         print("generated coord dataframes for chrom:"+str(chrom))
         t4 = time.time()
-        print(t4-t3)
+        print(t4-t3_2)
         if upsampled_indices is None:
             upsampled_indices=cur_upsampled_df
             non_upsampled_indices=cur_non_upsampled_df
