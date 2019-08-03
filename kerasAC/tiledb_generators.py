@@ -32,17 +32,19 @@ def get_upsampled_indices(data_arrays,
             else:
                 upsampled_indices_chrom=np.union1d(upsampled_indices_chrom,upsampled_indices_task_chrom)
         print("got indices to upsample for chrom:"+str(chrom))
-        non_upsampled_indices_chrom=np.setdiff1d(np.array(range(chrom_size)),
-                                           upsampled_indices_chrom)
+
+        mask = np.zeros(chrom_size, dtype=bool)
+        mask[upsampled_indices_chrom] = True
+        non_upsampled_indices_chrom = np.array(range(chrom_size))[~mask]
         print("got indices to NOT upsampled for chrom:"+str(chrom))
-        
+
         upsampled_chrom_name_array=[chrom]*upsampled_indices_chrom.shape[0]
         non_upsampled_chrom_name_array=[chrom]*non_upsampled_indices_chrom.shape[0]
 
         cur_upsampled_df=pd.DataFrame.from_dict({'chrom':upsampled_chrom_name_array,
-                                               'indices':upsampled_indices_chrom})
+                                               'indices':upsampled_indices_chrom.flatten()})
         cur_non_upsampled_df=pd.DataFrame.from_dict({'chrom':non_upsampled_chrom_name_array,
-                                                   'indices':non_upsampled_indices_chrom})
+                                                   'indices':non_upsampled_indices_chrom.flatten()})
         print("generated coord dataframes for chrom:"+str(chrom))
         if upsampled_indices is None:
             upsampled_indices=cur_upsampled_df
@@ -51,12 +53,12 @@ def get_upsampled_indices(data_arrays,
             upsampled_indices=pd.concat([upsampled_indices,cur_upsampled_df],axis=0)
             non_upsampled_indices=pd.concat([non_upsampled_indices,cur_non_upsampled_df],axis=0)
         print("added chrom coords to master list")
-        
+
     if shuffle==True:
         print("shuffling upsampled and non-upsampled dataframes prior to start of training")
         upsampled_indices.apply(np.random.shuffle,axis=0)
         non_upsampled_indices.apply(np.random.shuffle,axis=0)
-        
+
     print("finished generator init")
     return upsampled_indices,non_upsampled_indices 
 
