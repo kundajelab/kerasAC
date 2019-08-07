@@ -339,7 +339,7 @@ class SNPGenerator(DataGenerator):
         for index,row in entries.iterrows():
             allele=row[self.allele_col].split(',')[0] 
             chrom=index[0]
-            pos=index[1]
+            pos=index[1]-1
             start=pos-self.flank_size
             end=pos+self.flank_size
             seq=self.ref.fetch(chrom,start,end)
