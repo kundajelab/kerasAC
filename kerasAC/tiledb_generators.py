@@ -107,8 +107,10 @@ def open_tiledb_arrays_for_reading(tasks,chroms):
 
 class TiledbGenerator(Sequence):
     def __init__(self,
-                 chrom_sizes,
-                 shuffle,
+                 chrom_sizes=None,
+                 chroms=None,
+                 shuffle_epoch_start,
+                 shuffle_epoch_end,
                  batch_size,
                  task_file,
                  label_source,
@@ -126,10 +128,15 @@ class TiledbGenerator(Sequence):
         partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         label_aggregation -- one of 'avg','max',None
         '''
-        self.shuffle=shuffle
+        self.shuffle_epoch_start=shuffle_epoch_start
+        self.shuffle_epoch_end=shuffle_epoch_end
         self.batch_size=batch_size
         self.tasks=open(task_file,'r').read().strip().split('\n')
-        self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]
+        if chroms is not None:
+            self.chroms_to_use=chroms
+        else: 
+            self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]
+            
         self.data_arrays=open_tiledb_arrays_for_reading(self.tasks,self.chroms_to_use)
         self.label_source=label_source
         self.label_flank=label_flank

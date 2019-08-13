@@ -140,22 +140,38 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     print("complete!!")
 
 def initialize_generators_tiledb(args, train_upsample_ratio, valid_upsample_ratio):
-    train_generator=TiledbGenerator()
-    valid_generator=TiledbGenerator()
-    
-    train_generator=DataGenerator(data_path=args.train_path,
-                                  nonzero_bin_path=args.nonzero_bin_path,
-                                  universal_negative_path=args.universal_negative_path,
-                                  ref_fasta=args.ref_fasta,
-                                  batch_size=args.batch_size,
-                                  add_revcomp=args.revcomp,
-                                  upsample=train_upsample,
-                                  upsample_ratio=train_upsample_ratio,
-                                  chroms_to_use=args.train_chroms,
-                                  get_w1_w0=args.weighted,
-                                  expand_dims=args.expand_dims,
-                                  tasks=args.tasks)
+    train_generator=TiledbGenerator(chroms=args.train_chroms,
+                                    shuffle_start=args.shuffle_epoch_start,
+                                    shuffle_end=args.shuffle_epoch_end,
+                                    batch_size=args.batch_size,
+                                    task_file=args.tiledb_tasks,
+                                    label_source=args.tiledb_label_source_attribute,
+                                    label_flank=args.label_flank,
+                                    label_aggregation=args.label_aggregation,
+                                    sequence_flank=args.sequence_flank,
+                                    partition_attribute_for_upsample=args.partition_attribute_for_upsample,
+                                    partition_thresh_for_upsample=args.partition_thresh_for_upsample,
+                                    upsample_ratio=train_upsample_ratio,
+                                    revcomp=args.revcomp,
+                                    transform_label_vals=args.transform_label_vals)
     print("generated training data generator!")
+    
+    valid_generator=TiledbGenerator(chroms=args.valid_chroms,
+                                    shuffle_start=args.shuffle_epoch_start,
+                                    shuffle_end=args.shuffle_epoch_end,
+                                    batch_size=args.batch_size,
+                                    task_file=args.tiledb_tasks,
+                                    label_source=args.tiledb_label_source_attribute,
+                                    label_flank=args.label_flank,
+                                    label_aggregation=args.label_aggregation,
+                                    sequence_flank=args.sequence_flank,
+                                    partition_attribute_for_upsample=args.partition_attribute_for_upsample,
+                                    partition_thresh_for_upsample=args.partition_thresh_for_upsample,
+                                    upsample_ratio=valid_upsample_ratio,
+                                    revcomp=args.revcomp,
+                                    transform_label_vals=args.transform_label_vals)
+    print("generated validation data generator")
+    return train_generator, valid_generator
 
 def get_upsampling_parameters(args):
     if args.train_path==None:
