@@ -1,4 +1,3 @@
-#Raw keras model
 import importlib
 import imp
 import argparse
@@ -6,53 +5,84 @@ import numpy as np
 import h5py
 from .generators import *
 from .config import args_object_from_args_dict
+from .tiledb_generators import * 
 import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser()
-    parser.add_argument("--multi_gpu",action="store_true",default=False) 
-    parser.add_argument("--data_path",default=None)
-    parser.add_argument("--nonzero_bin_path",default=None)
-    parser.add_argument("--universal_negative_path",default=None) 
-    parser.add_argument("--train_chroms",nargs="*",default=None)
-    parser.add_argument("--validation_chroms",nargs="*",default=None) 
-    parser.add_argument("--train_path")
-    parser.add_argument("--valid_path")
-    parser.add_argument("--model_hdf5")
-    parser.add_argument("--batch_size",type=int,default=1000)
-    parser.add_argument("--init_weights",default=None)
-    parser.add_argument("--num_train",type=int,default=700000)
-    parser.add_argument("--num_valid",type=int,default=150000)
-    parser.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
-    parser.add_argument('--w1',nargs="*", type=float, default=None)
-    parser.add_argument('--w0',nargs="*", type=float, default=None)
-    parser.add_argument("--w1_w0_file",default=None)
-    parser.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
-    parser.add_argument("--weighted",action="store_true")
-    parser.add_argument("--from_checkpoint_weights",default=None)
-    parser.add_argument("--from_checkpoint_arch",default=None)
-    parser.add_argument("--num_tasks",type=int)
+
+    tiledbgroup=parser.add_argument_group('tiledb')
+    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    tiledbgroup.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--label_flank",type=float,help="flank around bin center to use in generating labels")
+    tiledbgroup.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
+    tiledbgroup.add_argument("--sequence_flank",help="length of sequence around bin center to use in one-hot-encoding")
+    tiledbgroup.add_argument("--partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
+    tiledbgroup.add_argument("--partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+
+    input_data_path=parser.add_argument_group('input_data_path')
+    input_data_path.add_argument("--tiledb_tasks_file",default=None,help="tsv file containing paths to tiledb tasks")
+    input_data_path.add_argument("--data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
+    input_data_path.add_argument("--nonzero_bin_path",default=None,help="seqdataloader output file containing genome bins with non-zero values")
+    input_data_path.add_argument("--universal_negative_path",default=None,help="seqdataloader output file containing genome bins that are universal negatives")
+    input_data_path.add_argument("--train_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the training split")
+    input_data_path.add_argument("--valid_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the validation split")
+    input_data_path.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
+    
+    train_val_splits=parser.add_argument_group("train_val_splits")
+    train_val_splits.add_argument("--train_chroms",nargs="*",default=None)
+    train_val_splits.add_argument("--validation_chroms",nargs="*",default=None)
+    train_val_splits.add_argument("--num_train",type=int,default=700000)
+    train_val_splits.add_argument("--num_valid",type=int,default=150000)
+
+    weights_params=parser.add_argument_group("weights_params")
+    weights_params.add_argument("--init_weights",default=None)
+    weights_params.add_argument('--w1',nargs="*", type=float, default=None)
+    weights_params.add_argument('--w0',nargs="*", type=float, default=None)
+    weights_params.add_argument("--w1_w0_file",default=None)
+    weights_params.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
+    weights_params.add_argument("--weighted",action="store_true",help="separate task-specific weights denoted with w1, w0 args are to be used")
+    weights_params.add_argument("--from_checkpoint_weights",default=None)
+    
+    arch_params=parser.add_argument_group("arch_params")
+    arch_params.add_argument("--from_checkpoint_arch",default=None)
+    arch_params.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
+    arch_params.add_argument("--architecture_from_file",type=str,default=None)
+    arch_params.add_argument("--num_tasks",type=int)
+    arch_params.add_argument("--tasks",nargs="*",default=None)
+    
+    batch_params=parser.add_argument_group("batch_params")
+    batch_params.add_argument("--batch_size",type=int,default=1000)
+    batch_params.add_argument("--revcomp",action="store_true")
+    batch_params.add_argument("--transform_label_vals",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
+    batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
+    batch_params.add_argument("--expand_dims",default=True)
+    batch_params.add_argument("--train_upsample", type=float, default=None)
+    batch_params.add_argument("--valid_upsample", type=float, default=None)
+
+    epoch_params=parser.add_argument_group("epoch_params")
+    epoch_params.add_argument("--epochs",type=int,default=40)
+    epoch_params.add_argument("--patience",type=int,default=3)
+    epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
+    epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=True)
+    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=True)
+    
     #add functionality to train on individuals' allele frequencies
-    parser.add_argument("--vcf_file",default=None)
-    parser.add_argument("--global_vcf",action="store_true")
-    parser.add_argument("--revcomp",action="store_true")
-    parser.add_argument("--epochs",type=int,default=40)
-    parser.add_argument("--patience",type=int,default=3)
-    parser.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    parser.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
-    parser.add_argument("--architecture_from_file",type=str,default=None)
-    parser.add_argument("--tensorboard",action="store_true")
-    parser.add_argument("--tensorboard_logdir",default="logs")
-    parser.add_argument("--squeeze_input_for_gru",action="store_true")
-    parser.add_argument("--seed",type=int,default=1234)
-    parser.add_argument("--train_upsample", type=float, default=None)
-    parser.add_argument("--valid_upsample", type=float, default=None)
-    parser.add_argument("--threads",type=int,default=1)
-    parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument("--calibrate_classification",action="store_true",default=False)
-    parser.add_argument("--calibrate_regression",action="store_true",default=False)
-    parser.add_argument("--expand_dims",default=True)
-    parser.add_argument("--tasks",nargs="*",default=None)
+    snp_params=parser.add_argument_group("snp_params")
+    snp_params.add_argument("--vcf_file",default=None)
+    snp_params.add_argument("--global_vcf",action="store_true")
+
+    parallelization_params=parser.add_argument_group("parallelization")
+    parallelization_params.add_argument("--threads",type=int,default=1)
+    parallelization_params.add_argument("--max_queue_size",type=int,default=100)
+    parallelization_params.add_argument("--multi_gpu",action="store_true",default=False) 
+
+    vis_params=parser.add_argument_group("visualization")            
+    vis_params.add_argument("--tensorboard",action="store_true")
+    vis_params.add_argument("--tensorboard_logdir",default="logs")
+    
+    parser.add_argument("model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
+    parser.add_argument("seed",type=int,default=1234)    
     return parser.parse_args()
 
 def get_weights(args,train_generator):
@@ -109,19 +139,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf.write(architecture_string)
     print("complete!!")
 
-def initialize_generators(args):
-    if args.train_path==None:
-        args.train_path=args.data_path
-    if args.valid_path==None:
-        args.valid_path=args.data_path
-
-    if args.train_upsample==None:
-        train_upsample=False
-        train_upsample_ratio=0
-    else:
-        train_upsample=True
-        train_upsample_ratio=args.train_upsample
-        
+def initialize_generators_tiledb(args, train_upsample_ratio, valid_upsample_ratio):
+    train_generator=TiledbGenerator()
+    valid_generator=TiledbGenerator()
+    
     train_generator=DataGenerator(data_path=args.train_path,
                                   nonzero_bin_path=args.nonzero_bin_path,
                                   universal_negative_path=args.universal_negative_path,
@@ -135,12 +156,53 @@ def initialize_generators(args):
                                   expand_dims=args.expand_dims,
                                   tasks=args.tasks)
     print("generated training data generator!")
+
+def get_upsampling_parameters(args):
+    if args.train_path==None:
+        train_path=args.data_path
+    else:
+        train_path=args.train_path
+        
+    if args.valid_path==None:
+        valid_path=args.data_path
+    else:
+        valid_path=args.valid_path
+        
+    if args.train_upsample==None:
+        train_upsample=False
+        train_upsample_ratio=0
+    else:
+        train_upsample=True
+        train_upsample_ratio=args.train_upsample
     if args.valid_upsample==None:
         valid_upsample=False
         valid_upsample_ratio=0
     else:
         valid_upsample=True
         valid_upsample_ratio=args.valid_upsample
+    return train_path, valid_path, train_upsample,train_upsample_ratio,valid_upsample,valid_upsample_ratio
+
+def initialize_generators(args):
+    #get upsampling parameters
+    train_path, valid_path, train_upsample,train_upsample_ratio,valid_upsample,valid_upsample_ratio=get_upsampling_parameters(args)
+
+    #data is being read in from tiledb for training 
+    if args.tiledb_data_file is not None:
+        return initialize_generators_tiledb(args,train_upsample_ratio,valid_upsample_ratio)
+    
+    train_generator=DataGenerator(data_path=args.train_path,
+                                  nonzero_bin_path=args.nonzero_bin_path,
+                                  universal_negative_path=args.universal_negative_path,
+                                  ref_fasta=args.ref_fasta,
+                                  batch_size=args.batch_size,
+                                  add_revcomp=args.revcomp,
+                                  upsample=train_upsample,
+                                  upsample_ratio=train_upsample_ratio,
+                                  chroms_to_use=args.train_chroms,
+                                  get_w1_w0=args.weighted,
+                                  expand_dims=args.expand_dims,
+                                  tasks=args.tasks)
+    print("generated training data generator!")
     valid_generator=DataGenerator(data_path=args.valid_path,
                                   nonzero_bin_path=args.nonzero_bin_path,
                                   universal_negative_path=args.universal_negative_path,

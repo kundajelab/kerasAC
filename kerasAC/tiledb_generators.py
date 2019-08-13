@@ -117,7 +117,7 @@ class TiledbGenerator(Sequence):
                  sequence_flank,
                  partition_attribute_for_upsample,
                  partition_thresh_for_upsample=1,
-                 fraction_to_upsample=0,
+                 upsample_ratio=0,
                  revcomp=False,
                  transform_label_vals=None,
                  pseudocount=0):
@@ -149,7 +149,7 @@ class TiledbGenerator(Sequence):
         if self.revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
             
-        self.upsampled_batch_size=math.ceil(self.fraction_to_upsample*self.batch_size)
+        self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size
         
         

@@ -6,6 +6,12 @@ def args_object_from_args_dict(args_dict):
     #set the defaults for training/prediction/interpretation/cross-validation
     #training
     vars(args_object)['data_path']=None
+    vars(args_object)['tiledb_tasks_file']=None
+    vars(args_object)['chrom_sizes']=None
+    vars(args_object)['label_source_attribute']="fc_bigwig"
+    vars(args_object)['label_aggregation']=None
+    vars(args_object)['partition_attribute_for_upsample']='idr_peak'
+    vars(args_object)['partition_thresh_for_upsample']=1
     vars(args_object)['nonzero_bin_path']=None
     vars(args_object)['universal_negative_path']=None 
     vars(args_object)['multigpu']=False
