@@ -93,7 +93,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     if w0!=None:
         loss=get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
-        loss=get_ambig_binary_crossentropy() 
+        loss=ambig_binary_crossentropy 
     model.compile(optimizer=adam,
                   loss=loss,
                   metrics=[recall, specificity, fpr, fnr, precision, f1])
