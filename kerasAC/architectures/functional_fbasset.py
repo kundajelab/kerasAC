@@ -1,11 +1,18 @@
+#functional factorized bassett? 
 import numpy as np ;
 from keras.constraints import max_norm
 from kerasAC.metrics import *
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
 from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the arguments
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    seed=args.seed
+    
+    np.random.seed(seed)
     import keras;
     from keras.layers import (
         Activation, AveragePooling1D, BatchNormalization,

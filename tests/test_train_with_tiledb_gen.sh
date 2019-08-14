@@ -1,0 +1,22 @@
+CUDA_VISIBLE_DEVICES=3 kerasAC_train --tiledb_tasks_file tasks.tsv \
+                       --train_chroms chr2 chr3 chr4 chr5 chr6 chr7 chr9 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY \
+                       --valid_chroms chr8 chr10 \
+                       --batch_size 100 \
+                       --label_source fc_bigwig \
+                       --label_flank 1500 \
+                       --label_aggregation None \
+                       --sequence_flank 6500 \
+		       --partition_attribute_for_upsample idr_peak \
+		       --partition_thresh_for_upsample 1 \
+		       --train_upsample 1 \
+		       --valid_upsample 0 \
+		       --num_train 100000 \
+		       --num_valid 100000 \
+		       --num_tasks 1 \
+		       --threads 1 \
+		       --max_queue_size 100 \
+		       --patience 3 \
+		       --patience_lr 2 \
+		       --model_hdf5 DNASE.K562.regression.profile \
+		       --ref_fasta /mnt/data/annotations/by_release/hg20.GRCh38/GRCh38.genome.fa \
+		       --architecture_spec profile_model

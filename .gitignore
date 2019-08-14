@@ -1,9 +1,9 @@
 __pycache__/
-.pyc
-.ipynb_checkpoints
-.idea
-/kerasAC/architectures/__pycache__*
-/kerasAC/__pycache__*
+*.pyc
+*.ipynb_checkpoints
+*.idea
+kerasAC/architectures/__pycache__*
+kerasAC/__pycache__*
 kerasAC.egg-info/
 *~
 build/

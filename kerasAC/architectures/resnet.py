@@ -59,8 +59,14 @@ def l4_block(x):
 
 
 #note: functional model
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights=None,checkpoint_weights=None,checkpoint_args=None,ntasks=None):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the args
+    w0=args.w0
+    w1=args.w1
+    ntasks=args.ntasks
+    seed=args.seed
+    
+    np.random.seed(seed)
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
 

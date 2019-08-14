@@ -240,6 +240,8 @@ def train(args):
 
     train_generator,valid_generator=initialize_generators(args)   
     w1,w0=get_weights(args,train_generator)
+    args.w1=w1
+    args.w0=w0
     try:
         if (args.architecture_from_file!=None):
             architecture_module=imp.load_source('',args.architecture_from_file)
@@ -247,12 +249,7 @@ def train(args):
             architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
         raise Exception("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model=architecture_module.getModelGivenModelOptionsAndWeightInits(w0,
-                                                                      w1,
-                                                                      args.init_weights,
-                                                                      args.from_checkpoint_weights,
-                                                                      args.from_checkpoint_arch,
-                                                                      args.num_tasks,args.seed)
+    model=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
     if args.multi_gpu==True:
         try:
             model=multi_gpu_model(model)

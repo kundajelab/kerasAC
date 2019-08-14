@@ -16,7 +16,11 @@ from keras import backend as K
 K.set_image_data_format('channels_last')
 print(K.image_data_format())
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the args
+    ntasks=args.ntasks
+    seed=args.seed
+    
     np.random.seed(seed)
     model=Sequential()
     model.add(Conv2D(filters=50,kernel_size=(1,15),padding="same", kernel_constraint=max_norm(7.0,axis=-1),input_shape=(1,1000,4)))

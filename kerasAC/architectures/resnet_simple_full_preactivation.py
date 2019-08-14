@@ -22,13 +22,17 @@ def l1_block(x):
     tmp=Activation('relu')(tmp)
     tmp=Conv2D(filters=300,padding="same",kernel_size=(1,7))(tmp)
     out=Add()([x,tmp])
-    return out
-
-    
+    return out   
     
 #note: functional model
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights=None,checkpoint_weights=None,checkpoint_args=None,ntasks=None):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the args
+    seed=args.seed
+    ntasks=args.ntasks
+    w0=args.w0
+    w1=args.w1
+    
+    np.random.seed(seed)
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
 

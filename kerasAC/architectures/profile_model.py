@@ -1,3 +1,114 @@
+import numpy as np ;
+from kerasAC.metrics import * 
+from kerasAC.custom_losses import *
+import pdb
+
+
+def res_block(conv,num_filter,f_width,act,d_rate,i,bn_true=True):
+    import tensorflow as tf
+    import keras
+    from keras import backend as K
+    from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
+    from keras.models import Sequential,Model
+    from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
+    from keras.layers.convolutional import Conv1D,Conv2D,Cropping1D
+    from keras.layers.normalization import BatchNormalization
+    from keras.regularizers import l1,l2
+    from keras.optimizers import SGD,RMSprop,Adam
+    from sklearn.metrics import average_precision_score
+    crop_id=Cropping1D(d_rate*(f_width-1))(conv)
+    conv1 = BatchNormalization_mod(conv,bn_true)
+    conv1 = Activation("relu")(conv1)
+    conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_a')(conv1)
+    conv1 = BatchNormalization_mod(conv1,bn_true)
+    conv1 = Activation("relu")(conv1)
+    conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_b')(conv1)
+    return keras.layers.Add()([conv1, crop_id])
+
+def build1d_model_residual(input_width,input_dimension,number_of_convolutions,filters,filter_dim,dilation,activations,bn_true=True,max_flag=True):
+    import tensorflow as tf
+    import keras
+    from keras import backend as K
+    from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
+    from keras.models import Sequential,Model
+    from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
+    from keras.layers.convolutional import Conv1D,Conv2D
+    from keras.layers.normalization import BatchNormalization
+    from keras.regularizers import l1,l2
+    from keras.optimizers import SGD,RMSprop,Adam
+    from sklearn.metrics import average_precision_score
+    input1=Input(shape=(input_width,4), name='sequence')
+    conv=Conv1D(32,1, padding='same',activation='relu',name = 'upsampling')(input1)
+    for i in range(0,number_of_convolutions):
+            conv = res_block(conv,filters[i],filter_dim[i],activations,dilation[i],i,bn_true)
+    conv= Conv1D(32, 1,padding='valid', activation='relu',name='down_sampling')(conv)
+    output=Conv1D(1,1,activation='relu',name='dnase')(conv)
+    model = Model(input=[input1],output=[output])
+    model.compile(optimizer='adam',loss='mse',metrics=['accuracy'])
+    return model
+
+def getModelGivenModelOptionsAndWeightInits(args):
+    np.random.seed(args.seed)
+    input_width=2*args.13000 
+    input_dimension=4
+    number_of_convolutions=16
+    filters=[32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32]
+    filter_dim=[11,11,11,11,11,11,11,11,21,21,21,21,41,41,41,41]
+    dilation=[1,1,1,1,4,4,4,4,10,10,10,10,25,25,25,25]
+    activations='relu'
+    bn_true=True
+
+    import keras;
+    from keras.models import Sequential
+    from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+    from keras.layers.convolutional import Conv2D, MaxPooling2D
+    from keras.optimizers import Adadelta, SGD, RMSprop;
+    import keras.losses;
+    from keras.constraints import maxnorm;
+    from keras.layers.normalization import BatchNormalization
+    from keras.regularizers import l1, l2    
+    from keras import backend as K
+    K.set_image_data_format('channels_last')
+    print(K.image_data_format())
+
+    #load the weight initializations 
+    data=np.load(init_weights);
+    model=Sequential()
+    model.add(Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4),weights=[data['0.Conv/weights:0'],np.zeros(300,)],padding="same"))
+    model.add(BatchNormalization(axis=-1,weights=[data['2.BatchNorm/gamma:0'],data['1.BatchNorm/beta:0'],np.zeros(300,),np.zeros(300,)]))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(1,3)))
+    model.add(Conv2D(filters=200,kernel_size=(1,11),weights=[data['3.Conv_1/weights:0'],np.zeros(200,)],padding="same"))
+    model.add(BatchNormalization(axis=-1,weights=[data['5.BatchNorm_1/gamma:0'],data['4.BatchNorm_1/beta:0'],np.zeros(200,),np.zeros(200,)]))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(1,4)))
+    model.add(Conv2D(filters=200,kernel_size=(1,7),weights=[data['6.Conv_2/weights:0'],np.zeros(200,)],padding="same"))
+    model.add(BatchNormalization(axis=-1,weights=[data['8.BatchNorm_2/gamma:0'],data['7.BatchNorm_2/beta:0'],np.zeros(200,),np.zeros(200,)]))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(1,4)))
+
+    model.add(Flatten())
+    model.add(Dense(1000,weights=[data['9.fc0/fully_connected/weights:0'],np.zeros(1000,)]))
+    model.add(BatchNormalization(axis=1,weights=[data['11.fc0/BatchNorm/gamma:0'],data['10.fc0/BatchNorm/beta:0'],np.zeros(1000,),np.zeros(1000,)]))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+
+    model.add(Dense(1000,weights=[data['12.fc1/fully_connected/weights:0'],np.zeros(1000,)]))
+    model.add(BatchNormalization(axis=1,weights=[data['14.fc1/BatchNorm/gamma:0'],data['13.fc1/BatchNorm/beta:0'],np.zeros(1000,),np.zeros(1000,)]))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+
+    model.add(Dense(ntasks))
+
+        
+    adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    print("compiling!")
+    loss=ambig_mean_squared_error
+    model.compile(optimizer=adam,loss=loss)
+    return model
+
+
+
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -52,14 +163,6 @@ validation_data=dnase_positives_validation
 test_data=dnase_positives_test
 print validation_data[0:5]
 
-input_width=13000 
-input_dimension=4
-number_of_convolutions=16
-filters=[32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32]
-filter_dim=[11,11,11,11,11,11,11,11,21,21,21,21,41,41,41,41]
-dilation=[1,1,1,1,4,4,4,4,10,10,10,10,25,25,25,25]
-activations='relu'
-bn_true=True
 
 
 
@@ -71,48 +174,6 @@ def BatchNormalization_mod(conv, bn_flag=True):
         return conv
 
 
-def res_block(conv,num_filter,f_width,act,d_rate,i,bn_true=True):
-    import tensorflow as tf
-    import keras
-    from keras import backend as K
-    from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
-    from keras.models import Sequential,Model
-    from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
-    from keras.layers.convolutional import Conv1D,Conv2D,Cropping1D
-    from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1,l2
-    from keras.optimizers import SGD,RMSprop,Adam
-    from sklearn.metrics import average_precision_score
-    crop_id=Cropping1D(d_rate*(f_width-1))(conv)
-    conv1 = BatchNormalization_mod(conv,bn_true)
-    conv1 = Activation("relu")(conv1)
-    conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_a')(conv1)
-    conv1 = BatchNormalization_mod(conv1,bn_true)
-    conv1 = Activation("relu")(conv1)
-    conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_b')(conv1)
-    return keras.layers.Add()([conv1, crop_id])
-
-def build1d_model_residual(input_width,input_dimension,number_of_convolutions,filters,filter_dim,dilation,activations,bn_true=True,max_flag=True):
-    import tensorflow as tf
-    import keras
-    from keras import backend as K
-    from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
-    from keras.models import Sequential,Model
-    from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
-    from keras.layers.convolutional import Conv1D,Conv2D
-    from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1,l2
-    from keras.optimizers import SGD,RMSprop,Adam
-    from sklearn.metrics import average_precision_score
-    input1=Input(shape=(input_width,4), name='sequence')
-    conv=Conv1D(32,1, padding='same',activation='relu',name = 'upsampling')(input1)
-    for i in range(0,number_of_convolutions):
-            conv = res_block(conv,filters[i],filter_dim[i],activations,dilation[i],i,bn_true)
-    conv= Conv1D(32, 1,padding='valid', activation='relu',name='down_sampling')(conv)
-    output=Conv1D(1,1,activation='relu',name='dnase')(conv)
-    model = Model(input=[input1],output=[output])
-    model.compile(optimizer='adam',loss='mse',metrics=['accuracy'])
-    return model
 
 
 
