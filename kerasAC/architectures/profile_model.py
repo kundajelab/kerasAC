@@ -1,3 +1,4 @@
+import pdb 
 import numpy as np ;
 from sklearn.metrics import average_precision_score
 from kerasAC.metrics import * 
@@ -30,7 +31,7 @@ def res_block(conv,num_filter,f_width,act,d_rate,i,bn_true=True):
     conv1 = BatchNormalization_mod(conv,bn_true)
     conv1 = Activation("relu")(conv1)
     conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_a')(conv1)
-    conv1 = BatchNormalization_mod(conv1,bn_true)
+    conv1 = BatchNormalization_mod(conv1,bn_true)    
     conv1 = Activation("relu")(conv1)
     conv1 = Conv1D(num_filter,f_width,dilation_rate=d_rate,padding="valid",name='conv_'+str(i)+'_b')(conv1)
     return keras.layers.Add()([conv1, crop_id])
@@ -51,7 +52,6 @@ def getModelGivenModelOptionsAndWeightInits(args):
     init_weights=args.init_weights 
     sequence_flank=args.sequence_flank
     np.random.seed(seed)
-    
     input_width=2*sequence_flank
     input_dimension=4
     number_of_convolutions=16
@@ -75,5 +75,3 @@ def getModelGivenModelOptionsAndWeightInits(args):
     loss=ambig_mean_squared_error
     model.compile(optimizer=adam,loss=loss)
     return model
-
-    

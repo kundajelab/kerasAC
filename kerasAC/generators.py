@@ -115,8 +115,8 @@ class DataGenerator(Sequence):
                  add_revcomp=True,
                  tasks=None,
                  shuffled_ref_negatives=False,
-                 upsample=True,
-                 upsample_ratio=0.1,
+                 upsample_thresh=0,
+                 upsample_ratio=None,
                  chroms_to_use=None,
                  get_w1_w0=False,
                  expand_dims=True,
@@ -165,13 +165,13 @@ class DataGenerator(Sequence):
 
         
         #set variables needed for upsampling the positives
-        self.upsample=upsample
-        if self.upsample==True:
-            self.upsample_ratio=upsample_ratio
+        self.upsample_ratio=upsample_ratio
+        self.upsample_thresh=upsample_thresh
+        if self.upsample_ratio is not None:
             if self.data_path is not None:
-                self.ones = self.data.loc[(self.data > 0).any(axis=1)]                
+                self.ones = self.data.loc[(self.data > self.upsample_thresh).any(axis=1)]                
                 #extract the indices where all bins are 0
-                self.zeros = self.data.loc[(self.data < 1).all(axis=1)].index 
+                self.zeros = self.data.loc[(self.data < self.upsample_thresh).all(axis=1)].index
             else:
                 #use the provided sets of nonzero bins and universal negatives
                 self.ones=self.nonzero_bins
@@ -201,7 +201,7 @@ class DataGenerator(Sequence):
             self.ref=ref
             if self.shuffled_ref_negatives==True:
                 return self.get_shuffled_ref_negatives_batch(idx)
-            elif self.upsample==True:
+            elif self.upsample_ratio is not None:
                 return self.get_upsampled_positives_batch(idx)
             else:
                 return self.get_basic_batch(idx) 
@@ -237,10 +237,10 @@ class DataGenerator(Sequence):
         pos_inds=self.pos_indices[idx*self.pos_batch_size:(idx+1)*self.pos_batch_size]
         pos_bed_entries=self.ones.index[pos_inds]
         neg_inds=self.neg_indices[idx*self.neg_batch_size:(idx+1)*self.neg_batch_size]
-        neg_bed_entries=self.zeros.index[neg_inds]
-    
-        #print(neg_inds[0:10])
-        #bed_entries=pos_bed_entries+neg_bed_entries
+        try:
+            neg_bed_entries=self.zeros.index[neg_inds]
+        except:
+            neg_bed_entries=self.zeros[neg_inds]
 
         #get sequences
         pos_seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in pos_bed_entries]
@@ -264,9 +264,6 @@ class DataGenerator(Sequence):
         #add in the labels for the reverse complement sequences, if used 
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
-        #pdb.set_trace()
-        #print(y_batch.shape)
-        #print(x_batch.shape)
         return (x_batch,y_batch)            
     
     def get_basic_batch(self,idx):
@@ -304,7 +301,7 @@ class DataGenerator(Sequence):
     def on_epoch_end(self):
         #if upsampling is being used, shuffle the positive and negative indices
         if self.shuffle==True:
-            if self.upsample==True:
+            if self.upsample_ratio is not None:
                 np.random.shuffle(self.pos_indices)
                 np.random.shuffle(self.neg_indices)
             else:
@@ -325,7 +322,7 @@ class DataGenerator(Sequence):
 #generate batches of SNP data with specified allele column name and flank size 
 class SNPGenerator(DataGenerator):
     def __init__(self,data_path,ref_fasta,allele_col,flank_size=500,batch_size=128,expand_dims=True,add_revcomp=False):
-        DataGenerator.__init__(self,data_path=data_path,ref_fasta=ref_fasta,batch_size=batch_size,add_revcomp=add_revcomp,upsample=False,expand_dims=expand_dims)
+        DataGenerator.__init__(self,data_path=data_path,ref_fasta=ref_fasta,batch_size=batch_size,add_revcomp=add_revcomp,upsample_ratio=None,expand_dims=expand_dims)
         self.allele_col=allele_col
         self.flank_size=flank_size 
 

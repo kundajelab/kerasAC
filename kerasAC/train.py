@@ -7,6 +7,8 @@ from .generators import *
 from .config import args_object_from_args_dict
 from .tiledb_generators import * 
 import pdb
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
+from keras.utils import multi_gpu_model
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -14,9 +16,9 @@ def parse_args():
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    tiledbgroup.add_argument("--label_flank",type=float,help="flank around bin center to use in generating labels")
+    tiledbgroup.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
     tiledbgroup.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
-    tiledbgroup.add_argument("--sequence_flank",help="length of sequence around bin center to use in one-hot-encoding")
+    tiledbgroup.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
     tiledbgroup.add_argument("--partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
 
@@ -57,6 +59,7 @@ def parse_args():
     batch_params.add_argument("--transform_label_vals",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
     batch_params.add_argument("--expand_dims",default=True)
+    batch_params.add_argument("--upsample_thresh",type=float, default=0)
     batch_params.add_argument("--train_upsample", type=float, default=None)
     batch_params.add_argument("--valid_upsample", type=float, default=None)
 
@@ -81,8 +84,8 @@ def parse_args():
     vis_params.add_argument("--tensorboard",action="store_true")
     vis_params.add_argument("--tensorboard_logdir",default="logs")
     
-    parser.add_argument("model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
-    parser.add_argument("seed",type=int,default=1234)    
+    parser.add_argument("--model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
+    parser.add_argument("--seed",type=int,default=1234)    
     return parser.parse_args()
 
 def get_weights(args,train_generator):
@@ -106,8 +109,6 @@ def get_weights(args,train_generator):
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     model_output_path = args.model_hdf5
-    from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
-    from keras.utils import multi_gpu_model
     checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
     csvlogger = CSVLogger(args.model_hdf5+".log", append = True)
@@ -122,7 +123,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         cur_callbacks.append(tensorboard_visualizer)
-    np.random.seed(1234)
+    pdb.set_trace() 
     model.fit_generator(train_gen,
                         validation_data=valid_gen,
                         steps_per_epoch=args.num_train/args.batch_size,
@@ -139,94 +140,85 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf.write(architecture_string)
     print("complete!!")
 
-def initialize_generators_tiledb(args, train_upsample_ratio, valid_upsample_ratio):
+def initialize_generators_tiledb(args):
     train_generator=TiledbGenerator(chroms=args.train_chroms,
-                                    shuffle_start=args.shuffle_epoch_start,
-                                    shuffle_end=args.shuffle_epoch_end,
+                                    chrom_sizes=args.chrom_sizes,
+                                    shuffle_epoch_start=args.shuffle_epoch_start,
+                                    shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    task_file=args.tiledb_tasks,
-                                    label_source=args.tiledb_label_source_attribute,
+                                    task_file=args.tiledb_tasks_file,
+                                    label_source=args.label_source_attribute,
                                     label_flank=args.label_flank,
                                     label_aggregation=args.label_aggregation,
                                     sequence_flank=args.sequence_flank,
                                     partition_attribute_for_upsample=args.partition_attribute_for_upsample,
                                     partition_thresh_for_upsample=args.partition_thresh_for_upsample,
-                                    upsample_ratio=train_upsample_ratio,
+                                    upsample_ratio=args.train_upsample,
                                     revcomp=args.revcomp,
                                     transform_label_vals=args.transform_label_vals)
     print("generated training data generator!")
     
-    valid_generator=TiledbGenerator(chroms=args.valid_chroms,
-                                    shuffle_start=args.shuffle_epoch_start,
-                                    shuffle_end=args.shuffle_epoch_end,
+    valid_generator=TiledbGenerator(chroms=args.validation_chroms,
+                                    chrom_sizes=args.chrom_sizes,
+                                    shuffle_epoch_start=args.shuffle_epoch_start,
+                                    shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    task_file=args.tiledb_tasks,
-                                    label_source=args.tiledb_label_source_attribute,
+                                    task_file=args.tiledb_tasks_file,
+                                    label_source=args.label_source_attribute,
                                     label_flank=args.label_flank,
                                     label_aggregation=args.label_aggregation,
                                     sequence_flank=args.sequence_flank,
                                     partition_attribute_for_upsample=args.partition_attribute_for_upsample,
                                     partition_thresh_for_upsample=args.partition_thresh_for_upsample,
-                                    upsample_ratio=valid_upsample_ratio,
+                                    upsample_ratio=args.valid_upsample,
                                     revcomp=args.revcomp,
                                     transform_label_vals=args.transform_label_vals)
     print("generated validation data generator")
     return train_generator, valid_generator
 
-def get_upsampling_parameters(args):
-    if args.train_path==None:
+def get_paths(args):
+    if args.train_path is None:
         train_path=args.data_path
     else:
         train_path=args.train_path
         
-    if args.valid_path==None:
+    if args.valid_path is None:
         valid_path=args.data_path
     else:
         valid_path=args.valid_path
         
-    if args.train_upsample==None:
-        train_upsample=False
-        train_upsample_ratio=0
-    else:
-        train_upsample=True
-        train_upsample_ratio=args.train_upsample
-    if args.valid_upsample==None:
-        valid_upsample=False
-        valid_upsample_ratio=0
-    else:
-        valid_upsample=True
-        valid_upsample_ratio=args.valid_upsample
-    return train_path, valid_path, train_upsample,train_upsample_ratio,valid_upsample,valid_upsample_ratio
+    return train_path, valid_path
 
 def initialize_generators(args):
     #get upsampling parameters
-    train_path, valid_path, train_upsample,train_upsample_ratio,valid_upsample,valid_upsample_ratio=get_upsampling_parameters(args)
-
-    #data is being read in from tiledb for training 
-    if args.tiledb_data_file is not None:
-        return initialize_generators_tiledb(args,train_upsample_ratio,valid_upsample_ratio)
+    train_path, valid_path=get_paths(args)
     
-    train_generator=DataGenerator(data_path=args.train_path,
+    #data is being read in from tiledb for training 
+    if args.tiledb_tasks_file is not None:
+        return initialize_generators_tiledb(args)
+    
+    train_generator=DataGenerator(data_path=train_path,
                                   nonzero_bin_path=args.nonzero_bin_path,
                                   universal_negative_path=args.universal_negative_path,
                                   ref_fasta=args.ref_fasta,
                                   batch_size=args.batch_size,
                                   add_revcomp=args.revcomp,
-                                  upsample=train_upsample,
-                                  upsample_ratio=train_upsample_ratio,
+                                  upsample_thresh=args.upsample_thresh,
+                                  upsample_ratio=args.train_upsample,
                                   chroms_to_use=args.train_chroms,
                                   get_w1_w0=args.weighted,
                                   expand_dims=args.expand_dims,
                                   tasks=args.tasks)
+    
     print("generated training data generator!")
-    valid_generator=DataGenerator(data_path=args.valid_path,
+    valid_generator=DataGenerator(data_path=valid_path,
                                   nonzero_bin_path=args.nonzero_bin_path,
                                   universal_negative_path=args.universal_negative_path,
                                   ref_fasta=args.ref_fasta,
                                   batch_size=args.batch_size,
                                   add_revcomp=args.revcomp,                        
-                                  upsample=valid_upsample,
-                                  upsample_ratio=valid_upsample_ratio,
+                                  upsample_thresh=args.upsample_thresh,
+                                  upsample_ratio=args.valid_upsample,
                                   chroms_to_use=args.validation_chroms,
                                   expand_dims=args.expand_dims,
                                   tasks=args.tasks)

@@ -2,95 +2,97 @@ from keras.utils import Sequence
 import pandas as pd
 import numpy as np
 import random
+from random import shuffle 
 import math 
 import pysam
 from .util import *
 import tiledb
-import pdb 
+import pdb
+
+def get_genome_size(chrom_sizes_file,chroms):
+    '''
+    get size of chromosomes to train on 
+    '''
+    chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
+    chrom_sizes_subset=chrom_sizes[chrom_sizes[0].isin(chroms)]
+    genome_size=chrom_sizes_subset[1].sum()
+    last_index_to_chrom=dict()
+    last_index=0
+    for index,row in chrom_sizes_subset.iterrows():
+        chrom_name=row[0]
+        chrom_size=row[1]
+        last_index+=chrom_size
+        last_index_to_chrom[last_index]=[chrom_name,chrom_size]
+    return last_index_to_chrom, genome_size
+
+def get_nonupsample_batch_indices(n,last_index_to_chrom,length):
+    '''
+    randomly select n positions from the genome 
+    '''
+    indices=random.sample(range(length),n)
+    #get the chroms and coords for each index
+    chroms=[]
+    chrom_pos=[]
+    for cur_index in indices:
+        for chrom_last_index in last_index_to_chrom:
+            if cur_index < chrom_last_index:
+                #this is the chromosome to use!
+                cur_chrom,cur_chrom_size=last_index_to_chrom[chrom_last_index]
+                cur_chrom_pos=cur_index % cur_chrom_size
+                chroms.append(cur_chrom)
+                chrom_pos.append(cur_chrom_pos)
+    return pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
 
 def get_upsampled_indices(data_arrays,
                           partition_attribute_for_upsample,
                           partition_thresh_for_upsample,
-                          shuffle):
-    #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values 
+                          shuffle_epoch_start,
+                          upsample_ratio):
+    #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
+    upsampled_chroms=None
     upsampled_indices=None
-    non_upsampled_indices=None
 
     for chrom in data_arrays:
         upsampled_indices_chrom=None
-        non_upsampled_indices_chrom=None
         chrom_size=None
         for task in data_arrays[chrom]:
+            print("starting:"+str(task)+":"+str(chrom))
             cur_vals=data_arrays[chrom][task][:][partition_attribute_for_upsample]
+            print(cur_vals.shape)
             if chrom_size is None:
                 chrom_size=cur_vals.shape[0]
             print("got values for cur task/chrom") 
             upsampled_indices_task_chrom=np.argwhere(cur_vals>=partition_thresh_for_upsample)
-            print(upsampled_indices_task_chrom.shape)
+            print("got upsampled indices")
             if upsampled_indices_chrom is None:
                 upsampled_indices_chrom=upsampled_indices_task_chrom
             else:
                 upsampled_indices_chrom=np.union1d(upsampled_indices_chrom,upsampled_indices_task_chrom)
+            print("performed task union")
         print("got indices to upsample for chrom:"+str(chrom))
-
-        mask = np.zeros(chrom_size, dtype=bool)
-        mask[upsampled_indices_chrom] = True
-        non_upsampled_indices_chrom = np.array(range(chrom_size))[~mask]
-        print("got indices to NOT upsampled for chrom:"+str(chrom))
-
-        upsampled_chrom_name_array=[chrom]*upsampled_indices_chrom.shape[0]
-        non_upsampled_chrom_name_array=[chrom]*non_upsampled_indices_chrom.shape[0]
-
-        cur_upsampled_df=pd.DataFrame.from_dict({'chrom':upsampled_chrom_name_array,
-                                               'indices':upsampled_indices_chrom.flatten()})
-        cur_non_upsampled_df=pd.DataFrame.from_dict({'chrom':non_upsampled_chrom_name_array,
-                                                   'indices':non_upsampled_indices_chrom.flatten()})
-        print("generated coord dataframes for chrom:"+str(chrom))
-        if upsampled_indices is None:
-            upsampled_indices=cur_upsampled_df
-            non_upsampled_indices=cur_non_upsampled_df
+        if upsampled_chroms is None:
+            upsampled_chroms=[chrom]*upsampled_indices_chrom.shape[0]
+            upsampled_indices=upsampled_indices_chrom
         else:
-            upsampled_indices=pd.concat([upsampled_indices,cur_upsampled_df],axis=0)
-            non_upsampled_indices=pd.concat([non_upsampled_indices,cur_non_upsampled_df],axis=0)
-        print("added chrom coords to master list")
-
-    if shuffle==True:
-        print("shuffling upsampled and non-upsampled dataframes prior to start of training")
-        upsampled_indices.apply(np.random.shuffle,axis=0)
-        non_upsampled_indices.apply(np.random.shuffle,axis=0)
+            upsampled_chroms=upsampled_chroms+[chrom]*upsampled_indices_chrom.shape[0]
+            upsampled_indices=np.concatenate((upsampled_indices,upsampled_indices_chrom),axis=0)
+        print("appended chrom indices to master list") 
+        
+    upsampled_indices=pd.DataFrame.from_dict({'chrom':upsampled_chroms,
+                                              'pos':upsampled_indices.squeeze()})
+    print("made upsampled index data frame")
+    if shuffle_epoch_start==True:
+        numrows=upsampled_indices.shape[0]
+        df_indices=list(range(numrows))
+        shuffle(df_indices)#this is an in-place operation
+        df_indices=pd.Series(df_indices)
+        upsampled_indices=upsampled_indices.set_index(df_indices)
+        print("shuffling upsampled dataframes prior to start of training")
+        #print(upsampled_indices.head())
 
     print("finished generator init")
-    return upsampled_indices,non_upsampled_indices 
-
-
-def get_upsampled_indices_old(data_arrays,
-                          partition_attribute_for_upsample,
-                          partition_thresh_for_upsample,
-                          shuffle):
-    upsampled_indices=[]
-    non_upsampled_indices=[]
-    
-    for chrom in data_arrays:
-        positions=None
-        for task in data_arrays[chrom]:
-            cur_vals=data_arrays[chrom][task][:][partition_attribute_for_upsample]
-            if positions is None:
-                positions=np.zeros(cur_vals.shape)
-            print("got values for cur task/chrom") 
-            upsampled_indices_task_chrom=np.argwhere(cur_vals>=partition_thresh_for_upsample)
-            print("got indices to upsample for task/chrom") 
-            positions[upsampled_indices_task_chrom]=1
-        print("aggregating indices to upsample across chroms") 
-        for index in np.argwhere(positions==1):
-            upsampled_indices.append((chrom,index))
-        print("aggregated upsampled")
-        for index in np.argwhere(positions==0):
-            non_upsampled_indices.append((chrom,index))
-        print("done with chrom:"+str(chrom))
-    if shuffle==True:
-        random.shuffle(upsampled_indices)
-        random.shuffle(non_upsampled_indices)
-    return upsampled_indices,non_upsampled_indices 
+    print(upsampled_indices.head())
+    return upsampled_indices
 
             
 def open_tiledb_arrays_for_reading(tasks,chroms):
@@ -107,8 +109,6 @@ def open_tiledb_arrays_for_reading(tasks,chroms):
 
 class TiledbGenerator(Sequence):
     def __init__(self,
-                 chrom_sizes=None,
-                 chroms=None,
                  shuffle_epoch_start,
                  shuffle_epoch_end,
                  batch_size,
@@ -118,6 +118,8 @@ class TiledbGenerator(Sequence):
                  label_aggregation,
                  sequence_flank,
                  partition_attribute_for_upsample,
+                 chrom_sizes=None,
+                 chroms=None,
                  partition_thresh_for_upsample=1,
                  upsample_ratio=0,
                  revcomp=False,
@@ -146,12 +148,15 @@ class TiledbGenerator(Sequence):
         self.sequence_flank=sequence_flank
         self.partition_attribute_for_upsample=partition_attribute_for_upsample
         self.partition_thresh_for_upsample=partition_thresh_for_upsample
-        self.upsampled_indices, self.non_upsampled_indices=get_upsampled_indices(self.data_arrays,
-                                                                                 self.partition_attribute_for_upsample,
-                                                                                 self.partition_thresh_for_upsample,
-                                                                                 self.shuffle)
+        self.upsample_ratio=upsample_ratio
+
+        self.upsampled_indices=get_upsampled_indices(self.data_arrays,
+                                                      self.partition_attribute_for_upsample,
+                                                      self.partition_thresh_for_upsample,
+                                                      self.shuffle_epoch_start,
+                                                      self.upsample_ratio)
         self.upsampled_indices_len=len(self.upsampled_indices)
-        self.non_upsampled_indices_len=len(self.non_upsampled_indices)
+        self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
         self.revcomp=revcomp
         if self.revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
@@ -159,11 +164,9 @@ class TiledbGenerator(Sequence):
         self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size
         
-        
-        
     def __len__(self):
-        return math.ceil(max([self.upsampled_indices_len,
-                              self.non_upsampled_indices_len])/self.batch_size)
+        return self.length/self.batch_size
+    
 
     def __getitem__(self,idx):
         with self.lock:
@@ -173,17 +176,17 @@ class TiledbGenerator(Sequence):
     def on_epoch_end(self):
         if self.shuffle==True:
             random.shuffle(self.upsampled_indices)
-            random.shuffle(self.non_upsampled_indices)
-            
+
     def get_batch(self,idx):
         upsampled_idx=idx % self.upsampled_indices_len
-        non_upsampled_idx=idx % self.non_upsampled_indices_len 
-        upsampled_indices=self.upsampled_indices[upsampled_idx*self.upsampled_batch_size:(upsampled_idx+1)*self.upsampled_batch_size]
-        non_upsampled_indices=self.non_upsampled_indices[non_upsampled_idx*self.non_upsampled_batch_size:(non_upsampled_idx+1)*self.non_upsampled_batch_size]
+        non_upsampled_idx=idx % self.length
+        upsampled_batch_indices=self.upsampled_indices.loc[upsampled_idx*self.upsampled_batch_size:(upsampled_idx+1)*self.upsampled_batch_size]
+        #select random indices from genome 
+        non_upsampled_batch_indices=get_nonupsample_batch_indices(self.non_upsampled_batch_size,self.last_index_to_chrom,self.length)
 
         #get the sequences
-        X_upsampled=self.get_seqs(upsampled_indices)
-        X_non_upsampled=self.get_seqs(non_upsampled_indices)
+        X_upsampled=self.get_seqs(upsampled_batch_indices)
+        X_non_upsampled=self.get_seqs(non_upsampled_batch_indices)
         X=np.concatenate((X_upsampled, X_non_upsampled),axis=0)
         
         #get the labels
@@ -193,6 +196,7 @@ class TiledbGenerator(Sequence):
         return X,y
     
     def get_seqs(self,indices):
+        pdb.set_trace() 
         seqs=[self.ref.fetch(i[0],i[1]-self.sequence_flank,i[1]+self.sequence_flank-1) for i in indices]
         if self.revcomp==True:
             seqs=seqs+revcomp(seqs)
