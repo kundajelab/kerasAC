@@ -2,8 +2,10 @@ from keras.utils import Sequence
 import pandas as pd
 import numpy as np
 import random
+import threading 
 from random import shuffle 
-import math 
+import math
+from math import ceil 
 import pysam
 from .util import *
 import tiledb
@@ -41,7 +43,9 @@ def get_nonupsample_batch_indices(n,last_index_to_chrom,length):
                 cur_chrom_pos=cur_index % cur_chrom_size
                 chroms.append(cur_chrom)
                 chrom_pos.append(cur_chrom_pos)
-    return pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
+                break 
+    cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
+    return cur_batch
 
 def get_upsampled_indices(data_arrays,
                           partition_attribute_for_upsample,
@@ -56,9 +60,8 @@ def get_upsampled_indices(data_arrays,
         upsampled_indices_chrom=None
         chrom_size=None
         for task in data_arrays[chrom]:
-            print("starting:"+str(task)+":"+str(chrom))
+            
             cur_vals=data_arrays[chrom][task][:][partition_attribute_for_upsample]
-            print(cur_vals.shape)
             if chrom_size is None:
                 chrom_size=cur_vals.shape[0]
             print("got values for cur task/chrom") 
@@ -91,7 +94,6 @@ def get_upsampled_indices(data_arrays,
         #print(upsampled_indices.head())
 
     print("finished generator init")
-    print(upsampled_indices.head())
     return upsampled_indices
 
             
@@ -104,7 +106,6 @@ def open_tiledb_arrays_for_reading(tasks,chroms):
         array_dict[chrom]=dict()
         for task in tasks:
             array_dict[chrom][task]= tiledb.DenseArray(task+'.'+chrom,mode='r')
-    print("opened array dict") 
     return array_dict
 
 class TiledbGenerator(Sequence):
@@ -113,25 +114,28 @@ class TiledbGenerator(Sequence):
                  shuffle_epoch_end,
                  batch_size,
                  task_file,
+                 ref_fasta,
                  label_source,
                  label_flank,
                  label_aggregation,
                  sequence_flank,
                  partition_attribute_for_upsample,
+                 label_transformer=None,
                  chrom_sizes=None,
                  chroms=None,
                  partition_thresh_for_upsample=1,
                  upsample_ratio=0,
                  revcomp=False,
-                 transform_label_vals=None,
                  pseudocount=0):
         '''
         partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         label_aggregation -- one of 'avg','max',None
         '''
+        self.lock=threading.Lock()
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
+        self.ref_fasta=ref_fasta
         self.batch_size=batch_size
         self.tasks=open(task_file,'r').read().strip().split('\n')
         if chroms is not None:
@@ -143,7 +147,7 @@ class TiledbGenerator(Sequence):
         self.label_source=label_source
         self.label_flank=label_flank
         self.label_aggregation=label_aggregation
-        self.transform_label_vals=transform_label_vals
+        self.label_transformer=label_transformer
         self.pseudocount=pseudocount
         self.sequence_flank=sequence_flank
         self.partition_attribute_for_upsample=partition_attribute_for_upsample
@@ -165,7 +169,7 @@ class TiledbGenerator(Sequence):
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size
         
     def __len__(self):
-        return self.length/self.batch_size
+        return int(ceil(self.length/self.batch_size))
     
 
     def __getitem__(self,idx):
@@ -175,56 +179,78 @@ class TiledbGenerator(Sequence):
         
     def on_epoch_end(self):
         if self.shuffle==True:
-            random.shuffle(self.upsampled_indices)
+            #shuffle the indices!
+            numrows=self.upsampled_indices.shape[0]
+            df_indices=list(range(numrows))
+            shuffle(df_indices)#this is an in-place operation
+            df_indices=pd.Series(df_indices)
+            self.upsampled_indices=self.upsampled_indices.set_index(df_indices)
 
+            
     def get_batch(self,idx):
         upsampled_idx=idx % self.upsampled_indices_len
         non_upsampled_idx=idx % self.length
-        upsampled_batch_indices=self.upsampled_indices.loc[upsampled_idx*self.upsampled_batch_size:(upsampled_idx+1)*self.upsampled_batch_size]
-        #select random indices from genome 
-        non_upsampled_batch_indices=get_nonupsample_batch_indices(self.non_upsampled_batch_size,self.last_index_to_chrom,self.length)
-
-        #get the sequences
-        X_upsampled=self.get_seqs(upsampled_batch_indices)
-        X_non_upsampled=self.get_seqs(non_upsampled_batch_indices)
-        X=np.concatenate((X_upsampled, X_non_upsampled),axis=0)
+        X_upsampled=None
+        X_non_upsampled=None
         
-        #get the labels
-        y_upsampled=self.get_labels(upsampled_indices,self.upsampled_batch_size)
-        y_non_upsampled=self.get_labels(non_upsampled_indices,self.non_upsampled_batch_size) 
-        y=np.concatenate((y_upsampled,y_non_upsampled),axis=0)
+        if self.upsampled_batch_size > 0: 
+            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_idx*self.upsampled_batch_size,(upsampled_idx+1)*self.upsampled_batch_size))]
+            #get the sequences
+            X_upsampled=self.get_seqs(upsampled_batch_indices)
+            #get the labels 
+            y_upsampled=self.get_labels(upsampled_batch_indices,self.upsampled_batch_size)
+            
+        if self.non_upsampled_batch_size > 0:
+            #select random indices from genome
+            non_upsampled_batch_indices=get_nonupsample_batch_indices(self.non_upsampled_batch_size,self.last_index_to_chrom,self.length)
+            X_non_upsampled=self.get_seqs(non_upsampled_batch_indices)
+            y_non_upsampled=self.get_labels(non_upsampled_indices,self.non_upsampled_batch_size)
+
+        #combine upsampled & non_upsampled batches
+        if ((X_upsampled is not None) and (X_non_upsampled is not None)):
+            X=np.concatenate((X_upsampled, X_non_upsampled),axis=0)
+            y=np.concatenate((y_upsampled,y_non_upsampled),axis=0)
+        elif X_upsampled is not None:
+            X=X_upsampled
+            y=y_upsampled
+        else:
+            X=X_non_upsampled
+            y=y_non_upsampled
+            
         return X,y
     
     def get_seqs(self,indices):
-        pdb.set_trace() 
-        seqs=[self.ref.fetch(i[0],i[1]-self.sequence_flank,i[1]+self.sequence_flank-1) for i in indices]
+        seqs=[]
+        for index,row in indices.iterrows():
+            seqs.append(self.ref.fetch(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank))
         if self.revcomp==True:
             seqs=seqs+revcomp(seqs)
-        onehot_seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
         return seqs
 
     def transform_label_vals(self,labels):
-        if self.transform_label_vals is None:
+        self.label_transformer=str(self.label_transformer)
+        if self.label_transformer == 'None':
             return labels
-        elif self.transform_label_vals is'asinh':
+        elif self.label_transformer == 'asinh':
             return np.asinh(labels)
-        elif self.transform_label_vals is 'log10':
+        elif self.label_transformer == 'log10':
             return np.log10(labels+self.pseudocount)
-        elif self.transform_label_vals is 'log':
+        elif self.label_transformer == 'log':
             return np.log(labels+self.pseudocount)
         else:
-            raise Exception("transform_label_vals argument must be one of None, asinh, log10, log; you provided:"+str(self.transform_label_vals)) 
+            raise Exception("transform_label_vals argument must be one of None, asinh, log10, log; you provided:"+str(self.label_transformer)) 
     
     def aggregate_label_vals(self,labels):
-        if self.label_aggregation is None:
+        self.label_aggregation=str(self.label_aggregation)
+        if self.label_aggregation == 'None':
             return labels
-        elif self.label_aggregation is 'average':
+        elif self.label_aggregation == 'average':
             return np.mean(labels)
-        elif self.label_aggregation is 'max':
+        elif self.label_aggregation == 'max':
             return np.max(labels)
         else:
             raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+str(self.label_aggregation))
-    
     
     def get_labels(self,indices,batch_size):
         '''
@@ -233,22 +259,25 @@ class TiledbGenerator(Sequence):
         #double the batch size implicitly if reverse-complemented inputs are being used for training 
             
         label_vector_len=1
-        if self.label_aggregation is None:
+        if self.label_aggregation == "None":
             label_vector_len=2*self.label_flank 
         
         labels=np.zeros((batch_size,label_vector_len,len(self.tasks)))
-        for i in range(len(indices)):
-            index=indices[i]
-            cur_chrom=index[0]
-            cur_start=index[1]-self.label_flank
-            cur_end=index[1]+self.label_flank-1
-            for task_index in len(self.tasks):
+        batch_entry_index=0 
+        for index,row in indices.iterrows():
+            cur_chrom=row['chrom']
+            cur_pos=row['pos']
+            cur_start=cur_pos-self.label_flank
+            cur_end=cur_pos+self.label_flank
+            for task_index in range(len(self.tasks)):
                 task=self.tasks[task_index]
                 vals=self.aggregate_label_vals(
                     self.transform_label_vals(
-                        self.array_dict[cur_chrom][task][cur_start:cur_end][self.label_flank])
+                        self.data_arrays[cur_chrom][task][cur_start:cur_end][self.label_source])
                     )
-                labels[i][:][task_index]=vals
+
+                labels[batch_entry_index,:,task_index]=vals
+            batch_entry_index+=1
         if self.revcomp==True:
             labels=np.concatenate((labels,labels),axis=0)
         return labels 

@@ -56,7 +56,7 @@ def parse_args():
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
     batch_params.add_argument("--revcomp",action="store_true")
-    batch_params.add_argument("--transform_label_vals",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
+    batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
     batch_params.add_argument("--expand_dims",default=True)
     batch_params.add_argument("--upsample_thresh",type=float, default=0)
@@ -123,7 +123,6 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         cur_callbacks.append(tensorboard_visualizer)
-    pdb.set_trace() 
     model.fit_generator(train_gen,
                         validation_data=valid_gen,
                         steps_per_epoch=args.num_train/args.batch_size,
@@ -143,6 +142,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
 def initialize_generators_tiledb(args):
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
+                                    ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
@@ -155,11 +155,12 @@ def initialize_generators_tiledb(args):
                                     partition_thresh_for_upsample=args.partition_thresh_for_upsample,
                                     upsample_ratio=args.train_upsample,
                                     revcomp=args.revcomp,
-                                    transform_label_vals=args.transform_label_vals)
+                                    label_transformer=args.label_transformer)
     print("generated training data generator!")
     
     valid_generator=TiledbGenerator(chroms=args.validation_chroms,
                                     chrom_sizes=args.chrom_sizes,
+                                    ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
@@ -172,7 +173,7 @@ def initialize_generators_tiledb(args):
                                     partition_thresh_for_upsample=args.partition_thresh_for_upsample,
                                     upsample_ratio=args.valid_upsample,
                                     revcomp=args.revcomp,
-                                    transform_label_vals=args.transform_label_vals)
+                                    label_transformer=args.label_transformer)
     print("generated validation data generator")
     return train_generator, valid_generator
 
