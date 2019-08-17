@@ -5,7 +5,13 @@ from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_bi
 from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
+def getModelGivenModelOptionsAndWeightInits(args):
+    seed=args.seed
+    w0=args.w0
+    w1=args.w1
+    ntasks=args.ntasks
+    init_weights=args.init_weights
+    
     np.random.seed(seed)
     import keras;
     from keras.models import Sequential
@@ -87,7 +93,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     if w0!=None:
         loss=get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
-        loss=get_ambig_binary_crossentropy() 
+        loss=ambig_binary_crossentropy 
     model.compile(optimizer=adam,
                   loss=loss,
                   metrics=[recall, specificity, fpr, fnr, precision, f1])

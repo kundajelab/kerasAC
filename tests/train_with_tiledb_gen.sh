@@ -1,0 +1,23 @@
+CUDA_VISIBLE_DEVICES=3 kerasAC_train --tiledb_tasks_file tasks.tsv \
+		    --chrom_sizes /mnt/data/annotations/by_release/hg38/hg38.chrom.sizes \
+                    --train_chroms chr21 \
+                    --validation_chroms chrY \
+                    --batch_size 10 \
+                    --label_source fc_bigwig \
+                    --label_flank 1500 \
+                    --label_aggregation None \
+                    --sequence_flank 6500 \
+		    --partition_attribute_for_upsample idr_peak \
+		    --partition_thresh_for_upsample 1 \
+		    --train_upsample 1 \
+		    --valid_upsample 0 \
+		    --num_train 1000 \
+		    --num_valid 1000 \
+		    --num_tasks 1 \
+		    --threads 0 \
+		    --max_queue_size 100 \
+		    --patience 3 \
+		    --patience_lr 2 \
+		    --model_hdf5 DNASE.K562.regression.profile \
+		    --ref_fasta /mnt/data/annotations/by_release/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
+		    --architecture_spec profile_model

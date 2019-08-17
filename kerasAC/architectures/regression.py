@@ -3,8 +3,15 @@ from kerasAC.metrics import *
 from kerasAC.custom_losses import *
 import pdb
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the args
+    seed=args.seed
+    ntasks=args.ntasks
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    
+    np.random.seed(seed)
     import keras;
     from keras.models import Sequential
     from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten

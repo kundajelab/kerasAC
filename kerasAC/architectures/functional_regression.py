@@ -1,7 +1,14 @@
 import numpy as np ;
 from kerasAC.metrics import * 
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks, seed=1234):
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the arguments
+    seed=args.seed
+    ntasks=args.ntasks
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    
     np.random.seed(seed)
     import keras;
     from keras.layers import (
