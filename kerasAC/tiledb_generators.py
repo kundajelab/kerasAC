@@ -204,7 +204,7 @@ class TiledbGenerator(Sequence):
             #select random indices from genome
             non_upsampled_batch_indices=get_nonupsample_batch_indices(self.non_upsampled_batch_size,self.last_index_to_chrom,self.length)
             X_non_upsampled=self.get_seqs(non_upsampled_batch_indices)
-            y_non_upsampled=self.get_labels(non_upsampled_indices,self.non_upsampled_batch_size)
+            y_non_upsampled=self.get_labels(non_upsampled_batch_indices,self.non_upsampled_batch_size)
 
         #combine upsampled & non_upsampled batches
         if ((X_upsampled is not None) and (X_non_upsampled is not None)):
