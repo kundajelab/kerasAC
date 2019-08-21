@@ -14,7 +14,7 @@ CUDA_VISIBLE_DEVICES=3 kerasAC_train --tiledb_tasks_file tasks.tsv \
 		    --num_train 1000 \
 		    --num_valid 1000 \
 		    --num_tasks 1 \
-		    --threads 0 \
+		    --threads 40 \
 		    --max_queue_size 100 \
 		    --patience 3 \
 		    --patience_lr 2 \
