@@ -6,7 +6,7 @@ import pdb
 def getModelGivenModelOptionsAndWeightInits(args):
     #read in the args
     seed=args.seed
-    ntasks=args.ntasks
+    ntasks=args.num_tasks
     w0=args.w0
     w1=args.w1
     init_weights=args.init_weights
