@@ -171,7 +171,7 @@ class DataGenerator(Sequence):
             if self.data_path is not None:
                 self.ones = self.data.loc[(self.data > self.upsample_thresh).any(axis=1)]                
                 #extract the indices where all bins are 0
-                self.zeros = self.data.loc[(self.data < self.upsample_thresh).all(axis=1)].index
+                self.zeros = self.data.loc[(self.data <= self.upsample_thresh).all(axis=1)].index
             else:
                 #use the provided sets of nonzero bins and universal negatives
                 self.ones=self.nonzero_bins

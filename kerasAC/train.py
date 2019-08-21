@@ -4,8 +4,7 @@ import argparse
 import numpy as np
 import h5py
 from .generators import *
-from . import config 
-#from .config import args_object_from_args_dict
+from . import config
 from .tiledb_generators import * 
 import pdb
 from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
