@@ -45,6 +45,7 @@ def get_nonupsample_batch_indices(n,last_index_to_chrom,length):
                 chrom_pos.append(cur_chrom_pos)
                 break 
     cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
+    assert cur_batch.shape[0]==n
     return cur_batch
 
 def get_upsampled_indices(data_arrays,
@@ -110,8 +111,6 @@ def open_tiledb_arrays_for_reading(tasks,chroms):
 
 class TiledbGenerator(Sequence):
     def __init__(self,
-                 shuffle_epoch_start,
-                 shuffle_epoch_end,
                  batch_size,
                  task_file,
                  ref_fasta,
@@ -120,6 +119,8 @@ class TiledbGenerator(Sequence):
                  label_aggregation,
                  sequence_flank,
                  partition_attribute_for_upsample,
+                 shuffle_epoch_start=True,
+                 shuffle_epoch_end=True,
                  label_transformer=None,
                  chrom_sizes=None,
                  chroms=None,
@@ -132,7 +133,6 @@ class TiledbGenerator(Sequence):
         partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         label_aggregation -- one of 'avg','max',None
         '''
-        self.lock=threading.Lock()
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
         self.ref_fasta=ref_fasta
@@ -173,9 +173,8 @@ class TiledbGenerator(Sequence):
     
 
     def __getitem__(self,idx):
-        with self.lock:
-            self.ref=pysam.FastaFile(self.ref_fasta)
-            return self.get_batch(idx)
+        self.ref=pysam.FastaFile(self.ref_fasta)
+        return self.get_batch(idx)
         
     def on_epoch_end(self):
         if self.shuffle==True:
@@ -185,16 +184,16 @@ class TiledbGenerator(Sequence):
             shuffle(df_indices)#this is an in-place operation
             df_indices=pd.Series(df_indices)
             self.upsampled_indices=self.upsampled_indices.set_index(df_indices)
-
             
     def get_batch(self,idx):
-        upsampled_idx=idx % self.upsampled_indices_len
-        non_upsampled_idx=idx % self.length
+        upsampled_batch_start=(idx*self.upsampled_batch_size) % self.upsampled_indices_len
+        upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+        
         X_upsampled=None
         X_non_upsampled=None
         
-        if self.upsampled_batch_size > 0: 
-            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_idx*self.upsampled_batch_size,(upsampled_idx+1)*self.upsampled_batch_size))]
+        if self.upsampled_batch_size > 0:
+            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
             #get the sequences
             X_upsampled=self.get_seqs(upsampled_batch_indices)
             #get the labels 
@@ -216,7 +215,6 @@ class TiledbGenerator(Sequence):
         else:
             X=X_non_upsampled
             y=y_non_upsampled
-            
         return X,y
     
     def get_seqs(self,indices):
@@ -263,7 +261,8 @@ class TiledbGenerator(Sequence):
             label_vector_len=2*self.label_flank 
         
         labels=np.zeros((batch_size,label_vector_len,len(self.tasks)))
-        batch_entry_index=0 
+        batch_entry_index=0
+
         for index,row in indices.iterrows():
             cur_chrom=row['chrom']
             cur_pos=row['pos']
@@ -271,11 +270,8 @@ class TiledbGenerator(Sequence):
             cur_end=cur_pos+self.label_flank
             for task_index in range(len(self.tasks)):
                 task=self.tasks[task_index]
-                vals=self.aggregate_label_vals(
-                    self.transform_label_vals(
-                        self.data_arrays[cur_chrom][task][cur_start:cur_end][self.label_source])
-                    )
-
+                cur_vals=self.data_arrays[cur_chrom][task][cur_start:cur_end][self.label_source]
+                vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                 labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1
         if self.revcomp==True:
