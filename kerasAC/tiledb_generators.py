@@ -17,15 +17,17 @@ def get_genome_size(chrom_sizes_file,chroms):
     '''
     chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
     chrom_sizes_subset=chrom_sizes[chrom_sizes[0].isin(chroms)]
+    chrom_sizes_subset_dict=dict() 
     genome_size=chrom_sizes_subset[1].sum()
     last_index_to_chrom=dict()
     last_index=0
     for index,row in chrom_sizes_subset.iterrows():
         chrom_name=row[0]
         chrom_size=row[1]
+        chrom_sizes_subset_dict[chrom_name]=chrom_size 
         last_index+=chrom_size
         last_index_to_chrom[last_index]=[chrom_name,chrom_size]
-    return last_index_to_chrom, genome_size
+    return chrom_sizes_subset_dict,last_index_to_chrom, genome_size
 
 def get_nonupsample_batch_indices(n,last_index_to_chrom,length):
     '''
@@ -160,7 +162,7 @@ class TiledbGenerator(Sequence):
                                                       self.shuffle_epoch_start,
                                                       self.upsample_ratio)
         self.upsampled_indices_len=len(self.upsampled_indices)
-        self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
+        self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
         self.revcomp=revcomp
         if self.revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
@@ -220,7 +222,11 @@ class TiledbGenerator(Sequence):
     def get_seqs(self,indices):
         seqs=[]
         for index,row in indices.iterrows():
-            seqs.append(self.ref.fetch(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank))
+            try:
+                seqs.append(self.ref.fetch(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank))
+            except:
+                #we are off the chromosome edge, just use all N's for the sequene in this edge case 
+                seqs.append("N"*2*self.sequence_flank)
         if self.revcomp==True:
             seqs=seqs+revcomp(seqs)
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
