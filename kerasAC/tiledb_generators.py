@@ -62,8 +62,7 @@ def get_upsampled_indices(data_arrays,
     for chrom in data_arrays:
         upsampled_indices_chrom=None
         chrom_size=None
-        for task in data_arrays[chrom]:
-            
+        for task in data_arrays[chrom]:            
             cur_vals=data_arrays[chrom][task][:][partition_attribute_for_upsample]
             if chrom_size is None:
                 chrom_size=cur_vals.shape[0]
@@ -218,12 +217,19 @@ class TiledbGenerator(Sequence):
             X=X_non_upsampled
             y=y_non_upsampled
         return X,y
-    
+     
     def get_seqs(self,indices):
         seqs=[]
         for index,row in indices.iterrows():
             try:
-                seqs.append(self.ref.fetch(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank))
+                start_coord=row['pos']-self.sequence_flank
+                end_coord=row['pos']+self.sequence_flank
+                cur_chrom=row['chrom']
+                if start_coord < 0:
+                    raise Exception()
+                if end_coord>=self.chrom_sizes[cur_chrom]:
+                    raise Exception()
+                seqs.append(self.ref.fetch(cur_chrom,start_coord,end_coord))
             except:
                 #we are off the chromosome edge, just use all N's for the sequene in this edge case 
                 seqs.append("N"*2*self.sequence_flank)
