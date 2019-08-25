@@ -282,5 +282,5 @@ class TiledbGenerator(Sequence):
                     chrom_pos.append(cur_chrom_pos)
                     break 
         cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
-        assert cur_batch.shape[0]==n
+        assert cur_batch.shape[0]==self.non_upsampled_batch_size
         return cur_batch
