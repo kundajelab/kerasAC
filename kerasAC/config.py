@@ -48,6 +48,8 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['json']=None
     vars(args_object)['expand_dims']=True
     vars(args_object)['tasks']=None
+    vars(args_object)['shuffle_epoch_start']=True
+    vars(args_object)['shuffle_epoch_end']=True
     
     #prediction
     vars(args_object)['predict_chroms']=None
