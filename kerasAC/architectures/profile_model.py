@@ -43,7 +43,7 @@ def build1d_model_residual(input_width,input_dimension,number_of_convolutions,fi
             conv = res_block(conv,filters[i],filter_dim[i],activations,dilation[i],i,bn_true)
     conv= Conv1D(32, 1,padding='valid', activation='relu',name='down_sampling')(conv)
     output=Conv1D(1,1,activation='relu',name='dnase')(conv)
-    model = Model(input=[input1],output=[output])
+    model = Model(inputs=[input1],outputs=[output])
     return model
 
 def getModelGivenModelOptionsAndWeightInits(args):

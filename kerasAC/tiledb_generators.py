@@ -261,7 +261,8 @@ class TiledbGenerator(Sequence):
             cur_end=cur_pos+self.label_flank
             for task_index in range(len(self.tasks)):
                 task=self.tasks[task_index]
-                with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r') as cur_array:
+                ctx = tiledb.Ctx()
+                with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
                     cur_vals=cur_array[cur_start:cur_end][self.label_source]
                 vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))                    
                 labels[batch_entry_index,:,task_index]=vals

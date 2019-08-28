@@ -1,4 +1,4 @@
-import multiprocessing as mp
+from __future__ import division, print_function, absolute_import
 import importlib
 import imp
 import argparse
@@ -124,7 +124,6 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         cur_callbacks.append(tensorboard_visualizer)
-    mp.set_start_method('spawn')
     model.fit_generator(train_gen,
                         validation_data=valid_gen,
                         steps_per_epoch=args.num_train/args.batch_size,
@@ -134,7 +133,8 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         use_multiprocessing=True,
                         workers=args.threads,
                         max_queue_size=args.max_queue_size,
-                        callbacks=cur_callbacks)
+                        callbacks=cur_callbacks,
+                        shuffle=False)
     model.save_weights(model_output_path+".weights")
     architecture_string=model.to_json()
     outf=open(args.model_hdf5+".arch",'w')
@@ -260,4 +260,9 @@ def main():
     
 
 if __name__=="__main__":
+    #import multiprocessing as mp
+    #try:
+    #    mp.set_start_method('forkserver')
+    #except RuntimeError:
+    #    pass
     main()
