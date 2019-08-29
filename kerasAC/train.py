@@ -7,7 +7,7 @@ from .generators import *
 from . import config
 from .tiledb_generators import * 
 import pdb
-from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau
+from keras.callbacks import *
 from keras.utils import multi_gpu_model
 
 def parse_args():
@@ -59,7 +59,9 @@ def parse_args():
     batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
     batch_params.add_argument("--expand_dims",default=True)
+    parser.add_argument("--upsample_thresh_list",type=float,nargs="+",default=None)
     batch_params.add_argument("--upsample_thresh",type=float, default=0)
+    parser.add_argument("--upsample_ratio_list",type=float,nargs="+",default=None)
     batch_params.add_argument("--train_upsample", type=float, default=None)
     batch_params.add_argument("--valid_upsample", type=float, default=None)
 
@@ -209,6 +211,8 @@ def initialize_generators(args):
                                   chroms_to_use=args.train_chroms,
                                   get_w1_w0=args.weighted,
                                   expand_dims=args.expand_dims,
+                                  upsample_thresh_list=args.upsample_thresh_list,
+                                  upsample_ratio_list=args.upsample_ratio_list,
                                   tasks=args.tasks)
     
     print("generated training data generator!")

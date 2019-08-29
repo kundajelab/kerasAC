@@ -36,7 +36,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['seed']=1234
     vars(args_object)['train_path']=None
     vars(args_object)['valid_path']=None
-    vars(args_object)['upsample_thresh']=None
+    vars(args_object)['upsample_thresh']=0
     vars(args_object)['train_upsample']=None
     vars(args_object)['valid_upsample']=None
     vars(args_object)['threads']=1

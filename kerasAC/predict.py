@@ -250,6 +250,7 @@ def get_model(args):
                     "precision":precision,
                     "f1":f1,
                     "ambig_binary_crossentropy":ambig_binary_crossentropy,
+                    "ambig_mean_absolute_error":ambig_mean_absolute_error,
                     "ambig_mean_squared_error":ambig_mean_squared_error}
     w1,w0=get_weights(args)
     if type(w1) in [np.ndarray, list]: 
