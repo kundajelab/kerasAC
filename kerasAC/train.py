@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import importlib
 import imp
 import argparse
@@ -59,11 +60,11 @@ def parse_args():
     batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
     batch_params.add_argument("--expand_dims",default=True)
-    parser.add_argument("--upsample_thresh_list",type=float,nargs="+",default=None)
+    batch_params.add_argument("--upsample_thresh_list",type=float,nargs="+",default=None)
     batch_params.add_argument("--upsample_thresh",type=float, default=0)
-    parser.add_argument("--upsample_ratio_list",type=float,nargs="+",default=None)
-    batch_params.add_argument("--train_upsample", type=float, default=None)
-    batch_params.add_argument("--valid_upsample", type=float, default=None)
+    batch_params.add_argument("--upsample_ratio_list",type=float,nargs="+",default=None)
+    batch_params.add_argument("--train_upsample", type=float, default=0)
+    batch_params.add_argument("--valid_upsample", type=float, default=0)
 
     epoch_params=parser.add_argument_group("epoch_params")
     epoch_params.add_argument("--epochs",type=int,default=40)
@@ -125,6 +126,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         cur_callbacks.append(tensorboard_visualizer)
+    mp.set_start_method('spawn')
     model.fit_generator(train_gen,
                         validation_data=valid_gen,
                         steps_per_epoch=args.num_train/args.batch_size,
@@ -231,7 +233,6 @@ def initialize_generators(args):
     return train_generator, valid_generator 
     
 def train(args):
-    
     if type(args)==type({}):
         args=config.args_object_from_args_dict(args)
 

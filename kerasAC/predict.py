@@ -285,7 +285,8 @@ def get_predictions(args,model):
     if args.variant_bed!=None:
         predictions=get_predictions_variant(args,model)
     elif args.data_hammock!=None:
-        predictions=get_predictions_hammock(args,model) 
+        predictions=get_predictions_hammock(args,model)
+        
     else:
         predictions=get_predictions_basic(args,model) 
     print('got model predictions')
