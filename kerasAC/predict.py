@@ -6,9 +6,9 @@ import warnings
 import numpy as np
 
 from keras import callbacks as cbks
-
 from kerasAC.activations import softMaxAxis1
 from kerasAC.generators import *
+from kerasAC.tiledb_predict import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -41,72 +41,29 @@ def get_weights(args):
         w0=args.w0 
     return w1,w0
 
-def get_predictions_hammock(args,model):
+def get_predictions_tiledb(args,model):
     import pysam
     import pandas as pd
-    num_generated=0
-    ref=pysam.FastaFile(args.ref_fasta) 
-    data=pd.read_csv(args.data_hammock,header=None,sep='\t')
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
-    #iterate through batches and one-hot-encode on the fly
-    num_entries=data.shape[0]
-    predictions=None
-    all_names=[] 
-    while num_generated < num_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([num_entries,start_index+args.batch_size])
-        seqs=[]
-        names=[]
-        for i in range(start_index,end_index):
-            cur_row=data.iloc[i]
-            chrom=cur_row[0]
-            start_val=cur_row[1]
-            end_val=cur_row[2]
-            peak_metadata=cur_row[3].split(',') 
-            peak_name=','.join([peak_metadata[-3],peak_metadata[-2]])
-            if args.center_on_summit==True:
-                summit_offset=int(peak_metadata[-1].split('[')[1].split(']')[0])
-                summit_pos=start_val+summit_offset
-                start_val=summit_pos - args.flank
-                end_val=summit_pos+args.flank
-            if start_val<1:
-                start_val=1
-                end_val=1+2*args.flank 
-            peak_name='\t'.join([str(i) for i in [chrom,start_val,end_val,peak_name]])
-            names.append(peak_name)
-            try:
-                seq=ref.fetch(chrom,start_val,end_val)
-            except:
-                continue
-            seqs.append(seq)
-        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        if (args.squeeze_input_for_gru==False):
-            #expand dimension of 1
-            x=np.expand_dims(seqs,1)
-        else:
-            x=seqs
-        try:
-            predictions_batch=model.predict(x)
-        except:
-            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
-        #add the batch predictions to the full set of predictions
-        if type(predictions)==type(None):
-            predictions=predictions_batch
-        elif type(predictions)==np.ndarray:
-            predictions=np.concatenate((predictions,predictions_batch),axis=0)
-            print(predictions.shape)
-        elif type(predictions)==type({}):
-            for key in predictions_batch:
-                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
-        else:
-            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
-            pdb.set_trace()
-        all_names=all_names+names 
-        num_generated+=(end_index-start_index)        
-    return [predictions,data,all_names]
-
-def get_predictions_basic(args,model):
+    test_generator=TiledbPredictGenerator(batch_size=args.batch_size,
+                                          task_file=args.tiledb_tasks_file,
+                                          ref_fasta=args.ref_fasta,
+                                          label_source=args.label_source_attribute,
+                                          label_flank=args.label_flank,
+                                          label_aggregation=args.label_aggregation,
+                                          sequence_flank=args.sequence_flank,
+                                          tiledb_stride=args.tiledb_stride,
+                                          chrom_sizes_file=args.chrom_sizes,
+                                          chroms=args.predict_chroms)
+    
+    predictions=model.predict_generator(test_generator,
+                                        max_queue_size=args.max_queue_size,
+                                        workers=args.threads,
+                                        use_multiprocessing=True,
+                                        verbose=1)
+    print("got predictions")
+    #iterate through to generator to get coords and labels
+    
+def get_predictions_bed(args,model):
     import pysam
     import pandas as pd
     test_generator=DataGenerator(data_path=args.data_path,
@@ -205,37 +162,63 @@ def get_predictions_variant(args,model):
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model yaml & weights files & a dataset, get model predictions and accuracy metrics')
-    parser.add_argument("--threads",type=int,default=1)
-    parser.add_argument("--max_queue_size",type=int,default=100)
-    parser.add_argument('--model_hdf5',help='hdf5 file that stores the model')
-    parser.add_argument('--weights',help='weights file for the model')
-    parser.add_argument('--yaml',help='yaml file for the model')
-    parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_path',default=None)
-    parser.add_argument("--nonzero_bin_path",default=None)
-    parser.add_argument("--universal_negative_path",default=None) 
-    parser.add_argument('--predict_chroms',nargs="*",default=None) 
-    parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
-    parser.add_argument('--variant_bed')
-    parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
+    
+    input_data_path=parser.add_argument_group("input_data_path")
+    input_data_path.add_argument('--data_path',default=None,help="bed regions, either as tsv or pandas")
+    input_data_path.add_argument("--nonzero_bin_path",default=None)
+    input_data_path.add_argument("--universal_negative_path",default=None)
+    input_data_path.add_argument('--variant_bed',default=None)
+    input_data_path.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
+    input_data_path.add_argument('--tiledb_tasks_file',default=None,help="path to tiledb database")
+    input_data_path.add_argument('--ref_fasta')
+
+    tiledb_group=parser.add_argument_group("tiledb")
+    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    tiledbgroup.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
+    tiledbgroup.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
+    tiledbgroup.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
+    tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
+
+    input_filtering_params=parser.add_argument_group("input_filtering_params")    
+    input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
+    input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
+    input_filtering_params.add_argument("--tasks",nargs="*",default=None)
+    
+    output_params=parser.add_argument_group("output_params")
+    output_params.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
     parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
+
+    calibration_params=parser.add_argument_group("calibration_params")
+    calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
+    calibration_params.add_argument("--calibrate_regression",action="store_true",default=False)        
+    
+    weight_params=parser.add_argument_group("weight_params")
+    weight_params.add_argument('--w1',nargs="*",type=float)
+    weight_params.add_argument('--w0',nargs="*",type=float)
+    weight_params.add_argument("--w1_w0_file",default=None)
+
+
+    model_params=parser.add_argument_group("model_params")
+    model_params.add_argument('--model_hdf5',help='hdf5 file that stores the model')
+    model_params.add_argument('--weights',help='weights file for the model')
+    model_params.add_argument('--yaml',help='yaml file for the model')
+    model_params.add_argument('--json',help='json file for the model')
+    model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
+    model_params.add_argument('--squeeze_input_for_gru',action='store_true')
+    model_params.add_argument("--expand_dims",default=True)
+    
+    parallelization_params=parser.add_argument_group("parallelization")
+    parallelization_params.add_argument("--threads",type=int,default=1)
+    parallelization_params.add_argument("--max_queue_size",type=int,default=100)
+
+    snp_params=parser.add_argument_group("snp_params")
+    snp_params.add_argument('--background_freqs',default=None)
+    snp_params.add_argument('--flank',default=500,type=int)
+    snp_params.add_argument('--mask',default=10,type=int)
+
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
-    parser.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
-    parser.add_argument('--ref_fasta',default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
-    parser.add_argument('--background_freqs',default=None)
-    parser.add_argument('--w1',nargs="*",type=float)
-    parser.add_argument('--w0',nargs="*",type=float)
-    parser.add_argument("--w1_w0_file",default=None)
-    parser.add_argument('--flank',default=500,type=int)
-    parser.add_argument('--mask',default=10,type=int)
-    parser.add_argument('--squeeze_input_for_gru',action='store_true')
-    parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
-    parser.add_argument("--calibrate_classification",action="store_true",default=False)
-    parser.add_argument("--calibrate_regression",action="store_true",default=False)
-    parser.add_argument("--expand_dims",default=True)
-    parser.add_argument("--tasks",nargs="*",default=None) 
     return parser.parse_args()
 
 def get_model(args):
@@ -282,13 +265,12 @@ def get_model(args):
     return model
 
 def get_predictions(args,model):
-    if args.variant_bed!=None:
+    if args.variant_bed is not None:
         predictions=get_predictions_variant(args,model)
-    elif args.data_hammock!=None:
-        predictions=get_predictions_hammock(args,model)
-        
+    elif args.tiledb_tasks_file is not None:
+        predictions=get_predictions_tiledb(args,model)
     else:
-        predictions=get_predictions_basic(args,model) 
+        predictions=get_predictions_bed(args,model) 
     print('got model predictions')
     return predictions
 

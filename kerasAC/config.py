@@ -20,7 +20,6 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['num_valid']=150000
     vars(args_object)['train_chroms']=None
     vars(args_object)['validation_chroms']=None 
-    vars(args_object)['ref_fasta']='/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa'
     vars(args_object)['init_weights']=None
     vars(args_object)['w1_w0_file']=None
     vars(args_object)['squeeze_input_for_gru']=False 
@@ -59,11 +58,13 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['predictions_pickle_to_load']=None
     vars(args_object)['sequential']=False
     vars(args_object)['background_freqs']=None
+    vars(args_object)['variant_bed']=None
     vars(args_object)['flank']=500
     vars(args_object)['mask']=10
     vars(args_object)['center_on_summit']=False
     vars(args_object)['calibrate_classification']=False
-    vars(args_object)['calibrate_regression']=False     
+    vars(args_object)['calibrate_regression']=False
+    vars(args_object)['tiledb_stride']=1
 
     #cross-validation
     vars(args_object)['assembly']='hg19'
