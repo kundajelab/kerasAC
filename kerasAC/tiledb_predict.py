@@ -106,7 +106,20 @@ class TiledbPredictGenerator(Sequence):
         #get the labels 
         y=self.get_labels(cur_chrom,positions)
         return X,y
-     
+
+    def get_batch_coords_and_labels(self,idx):
+        #mostly used in computing true labels for a dataset
+        #get genome position
+        startpos=idx*self.batch_size*self.stride
+        #map to chromosome & chromosome position 
+        cur_chrom,chrom_start_pos=self.transform_idx_to_chrom_idx(startpos)
+        positions=range(chrom_start_pos,chrom_start_pos+self.batch_size*self.stride,self.stride)
+        positions=[(chrom,p-self.sequence_flank,p+self.sequence_flank) for p in positions]
+        #get the labels 
+        y=self.get_labels(cur_chrom,positions)
+        return X,y
+        
+    
     def get_seqs(self,cur_chrom,positions):
         seqs=[]
         for pos in positions:
@@ -189,3 +202,18 @@ class TiledbPredictGenerator(Sequence):
                 return cur_chrom, cur_chrom_pos
         raise Exception("invalid index -- larger than the genome size")
     
+    def get_labels(self):
+        #iterate through to generator to get coords and labels
+        all_coords=None
+        all_y=None
+        for idx in range(self.__len__()):
+            coords,y=self.get_batch_coords_and_labels(idx)
+            if all_y is None:
+                all_y=y
+                all_coords=coords
+            else:
+                all_y=pd.concatenate((all_y,y),axis=0)
+                all_coords+=coords
+        print("got coordinate batches and labels")
+        all_coords=pd.DataFrame(all_coords,columns=['chrom','start','end'])
+        return all_coords,all_y
