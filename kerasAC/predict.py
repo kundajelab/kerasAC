@@ -63,7 +63,7 @@ def get_predictions_tiledb(args,model):
                                         verbose=1)
     print("got predictions")
     #iterate through to generator to get coords and labels
-    coords,labels=test_generator.get_labels()
+    coords,labels=test_generator.get_all_coords_and_labels()
     outputs={'coords':all_coords,
              'labels':all_y,
              'predictions':predictions}
@@ -148,7 +148,7 @@ def get_predictions_variant(args,model):
                                   verbose=1)
     
     print("got predictions")
-    labels=test_generator.get_labels()
+    labels=test_generator.get_batch_coords_and_labels()
     print("got labels")
     outputs={'ref_predictions':ref_predictions,
              'alt_predictions':alt_prefictions,
@@ -197,12 +197,12 @@ def parse_args():
     input_data_path.add_argument('--ref_fasta')
 
     tiledb_group=parser.add_argument_group("tiledb")
-    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
-    tiledbgroup.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    tiledbgroup.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
-    tiledbgroup.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
-    tiledbgroup.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
-    tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
+    tiledb_group.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    tiledb_group.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledb_group.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
+    tiledb_group.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
+    tiledb_group.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
+    tiledb_group.add_argument("--tiledb_stride",type=int,default=1)
 
     input_filtering_params=parser.add_argument_group("input_filtering_params")    
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)

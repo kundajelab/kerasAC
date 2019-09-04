@@ -97,10 +97,9 @@ class TiledbPredictGenerator(Sequence):
     def get_batch(self,idx):
         #get genome position
         startpos=idx*self.batch_size*self.stride
-        #map to chromosome & chromosome position 
+        #map to chromosome & chromosome position
         cur_chrom,chrom_start_pos=self.transform_idx_to_chrom_idx(startpos)
         positions=range(chrom_start_pos,chrom_start_pos+self.batch_size*self.stride,self.stride)
-        
         #get the sequences
         X=self.get_seqs(cur_chrom,positions)
         #get the labels 
@@ -166,7 +165,7 @@ class TiledbPredictGenerator(Sequence):
         extract the labels from tileDB 
         '''
         label_vector_len=1
-        if self.label_aggregation is None:
+        if self.label_aggregation in ['None', None]:
             label_vector_len=2*self.label_flank         
         labels=np.zeros((self.batch_size,label_vector_len,len(self.tasks)))
         batch_entry_index=0
@@ -182,7 +181,7 @@ class TiledbPredictGenerator(Sequence):
                     task=self.tasks[task_index]
                     ctx = tiledb.Ctx()
                     with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
-                        cur_vals=cur_array[cur_start:cur_end][self.label_source]
+                        cur_vals=cur_array.query(atts=(self.label_source,)[cur_start:cur_end]
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1
@@ -202,7 +201,7 @@ class TiledbPredictGenerator(Sequence):
                 return cur_chrom, cur_chrom_pos
         raise Exception("invalid index -- larger than the genome size")
     
-    def get_labels(self):
+    def get_all_coords_and_labels(self):
         #iterate through to generator to get coords and labels
         all_coords=None
         all_y=None
