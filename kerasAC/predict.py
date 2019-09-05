@@ -1,13 +1,21 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+#graceful shutdown
+import psutil
+import signal 
+import os
+
+#multithreading
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Queue 
 
 import warnings
 import numpy as np
 import pysam
 import pandas as pd
 
-from keras import callbacks as cbks
+import tensorflow as tf 
 from kerasAC.activations import softMaxAxis1
 from kerasAC.generators import *
 from kerasAC.tiledb_predict import * 
@@ -26,10 +34,20 @@ from keras.models import Model
 from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
-from scipy.special import logit,expit
 import pdb 
 
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(sig)
+        
 def get_weights(args):
     w1=None
     w0=None
@@ -44,7 +62,18 @@ def get_weights(args):
     return w1,w0
 
 
+def get_batch_wrapper(idx):
+    X,y,coords=test_generator.get_batch(idx)
+    y=y.squeeze()
+    #represent coords w/ string, MultiIndex not supported in table append mode
+    chrom=[i[0] for i in coords]
+    startpos=[i[1] for i in coords]
+    endpos=[i[2] for i in coords]
+    predictions_Queue.put([X,y,chrom,startpos,endpos],block=True)
+    return
+
 def get_predictions_tiledb(args,model):
+    global test_generator
     test_generator=TiledbPredictGenerator(batch_size=args.batch_size,
                                           task_file=args.tiledb_tasks_file,
                                           ref_fasta=args.ref_fasta,
@@ -55,20 +84,70 @@ def get_predictions_tiledb(args,model):
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes_file=args.chrom_sizes,
                                           chroms=args.predict_chroms)
+    print("created TiledbPredictGenerator")
+
+    #create output files
+    out_labels=args.predictions_hdf5+".labels"
+    out_predictions=args.predictions_hdf5+".predictions" 
     
-    predictions=model.predict_generator(test_generator,
-                                        max_queue_size=args.max_queue_size,
-                                        workers=args.threads,
-                                        use_multiprocessing=True,
-                                        verbose=1)
-    print("got predictions")
-    #iterate through to generator to get coords and labels
-    coords,labels=test_generator.get_all_coords_and_labels()
-    outputs={'coords':all_coords,
-             'labels':all_y,
-             'predictions':predictions}
-    print("got model predictions and labels")
-    return outputs
+    num_batches=len(test_generator)
+    global predictions_Queue
+    predictions_Queue=Queue(maxsize=args.max_queue_size)
+    pool=ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker)
+    try:
+        for idx in range(num_batches):
+            print(idx)
+            pool.submit(get_batch_wrapper,idx)
+        print("done submitting!") 
+        processed=0
+        first=True
+        while True:
+            #pop batch from queue 
+            batch=predictions_Queue.get(block=True)
+            X=batch[0]
+            y=batch[1]
+            chrom=batch[2]
+            startpos=batch[3]
+            endpos=batch[4]
+            
+            #get the model predictions            
+            preds=model.predict_on_batch(X)
+            preds=preds.squeeze()
+            
+            #append to output file
+            #make label df 
+            y_df=pd.DataFrame(y,index=[chrom,startpos,endpos])
+            
+            #make pred df 
+            pred_df=pd.DataFrame(preds,index=[chrom,startpos,endpos])
+            if first is True:
+                mode='w'
+                first=False
+                append=False
+            else:
+                mode='a'
+                append=True
+            y_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
+            pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})            
+            
+            processed+=1
+            print("Processed:"+str(processed)+"/"+str(num_batches))
+            if processed==num_batches:
+                print("got all batch predictions")
+                break
+        pool.shutdown(wait=True)
+    except KeyboardInterrupt:
+        #shutdown the pool
+        pool.shutdown(wait=False)
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        #shutdown the pool
+        pool.shutdown(wait=False)
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
     
 def get_predictions_bed(args,model):
     test_generator=DataGenerator(data_path=args.data_path,
@@ -211,10 +290,11 @@ def parse_args():
     
     output_params=parser.add_argument_group("output_params")
     output_params.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
+    output_params.add_argument('--predictions_hdf5',help='name of hdf5 to save predictions',default=None)
     output_params.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     output_params.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     output_params.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-
+    
     calibration_params=parser.add_argument_group("calibration_params")
     calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
     calibration_params.add_argument("--calibrate_regression",action="store_true",default=False)        
@@ -283,7 +363,7 @@ def get_model(args):
         from keras.models import load_model
         model=load_model(args.model_hdf5,custom_objects=custom_objects)
     print("got model architecture")
-    print("loaded model weights")        
+    print("loaded model weights")   
     return model
 
 def get_predictions(args,model):
@@ -347,7 +427,7 @@ def predict(args):
         #get the model
         model=get_model(args)
         predictions=get_predictions(args,model)
-
+    '''
     #calibrate predictions (if requested by user)
     predictions=calibrate(predictions,args,model)
 
@@ -361,7 +441,7 @@ def predict(args):
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)) or (args.performance_metrics_profile_file!=None):
         #getting performance metrics
         get_performance_metrics(args)
-    
+    '''
 def main():
     args=parse_args()
     predict(args)

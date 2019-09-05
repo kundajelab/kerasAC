@@ -104,20 +104,9 @@ class TiledbPredictGenerator(Sequence):
         X=self.get_seqs(cur_chrom,positions)
         #get the labels 
         y=self.get_labels(cur_chrom,positions)
-        return X,y
+        all_pos=[(cur_chrom,p-self.label_flank,p+self.label_flank) for p in positions]
+        return X,y,all_pos
 
-    def get_batch_coords_and_labels(self,idx):
-        #mostly used in computing true labels for a dataset
-        #get genome position
-        startpos=idx*self.batch_size*self.stride
-        #map to chromosome & chromosome position 
-        cur_chrom,chrom_start_pos=self.transform_idx_to_chrom_idx(startpos)
-        positions=range(chrom_start_pos,chrom_start_pos+self.batch_size*self.stride,self.stride)
-        positions=[(chrom,p-self.sequence_flank,p+self.sequence_flank) for p in positions]
-        #get the labels 
-        y=self.get_labels(cur_chrom,positions)
-        return X,y
-        
     
     def get_seqs(self,cur_chrom,positions):
         seqs=[]
@@ -181,7 +170,7 @@ class TiledbPredictGenerator(Sequence):
                     task=self.tasks[task_index]
                     ctx = tiledb.Ctx()
                     with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
-                        cur_vals=cur_array.query(atts=(self.label_source,)[cur_start:cur_end]
+                        cur_vals=cur_array[cur_start:cur_end][self.label_source]
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1
@@ -201,18 +190,3 @@ class TiledbPredictGenerator(Sequence):
                 return cur_chrom, cur_chrom_pos
         raise Exception("invalid index -- larger than the genome size")
     
-    def get_all_coords_and_labels(self):
-        #iterate through to generator to get coords and labels
-        all_coords=None
-        all_y=None
-        for idx in range(self.__len__()):
-            coords,y=self.get_batch_coords_and_labels(idx)
-            if all_y is None:
-                all_y=y
-                all_coords=coords
-            else:
-                all_y=pd.concatenate((all_y,y),axis=0)
-                all_coords+=coords
-        print("got coordinate batches and labels")
-        all_coords=pd.DataFrame(all_coords,columns=['chrom','start','end'])
-        return all_coords,all_y
