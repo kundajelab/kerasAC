@@ -112,6 +112,7 @@ def get_predictions_tiledb(args,model):
                         print("FAILED to get data batch for idx:"+str(idx))
                         print(e)
                         failed_ids.append(idx)
+                        processed+=1
                         continue 
                     X=batch[0]
                     y=batch[1]
