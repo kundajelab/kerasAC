@@ -168,9 +168,17 @@ class TiledbPredictGenerator(Sequence):
             else:
                 for task_index in range(len(self.tasks)):
                     task=self.tasks[task_index]
-                    ctx = tiledb.Ctx()
-                    with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
-                        cur_vals=cur_array[cur_start:cur_end][self.label_source]
+                    fail=True
+                    while fail is True: 
+                        try:
+                            ctx = tiledb.Ctx()
+                            with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
+                                cur_vals=cur_array[cur_start:cur_end][self.label_source]
+                                fail=False
+                        except Exception as e:
+                            print(str(e))
+                            print("trying again")
+                            
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1

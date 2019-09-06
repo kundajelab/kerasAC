@@ -7,8 +7,8 @@ import signal
 import os
 
 #multithreading
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import Queue 
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 
 import warnings
 import numpy as np
@@ -69,8 +69,7 @@ def get_batch_wrapper(idx):
     chrom=[i[0] for i in coords]
     startpos=[i[1] for i in coords]
     endpos=[i[2] for i in coords]
-    predictions_Queue.put([X,y,chrom,startpos,endpos],block=True)
-    return
+    return [X,y,chrom,startpos,endpos]
 
 def get_predictions_tiledb(args,model):
     global test_generator
@@ -91,64 +90,70 @@ def get_predictions_tiledb(args,model):
     out_predictions=args.predictions_hdf5+".predictions" 
     
     num_batches=len(test_generator)
-    global predictions_Queue
-    predictions_Queue=Queue(maxsize=args.max_queue_size)
-    pool=ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker)
-    try:
-        for idx in range(num_batches):
-            print(idx)
-            pool.submit(get_batch_wrapper,idx)
-        print("done submitting!") 
-        processed=0
-        first=True
-        while True:
-            #pop batch from queue 
-            batch=predictions_Queue.get(block=True)
-            X=batch[0]
-            y=batch[1]
-            chrom=batch[2]
-            startpos=batch[3]
-            endpos=batch[4]
-            
-            #get the model predictions            
-            preds=model.predict_on_batch(X)
-            preds=preds.squeeze()
-            
-            #append to output file
-            #make label df 
-            y_df=pd.DataFrame(y,index=[chrom,startpos,endpos])
-            
-            #make pred df 
-            pred_df=pd.DataFrame(preds,index=[chrom,startpos,endpos])
-            if first is True:
-                mode='w'
-                first=False
-                append=False
-            else:
-                mode='a'
-                append=True
-            y_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
-            pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})            
-            
-            processed+=1
-            print("Processed:"+str(processed)+"/"+str(num_batches))
-            if processed==num_batches:
-                print("got all batch predictions")
-                break
-        pool.shutdown(wait=True)
-    except KeyboardInterrupt:
-        #shutdown the pool
-        pool.shutdown(wait=False)
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise 
-    except Exception as e:
-        #shutdown the pool
-        pool.shutdown(wait=False)
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise e
-    
+    processed=0
+    failed_ids=[]
+    while (processed < num_batches) or (len(failed_ids)>0):
+        with ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker) as pool: 
+            try:
+                if processed< num_batches:
+                    idset=range(processed,min([num_batches,processed+args.max_queue_size]))
+                else:
+                    assert len(failed_ids)>0
+                    idset=failed_ids
+                    failed_ids=[]
+                    
+                future_to_batch={pool.submit(get_batch_wrapper,idx): idx for idx in idset}
+                first=True
+                for future in as_completed(future_to_batch):
+                    idx=future_to_batch[future]
+                    try:
+                        batch=future.result()
+                    except Exception as e:                        
+                        print("FAILED to get data batch for idx:"+str(idx))
+                        print(e)
+                        failed_ids.append(idx)
+                        continue 
+                    X=batch[0]
+                    y=batch[1]
+                    chrom=batch[2]
+                    startpos=batch[3]
+                    endpos=batch[4]
+
+                    #get the model predictions            
+                    preds=model.predict_on_batch(X)
+                    preds=preds.squeeze()
+
+                    #append to output file
+                    #make label df 
+                    y_df=pd.DataFrame(y,index=[chrom,startpos,endpos])
+
+                    #make pred df 
+                    pred_df=pd.DataFrame(preds,index=[chrom,startpos,endpos])
+                    if first is True:
+                        mode='w'
+                        first=False
+                        append=False
+                    else:
+                        mode='a'
+                        append=True
+                    y_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
+                    pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
+                    processed+=1
+                    print('/'.join([str(processed),str(num_batches)]))
+            except KeyboardInterrupt:
+                #shutdown the pool
+                pool.shutdown(wait=False)
+                # Kill remaining child processes
+                kill_child_processes(os.getpid())
+                raise 
+            except Exception as e:
+                #shutdown the pool
+                pool.shutdown(wait=False)
+                # Kill remaining child processes
+                kill_child_processes(os.getpid())
+                raise e
+    return
+
 def get_predictions_bed(args,model):
     test_generator=DataGenerator(data_path=args.data_path,
                                  nonzero_bin_path=args.nonzero_bin_path,
@@ -427,7 +432,7 @@ def predict(args):
         #get the model
         model=get_model(args)
         predictions=get_predictions(args,model)
-    '''
+    
     #calibrate predictions (if requested by user)
     predictions=calibrate(predictions,args,model)
 
@@ -441,7 +446,7 @@ def predict(args):
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)) or (args.performance_metrics_profile_file!=None):
         #getting performance metrics
         get_performance_metrics(args)
-    '''
+
 def main():
     args=parse_args()
     predict(args)
