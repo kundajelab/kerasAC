@@ -92,6 +92,7 @@ def get_predictions_tiledb(args,model):
     num_batches=len(test_generator)
     processed=0
     failed_ids=[]
+    first=True
     while (processed < num_batches) or (len(failed_ids)>0):
         with ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker) as pool: 
             try:
@@ -103,7 +104,6 @@ def get_predictions_tiledb(args,model):
                     failed_ids=[]
                     
                 future_to_batch={pool.submit(get_batch_wrapper,idx): idx for idx in idset}
-                first=True
                 for future in as_completed(future_to_batch):
                     idx=future_to_batch[future]
                     try:
