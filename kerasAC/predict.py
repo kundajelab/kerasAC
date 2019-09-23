@@ -92,7 +92,7 @@ def get_predictions_tiledb(args,model):
     processed=0
     failed_ids=[]
     first=True
-    while (processed < num_batches) or (len(failed_ids)>0):
+    while ((processed < num_batches) or (len(failed_ids)>0)):
         with ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker) as pool: 
             try:
                 if processed< num_batches:
@@ -115,9 +115,8 @@ def get_predictions_tiledb(args,model):
                         continue 
                     X=batch[0]
                     y=batch[1]
-                    chrom=batch[2]
-                    startpos=batch[3]
-                    endpos=batch[4]
+                    x_coords=batch[2]
+                    y_coords=batch[3]
 
                     #get the model predictions            
                     preds=model.predict_on_batch(X)
@@ -125,10 +124,10 @@ def get_predictions_tiledb(args,model):
 
                     #append to output file
                     #make label df 
-                    y_df=pd.DataFrame(y,index=[chrom,startpos,endpos])
+                    y_df=pd.DataFrame(y,index=pd.MultiIndex.from_tuples(y_coords))
 
                     #make pred df 
-                    pred_df=pd.DataFrame(preds,index=[chrom,startpos,endpos])
+                    pred_df=pd.DataFrame(preds,index=pd.MultiIndex.from_tuples(y_coords))
                     if first is True:
                         mode='w'
                         first=False
@@ -152,6 +151,7 @@ def get_predictions_tiledb(args,model):
                 # Kill remaining child processes
                 kill_child_processes(os.getpid())
                 raise e
+    print("finished with tiledb predictions!")
     return
 
 def get_predictions_bed(args,model):
