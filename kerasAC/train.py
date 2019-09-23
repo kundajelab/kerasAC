@@ -57,7 +57,7 @@ def parse_args():
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
     batch_params.add_argument("--revcomp",action="store_true")
-    batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values (i.e. log, asinh, etc). NOT IMPLEMENTED YET!")
+    batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
     batch_params.add_argument("--expand_dims",default=True)
     batch_params.add_argument("--upsample_thresh_list",type=float,nargs="+",default=None)

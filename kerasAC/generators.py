@@ -316,7 +316,6 @@ class DataGenerator(Sequence):
         return (x_batch,y_batch)
 
     def get_basic_batch(self,idx):
-
         #get seq positions
         inds=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
         if self.data_path is not None:
@@ -350,7 +349,6 @@ class DataGenerator(Sequence):
 
     def on_epoch_end(self):
         #if upsampling is being used, shuffle the positive and negative indices
-        np.random.seed(1234)
         if self.shuffle==True:
             if self.upsample_thresh_list is not None:
                 for ind,val in enumerate(self.batch_sizes):
@@ -377,8 +375,44 @@ class DataGenerator(Sequence):
 
 #generate batches of SNP data with specified allele column name and flank size
 class SNPGenerator(DataGenerator):
-    def __init__(self,data_path,ref_fasta,allele_col,flank_size=500,batch_size=128,expand_dims=True,add_revcomp=False):
-        DataGenerator.__init__(self,data_path=data_path,ref_fasta=ref_fasta,batch_size=batch_size,add_revcomp=add_revcomp,upsample_ratio=0,expand_dims=expand_dims)
+    def __init__(self,
+                 allele_col,
+                 flank_size,
+                 data_path=None,
+                 nonzero_bin_path=None,
+                 universal_negative_path=None,
+                 ref_fasta=None,
+                 batch_size=128,
+                 add_revcomp=True,
+                 tasks=None,
+                 shuffled_ref_negatives=False,
+                 upsample_thresh=0,
+                 upsample_ratio=0,
+                 chroms_to_use=None,
+                 get_w1_w0=False,
+                 expand_dims=True,
+                 upsample_thresh_list=None,
+                 upsample_ratio_list=None,
+                 shuffle=True):
+
+        DataGenerator.__init__(self,
+                               data_path=data_path,
+                               nonzero_bin_path=nonzero_bin_path,
+                               universal_negative_path=universal_negative_path,
+                               ref_fasta=ref_fasta,
+                               batch_size=batch_size,
+                               add_revcomp=add_revcomp,
+                               tasks=tasks,
+                               shuffled_ref_negatives=shuffled_ref_negatives,
+                               upsample_thresh=upsample_thresh,
+                               upsample_ratio=upsample_ratio,
+                               chroms_to_use=chroms_to_use,
+                               get_w1_w0=get_w1_w0,
+                               expand_dims=expand_dims,
+                               upsample_thresh_list=upsample_thresh_list,
+                               upsample_ratio_list=upsample_ratio_list,
+                               shuffle=shuffle)
+        
         self.allele_col=allele_col
         self.flank_size=flank_size
 
@@ -406,4 +440,3 @@ class SNPGenerator(DataGenerator):
         if (self.expand_dims==True):
             x_batch=np.expand_dims(x_batch,1)
         return x_batch
-

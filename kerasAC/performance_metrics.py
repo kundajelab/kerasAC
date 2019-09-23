@@ -1,21 +1,35 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+import argparse
+import warnings
+import numpy as np
+import pysam
+import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score, precision_recall_curve 
 from scipy.stats import spearmanr, pearsonr 
-import numpy as np
 from .util import enum 
 from collections import OrderedDict, defaultdict
 import sys 
 import pdb
-import tensorflow as tf
-import keras.backend as K 
+
+def parse_args():
+    parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')    
+    parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
+    parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--profile_model_tasks',nargs="+")
+    parser.add_argument('--profile_model_task_indices',nargs="+")
+    return parser.parse_args()
+
 
 def remove_ambiguous_peaks(predictions, true_y,ambig_val=np.nan): 
     indices_to_remove = np.nonzero(np.isnan(true_y))
     true_y_filtered = np.delete(true_y, indices_to_remove)
     predictions_filtered = np.delete(predictions, indices_to_remove)
     return predictions_filtered, true_y_filtered
-
-
 
 def auroc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     try:
@@ -164,6 +178,59 @@ def get_performance_metrics_regression(predictions,true_y):
             performance_stats['spearmanr'].append(spearman_task)
             performance_stats['pearsonr'].append(pearson_task)
             performance_stats['spearman_nonzerobins'].append(spearman_task_nonzero)
-            performance_stats['pearson_nonzerobins'].append(pearson_task_nonzero)
-            
+            performance_stats['pearson_nonzerobins'].append(pearson_task_nonzero)            
     return performance_stats  
+
+
+def get_performance_metrics_profile(model_predictions,
+                                    labels,
+                                    coords,
+                                    profile_model_tasks,
+                                    profile_model_task_indices):
+    return {} 
+
+
+def get_performance_metrics(predictions,args):
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args)
+    labels=predictions['labels']
+    model_predictions=predictions['predictions']
+    #if calibration has been used, we want accuracy metrics on the calibrated predictions (last entry in predictions list) 
+    if ((args.calibrate_classification==True) or (args.calibrate_regression==True)): 
+        model_predictions=predictions['calibrated_predictionsn']
+    if args.performance_metrics_classification_file is not None:
+        print("calculating classification performance metrics...")
+        performance_metrics_classification=get_performance_metrics_classification(model_predictions,labels)
+        print("writing classification performance metrics to file...") 
+        write_performance_metrics(args.performance_metrics_classification_file,performance_metrics_classification,model_predictions.columns) 
+    elif args.performance_metrics_regression_file is not None:
+        print("calculating regression performance metrics...") 
+        performance_metrics_regression=get_performance_metrics_regression(model_predictions,labels)
+        print("writing regression performance metrics to file...") 
+        write_performance_metrics(args.performance_metrics_regression_file,performance_metrics_regression,model_predictions.columns)
+    elif args.performance_metrics_profile_file is not None:
+        print("calculating profile model performance metrics")
+        coords=predictions['coords']
+        performance_metrics_profile=get_performance_metrics_profile(model_predictions,
+                                                                    labels,
+                                                                    coords,
+                                                                    args.profile_model_tasks,
+                                                                    args.profile_model_task_indices)
+        print("writing profile performance metrics to file...")
+        write_performance_metrics(args.performance_metrics_profile_file,performance_metrics_profile,args.profile_models_tasks)
+    
+#write performance metrics to output file: 
+def write_performance_metrics(output_file,metrics_dict,tasks):
+    metrics_df=pd.DataFrame(metrics_dict,index=tasks).transpose()
+    metrics_df.to_csv(output_file,sep='\t',header=True,index=True)
+    print(metrics_df)
+
+def main():
+    args=parse_args()
+    with open(args.predictions_pickle_to_load,'rb') as handle:
+        predictions=pickle.load(handle)
+    get_performance_metrics(predictions, args)
+    
+if __name__=="__main__":
+    main()
+    
