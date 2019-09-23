@@ -32,6 +32,7 @@ class TiledbPredictGenerator(Sequence):
         Generator for getting sequences/labels out of tiledb 
         label_aggregation -- one of 'avg','max',None
         '''
+
         self.ref_fasta=ref_fasta
         self.batch_size=batch_size
         self.tasks=open(task_file,'r').read().strip().split('\n')
