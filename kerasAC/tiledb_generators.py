@@ -242,7 +242,7 @@ class TiledbGenerator(Sequence):
             return np.max(labels)
         else:
             raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+str(self.label_aggregation))
-    
+
     def get_labels(self,indices,batch_size):
         '''
         extract the labels from tileDB 

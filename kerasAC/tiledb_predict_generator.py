@@ -12,9 +12,6 @@ from .util import *
 import tiledb
 import pdb
 
-
-            
-
 class TiledbPredictGenerator(Sequence):
     def __init__(self,
                  batch_size,
@@ -24,6 +21,8 @@ class TiledbPredictGenerator(Sequence):
                  label_flank,
                  label_aggregation,
                  sequence_flank,
+                 label_subset_attribute=None,
+                 label_thresh=None,
                  tiledb_stride=1,
                  bed_regions=None,
                  label_transformer=None,
@@ -46,10 +45,56 @@ class TiledbPredictGenerator(Sequence):
         self.label_flank=label_flank
         self.label_aggregation=label_aggregation
         self.label_transformer=label_transformer
+        self.label_subset_attribute=label_subset_attribute
+        self.label_thresh=label_thresh
+        self.indices_to_score=None
         self.sequence_flank=sequence_flank
         self.chrom_edge_flank=max([self.label_flank,self.sequence_flank])
         self.chrom_sizes_file=chrom_sizes_file
         self.chrom_sizes,self.last_index_to_chrom,self.length=self.get_genome_size()
+
+        if self.label_subset_attribute is not None:
+            print("filtering indices to score")
+            self.indices_to_score=self.get_indices_to_score()
+        
+
+    def get_indices_to_score(self):
+        #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
+        to_score_chroms=None
+        to_score_indices=None
+
+        for chrom in self.data_arrays:
+            to_score_indices_chrom=None
+            chrom_size=None
+            for task in self.data_arrays[chrom]:
+                with tiledb.DenseArray(self.data_arrays[chrom][task], mode='r') as cur_array:
+                    cur_vals=cur_array[:][self.label_subset_attribute]
+                if chrom_size is None:
+                    chrom_size=cur_vals.shape[0]
+                print("got values for cur task/chrom") 
+                to_score_indices_task_chrom=np.argwhere(cur_vals>=self.label_thresh)
+                print("got to_score indices")
+                if to_score_indices_chrom is None:
+                    to_score_indices_chrom=to_score_indices_task_chrom
+                else:
+                    to_score_indices_chrom=np.union1d(to_score_indices_chrom,to_score_indices_task_chrom)
+                print("performed task union")
+                
+            #make sure we dont' run off the edges of the chromosome!
+            usampled_indices_chrom=to_score_indices_chrom[to_score_indices_chrom>self.chrom_edge_flank]
+            to_score_indices_chrom=to_score_indices_chrom[to_score_indices_chrom<(self.chrom_sizes[chrom]-self.chrom_edge_flank)]
+            print("got indices to upsample for chrom:"+str(chrom))            
+            if to_score_chroms is None:
+                to_score_chroms=[chrom]*to_score_indices_chrom.shape[0]
+                to_score_indices=to_score_indices_chrom
+            else:
+                to_score_chroms=to_score_chroms+[chrom]*to_score_indices_chrom.shape[0]
+                to_score_indices=np.concatenate((to_score_indices,to_score_indices_chrom),axis=0)
+            print("appended chrom indices to master list") 
+
+        to_score_indices=pd.DataFrame.from_dict({'chrom':to_score_chroms,
+                                                  'pos':to_score_indices.squeeze()})
+        return to_score_indices
         
     def get_genome_size(self):
         '''
@@ -84,40 +129,62 @@ class TiledbPredictGenerator(Sequence):
 
         
     def __len__(self):
-        return int(floor(self.length/(self.batch_size*self.stride)))
-    
+        if self.indices_to_score is None: 
+            return int(floor(self.length/(self.batch_size*self.stride)))
+        else:
+            return self.indices_to_score.shape[0] 
 
     def __getitem__(self,idx):
+        self.ctx = tiledb.Ctx()
         self.ref=pysam.FastaFile(self.ref_fasta)
-        return self.get_batch(idx) 
-        
+        if self.indices_to_score is None: 
+            return self.get_batch(idx) 
+        else:
+            return self.get_batch_from_pos_subset(idx) 
     def on_epoch_end(self):
         pass
-    
+
+    def get_batch_from_pos_subset(self,idx):
+        cur_batch=self.indices_to_score.iloc[idx:idx+self.batch_size]
+        
+        x_pos=[(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank) for index,row in cur_batch.iterrows()]
+        y_pos=[(row['chrom'],row['pos']-self.label_flank,row['pos']+self.label_flank) for index,row  in cur_batch.iterrows()]
+        
+        #get the sequences
+        X=self.get_seqs(x_pos)
+
+        #get the labels 
+        y=self.get_labels(y_pos)
+
+        return X,y,x_pos,y_pos
+        
     def get_batch(self,idx):
         #get genome position
         startpos=idx*self.batch_size*self.stride
         #map to chromosome & chromosome position
         cur_chrom,chrom_start_pos=self.transform_idx_to_chrom_idx(startpos)
         positions=range(chrom_start_pos,chrom_start_pos+self.batch_size*self.stride,self.stride)
+        x_pos=[(cur_chrom,p-self.sequence_flank,p+self.sequence_flank) for p in positions]
+        y_pos=[(cur_chrom,p-self.label_flank,p+self.label_flank) for p in positions]
+        
         #get the sequences
-        X=self.get_seqs(cur_chrom,positions)
+        X=self.get_seqs(x_pos)
         #get the labels 
-        y=self.get_labels(cur_chrom,positions)
-        all_pos=[(cur_chrom,p-self.label_flank,p+self.label_flank) for p in positions]
-        return X,y,all_pos
+        y=self.get_labels(y_pos)
+        return X,y,x_pos,y_pos
 
     
-    def get_seqs(self,cur_chrom,positions):
+    def get_seqs(self,positions):
         seqs=[]
         for pos in positions:
             try:
-                start_coord=pos-self.sequence_flank
-                end_coord=pos+self.sequence_flank
+                cur_chrom=pos[0]
+                start_coord=pos[1]
+                end_coord=pos[2]
                 if start_coord < 0:
                     raise Exception("start coordinate for sequence is < 0")
                 if end_coord>=self.chrom_sizes[cur_chrom]:
-                    raise Exception("end coordinate for sequence ("+str(end_coord)+") is greater than the size of chromosome:"+str(cur_chrom))                                
+                    raise Exception("end coordinate for sequence ("+str(end_coord)+") is greater than the size of chromosome:"+str(cur_chrom))      
                 seqs.append(self.ref.fetch(cur_chrom,start_coord,end_coord))
             except:
                 #we are off the chromosome edge, just use all N's for the sequene in this edge case
@@ -149,7 +216,7 @@ class TiledbPredictGenerator(Sequence):
         else:
             raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+str(self.label_aggregation))
     
-    def get_labels(self,cur_chrom,positions):
+    def get_labels(self,positions):
         '''
         extract the labels from tileDB 
         '''
@@ -159,8 +226,9 @@ class TiledbPredictGenerator(Sequence):
         labels=np.zeros((self.batch_size,label_vector_len,len(self.tasks)))
         batch_entry_index=0
         for cur_pos in positions:
-            cur_start=cur_pos-self.label_flank
-            cur_end=cur_pos+self.label_flank
+            cur_chrom=cur_pos[0]
+            cur_start=cur_pos[1]
+            cur_end=cur_pos[2]
             if cur_start < 0:
                 labels[batch_entry_index,:,:].fill(np.nan)
             elif cur_end>=self.chrom_sizes[cur_chrom]:
@@ -168,17 +236,8 @@ class TiledbPredictGenerator(Sequence):
             else:
                 for task_index in range(len(self.tasks)):
                     task=self.tasks[task_index]
-                    fail=True
-                    while fail is True: 
-                        try:
-                            ctx = tiledb.Ctx()
-                            with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
-                                cur_vals=cur_array[cur_start:cur_end][self.label_source]
-                                fail=False
-                        except Exception as e:
-                            print(str(e))
-                            print("trying again")
-                            
+                    with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=self.ctx) as cur_array:
+                        cur_vals=cur_array[cur_start:cur_end][self.label_source]
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1

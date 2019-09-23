@@ -18,7 +18,7 @@ import pandas as pd
 import tensorflow as tf 
 from kerasAC.activations import softMaxAxis1
 from kerasAC.generators import *
-from kerasAC.tiledb_predict import * 
+from kerasAC.tiledb_predict_generator import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -63,13 +63,10 @@ def get_weights(args):
 
 
 def get_batch_wrapper(idx):
-    X,y,coords=test_generator.get_batch(idx)
+    X,y,x_pos,y_pos=test_generator[idx]
     y=y.squeeze()
     #represent coords w/ string, MultiIndex not supported in table append mode
-    chrom=[i[0] for i in coords]
-    startpos=[i[1] for i in coords]
-    endpos=[i[2] for i in coords]
-    return [X,y,chrom,startpos,endpos]
+    return [X,y,x_pos,y_pos]
 
 def get_predictions_tiledb(args,model):
     global test_generator
@@ -79,6 +76,8 @@ def get_predictions_tiledb(args,model):
                                           label_source=args.label_source_attribute,
                                           label_flank=args.label_flank,
                                           label_aggregation=args.label_aggregation,
+                                          label_subset_attribute=args.label_subset_attribute,
+                                          label_thresh=args.label_thresh,
                                           sequence_flank=args.sequence_flank,
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes_file=args.chrom_sizes,
@@ -284,6 +283,8 @@ def parse_args():
     tiledb_group=parser.add_argument_group("tiledb")
     tiledb_group.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledb_group.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledb_group.add_argument("--label_subset_attribute",default="idr_peak")
+    tiledb_group.add_argument("--label_thresh",type=int,default=1) 
     tiledb_group.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
     tiledb_group.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
     tiledb_group.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
