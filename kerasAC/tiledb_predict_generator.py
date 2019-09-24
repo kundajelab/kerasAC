@@ -95,6 +95,7 @@ class TiledbPredictGenerator(Sequence):
 
         to_score_indices=pd.DataFrame.from_dict({'chrom':to_score_chroms,
                                                   'pos':to_score_indices.squeeze()})
+
         return to_score_indices
         
     def get_genome_size(self):
@@ -147,16 +148,13 @@ class TiledbPredictGenerator(Sequence):
 
     def get_batch_from_pos_subset(self,idx):
         cur_batch=self.indices_to_score.iloc[idx:idx+self.batch_size]
-        
         x_pos=[(row['chrom'],row['pos']-self.sequence_flank,row['pos']+self.sequence_flank) for index,row in cur_batch.iterrows()]
         y_pos=[(row['chrom'],row['pos']-self.label_flank,row['pos']+self.label_flank) for index,row  in cur_batch.iterrows()]
-        
         #get the sequences
         X=self.get_seqs(x_pos)
 
         #get the labels 
         y=self.get_labels(y_pos)
-
         return X,y,x_pos,y_pos
         
     def get_batch(self,idx):
@@ -224,7 +222,7 @@ class TiledbPredictGenerator(Sequence):
         label_vector_len=1
         if self.label_aggregation in ['None', None]:
             label_vector_len=2*self.label_flank         
-        labels=np.zeros((self.batch_size,label_vector_len,len(self.tasks)))
+        labels=np.zeros((len(positions),label_vector_len,len(self.tasks)))
         batch_entry_index=0
         for cur_pos in positions:
             cur_chrom=cur_pos[0]
@@ -242,6 +240,7 @@ class TiledbPredictGenerator(Sequence):
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1
+
         return labels 
 
     def transform_idx_to_chrom_idx(self,pos):
