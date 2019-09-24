@@ -311,8 +311,8 @@ def parse_args():
     tiledb_group=parser.add_argument_group("tiledb")
     tiledb_group.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledb_group.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    tiledb_group.add_argument("--label_subset_attribute",default="idr_peak")
-    tiledb_group.add_argument("--label_thresh",type=int,default=1) 
+    tiledb_group.add_argument("--label_subset_attribute",default=None)
+    tiledb_group.add_argument("--label_thresh",type=int,default=None) 
     tiledb_group.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
     tiledb_group.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
     tiledb_group.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
@@ -468,8 +468,8 @@ def predict(args):
     predictions=calibrate(predictions,args,model)
 
     #pickle the predictions if a pickle argument is provided to the code 
-    print("writing predictions to pickle")
     if args.predictions_pickle is not None:
+        print("writing predictions to pickle")
         with open(args.predictions_pickle,'wb') as handle:
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
@@ -493,8 +493,9 @@ def main():
     pred_writer.start() 
 
     predict(args)
-    
+    print("joining label writer") 
     label_writer.join()
+    print("joining prediction writer") 
     pred_writer.join()
 
     

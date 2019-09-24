@@ -65,8 +65,8 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['calibrate_classification']=False
     vars(args_object)['calibrate_regression']=False
     vars(args_object)['tiledb_stride']=1
-    vars(args_object)['label_subset_attribute']='idr_peak'
-    vars(args_object)['label_thresh']=1 
+    vars(args_object)['label_subset_attribute']=None
+    vars(args_object)['label_thresh']=None
 
     #cross-validation
     vars(args_object)['assembly']='hg19'
