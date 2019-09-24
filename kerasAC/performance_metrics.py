@@ -15,7 +15,9 @@ import sys
 import pdb
 
 def parse_args():
-    parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')    
+    parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')
+    parser.add_argument('--labels_hdf5')
+    parser.add_argument('--predictions_hdf5') 
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
     parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)

@@ -7,8 +7,8 @@ import signal
 import os
 
 #multithreading
-from concurrent.futures import ProcessPoolExecutor, as_completed
-
+#from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import Pool,Process, Queue 
 
 import warnings
 import numpy as np
@@ -35,6 +35,64 @@ from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
 import pdb 
+
+def write_predictions(args):
+    try:
+        out_predictions=args.predictions_hdf5+".predictions" 
+        first=True
+        while True:
+            pred_df=pred_queue.get()
+            if type(pred_df) == str: 
+                if pred_df=="FINISHED":
+                    return
+            if first is True:
+                mode='w'
+                first=False
+                append=False
+            else:
+                mode='a'
+                append=True
+            #print("wrote predictions for batch")
+            pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
+    except KeyboardInterrupt:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
+
+def write_labels(args):
+    try:
+        out_labels=args.predictions_hdf5+".labels" 
+        first=True
+        while True:
+            label_df=label_queue.get()
+            if type(label_df)==str:
+                if label_df=="FINISHED":
+                    return
+            if first is True:
+                mode='w'
+                first=False
+                append=False
+            else:
+                mode='a'
+                append=True
+            #print("wrote label for batch") 
+            label_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
+    except KeyboardInterrupt:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -66,7 +124,9 @@ def get_batch_wrapper(idx):
     X,y,x_pos,y_pos=test_generator[idx]
     y=y.squeeze()
     #represent coords w/ string, MultiIndex not supported in table append mode
-    return [X,y,x_pos,y_pos]
+    y_pos=pd.MultiIndex.from_tuples(y_pos)
+    y=pd.DataFrame(y,index=y_pos)
+    return [X,y,y_pos,idx]
 
 def get_predictions_tiledb(args,model):
     global test_generator
@@ -82,76 +142,44 @@ def get_predictions_tiledb(args,model):
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes_file=args.chrom_sizes,
                                           chroms=args.predict_chroms)
-    print("created TiledbPredictGenerator")
-
-    #create output files
-    out_labels=args.predictions_hdf5+".labels"
-    out_predictions=args.predictions_hdf5+".predictions" 
-    
+    print("created TiledbPredictGenerator")    
     num_batches=len(test_generator)
     processed=0
-    failed_ids=[]
-    first=True
-    while ((processed < num_batches) or (len(failed_ids)>0)):
-        with ProcessPoolExecutor(max_workers=args.threads,initializer=init_worker) as pool: 
-            try:
-                if processed< num_batches:
-                    idset=range(processed,min([num_batches,processed+args.max_queue_size]))
-                else:
-                    assert len(failed_ids)>0
-                    idset=failed_ids
-                    failed_ids=[]
-                    
-                future_to_batch={pool.submit(get_batch_wrapper,idx): idx for idx in idset}
-                for future in as_completed(future_to_batch):
-                    idx=future_to_batch[future]
-                    try:
-                        batch=future.result()
-                    except Exception as e:                        
-                        print("FAILED to get data batch for idx:"+str(idx))
-                        print(e)
-                        failed_ids.append(idx)
-                        processed+=1
-                        continue 
-                    X=batch[0]
-                    y=batch[1]
-                    x_coords=batch[2]
-                    y_coords=batch[3]
-
+    try:
+        with Pool(processes=args.threads,initializer=init_worker) as pool: 
+            while (processed < num_batches):
+                idset=range(processed,min([num_batches,processed+args.max_queue_size]))
+                for result in pool.imap_unordered(get_batch_wrapper,idset):
+                    X=result[0]
+                    y=result[1]
+                    y_pos=result[2]
+                    idx=result[3]
+                    processed+=1
+                    if processed%10==0:
+                        print(str(processed)+"/"+str(num_batches))
                     #get the model predictions            
                     preds=model.predict_on_batch(X)
                     preds=preds.squeeze()
-
-                    #append to output file
-                    #make label df 
-                    y_df=pd.DataFrame(y,index=pd.MultiIndex.from_tuples(y_coords))
-
-                    #make pred df 
-                    pred_df=pd.DataFrame(preds,index=pd.MultiIndex.from_tuples(y_coords))
-                    if first is True:
-                        mode='w'
-                        first=False
-                        append=False
-                    else:
-                        mode='a'
-                        append=True
-                    y_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
-                    pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
-                    processed+=1
-                    print('/'.join([str(processed),str(num_batches)]))
-            except KeyboardInterrupt:
-                #shutdown the pool
-                pool.shutdown(wait=False)
-                # Kill remaining child processes
-                kill_child_processes(os.getpid())
-                raise 
-            except Exception as e:
-                #shutdown the pool
-                pool.shutdown(wait=False)
-                # Kill remaining child processes
-                kill_child_processes(os.getpid())
-                raise e
+                    label_queue.put(y)
+                    pred_queue.put(pd.DataFrame(preds,index=y_pos))
+                    
+    except KeyboardInterrupt:
+        #shutdown the pool
+        pool.terminate()
+        pool.join() 
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        #shutdown the pool
+        pool.terminate()
+        pool.join()
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
     print("finished with tiledb predictions!")
+    label_queue.put("FINISHED")
+    pred_queue.put("FINISHED")
     return
 
 def get_predictions_bed(args,model):
@@ -377,6 +405,7 @@ def get_predictions(args,model):
     if args.variant_bed is not None:
         predictions=get_predictions_variant(args,model)
     elif args.tiledb_tasks_file is not None:
+        
         predictions=get_predictions_tiledb(args,model)
     else:
         predictions=get_predictions_bed(args,model) 
@@ -438,12 +467,12 @@ def predict(args):
     #calibrate predictions (if requested by user)
     predictions=calibrate(predictions,args,model)
 
-    #pickle the predictions
+    #pickle the predictions if a pickle argument is provided to the code 
     print("writing predictions to pickle")
-    assert args.predictions_pickle is not None
-    with open(args.predictions_pickle,'wb') as handle:
-        pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
-    print("pickled the model predictions to file:"+str(args.predictions_pickle))
+    if args.predictions_pickle is not NOne:
+        with open(args.predictions_pickle,'wb') as handle:
+            pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
+        print("pickled the model predictions to file:"+str(args.predictions_pickle))
         
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)) or (args.performance_metrics_profile_file!=None):
         #getting performance metrics
@@ -451,7 +480,22 @@ def predict(args):
 
 def main():
     args=parse_args()
+
+    global pred_queue
+    global label_queue
+    
+    pred_queue=Queue()
+    label_queue=Queue()
+    
+    label_writer=Process(target=write_predictions,args=([args]))
+    pred_writer=Process(target=write_labels,args=([args]))
+    label_writer.start()
+    pred_writer.start() 
+
     predict(args)
+    
+    label_writer.join()
+    pred_writer.join()
 
     
 

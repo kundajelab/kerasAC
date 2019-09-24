@@ -242,6 +242,7 @@ class TiledbPredictGenerator(Sequence):
                     vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))
                     labels[batch_entry_index,:,task_index]=vals
             batch_entry_index+=1
+
         return labels 
 
     def transform_idx_to_chrom_idx(self,pos):
