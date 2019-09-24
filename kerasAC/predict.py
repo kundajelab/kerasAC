@@ -122,7 +122,7 @@ def get_weights(args):
 
 def get_batch_wrapper(idx):
     X,y,x_pos,y_pos=test_generator[idx]
-    y=y.squeeze()
+    y=y.squeeze(axis=-1)
     #represent coords w/ string, MultiIndex not supported in table append mode
     y_pos=pd.MultiIndex.from_tuples(y_pos)
     y=pd.DataFrame(y,index=y_pos)
@@ -159,7 +159,7 @@ def get_predictions_tiledb(args,model):
                         print(str(processed)+"/"+str(num_batches))
                     #get the model predictions            
                     preds=model.predict_on_batch(X)
-                    preds=preds.squeeze()
+                    preds=preds.squeeze(axis=-1)
                     label_queue.put(y)
                     pred_queue.put(pd.DataFrame(preds,index=y_pos))
                     
@@ -469,7 +469,7 @@ def predict(args):
 
     #pickle the predictions if a pickle argument is provided to the code 
     print("writing predictions to pickle")
-    if args.predictions_pickle is not NOne:
+    if args.predictions_pickle is not None:
         with open(args.predictions_pickle,'wb') as handle:
             pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
         print("pickled the model predictions to file:"+str(args.predictions_pickle))
