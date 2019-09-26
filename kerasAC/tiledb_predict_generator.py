@@ -132,9 +132,9 @@ class TiledbPredictGenerator(Sequence):
         
     def __len__(self):
         if self.indices_to_score is None: 
-            return int(floor(self.length/(self.batch_size*self.stride)))
+            return int(ceil(self.length/(self.batch_size*self.stride)))
         else:
-            return self.indices_to_score.shape[0] 
+            return int(ceil(self.indices_to_score.shape[0] /self.batch_size))
 
     def __getitem__(self,idx):
         self.ctx = tiledb.Ctx()
