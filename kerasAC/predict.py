@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import time
 #graceful shutdown
 import psutil
 import signal 
@@ -52,7 +53,6 @@ def write_predictions(args):
             else:
                 mode='a'
                 append=True
-            #print("wrote predictions for batch")
             pred_df.to_hdf(out_predictions,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
     except KeyboardInterrupt:
         #shutdown the pool
@@ -60,6 +60,7 @@ def write_predictions(args):
         kill_child_processes(os.getpid())
         raise 
     except Exception as e:
+        print(e)
         #shutdown the pool
         # Kill remaining child processes
         kill_child_processes(os.getpid())
@@ -81,7 +82,6 @@ def write_labels(args):
             else:
                 mode='a'
                 append=True
-            #print("wrote label for batch") 
             label_df.to_hdf(out_labels,key="data",mode=mode, append=append,format="table", min_itemsize={'index':30})
     except KeyboardInterrupt:
         #shutdown the pool
@@ -89,6 +89,7 @@ def write_labels(args):
         kill_child_processes(os.getpid())
         raise 
     except Exception as e:
+        print(e)
         #shutdown the pool
         # Kill remaining child processes
         kill_child_processes(os.getpid())
@@ -171,6 +172,7 @@ def get_predictions_tiledb(args,model):
         kill_child_processes(os.getpid())
         raise 
     except Exception as e:
+        print(e)
         #shutdown the pool
         pool.terminate()
         pool.join()
@@ -179,7 +181,9 @@ def get_predictions_tiledb(args,model):
         raise e
     print("finished with tiledb predictions!")
     label_queue.put("FINISHED")
+    label_queue.close() 
     pred_queue.put("FINISHED")
+    pred_queue.close() 
     return
 
 def get_predictions_bed(args,model):
@@ -477,6 +481,7 @@ def predict(args):
     if ((args.performance_metrics_classification_file!=None) or (args.performance_metrics_regression_file!=None)) or (args.performance_metrics_profile_file!=None):
         #getting performance metrics
         get_performance_metrics(args)
+    return
 
 def main():
     args=parse_args()
@@ -493,6 +498,22 @@ def main():
     pred_writer.start() 
 
     predict(args)
+    print("exiting predict function")
+    #drain the queue
+    try:
+        while not label_queue.empty():
+            print("draining the label Queue")
+            time.sleep(2)
+    except Exception as e:
+        print(e)
+    try:
+        while not pred_queue.empty():
+            print("draining the prediction Queue")
+            time.sleep(2)
+    except Exception as e:
+        print(e)
+
+    
     print("joining label writer") 
     label_writer.join()
     print("joining prediction writer") 
