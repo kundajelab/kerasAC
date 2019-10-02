@@ -1,5 +1,6 @@
 import numpy as np ;
 from kerasAC.metrics import *
+from kerasAC.custom_losses import * 
 
 def getModelGivenModelOptionsAndWeightInits(args):
     #get the arguments
@@ -7,7 +8,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     w0=args.w0
     w1=args.w1
     init_weights=args.init_weights
-    ntasks=args.ntasks
+    ntasks=args.num_tasks
     
     np.random.seed(seed)
     import keras;
@@ -19,14 +20,14 @@ def getModelGivenModelOptionsAndWeightInits(args):
     from keras.layers.normalization import BatchNormalization
     from keras.regularizers import l1, l2
     from keras import backend as K
-    from keras.layers import Input
+    from keras.layers import Input, Add
     from keras.models import Model
 
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
 
     seq = Input(shape=(1,1000,4))
-    gc=Input(shape=(1,1000,1))
+    gc=Input(shape=(1,1,1))
     
     if (init_weights!=None):
         #load the weight initializations
@@ -96,5 +97,5 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("compiling!")
     loss=ambig_mean_squared_error 
     model = Model(inputs = [seq,gc], outputs = outputs)
-    model.compile(optimizer=adam,loss=loss,metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    model.compile(optimizer=adam,loss=loss)
     return model

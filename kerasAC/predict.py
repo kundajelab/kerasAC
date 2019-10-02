@@ -18,8 +18,8 @@ import pandas as pd
 
 import tensorflow as tf 
 from kerasAC.activations import softMaxAxis1
-from kerasAC.generators import *
-from kerasAC.tiledb_predict_generator import * 
+from .generators.basic_generator import *
+#from .generators.tiledb_predict_generator import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -131,7 +131,10 @@ def get_batch_wrapper(idx):
 
 def get_predictions_tiledb(args,model):
     global test_generator
-    test_generator=TiledbPredictGenerator(batch_size=args.batch_size,
+    test_generator=TiledbPredictGenerator(index_path=args.index_path,
+                                          input_path=args.input_path,
+                                          output_path=args.output_path,
+                                          batch_size=args.batch_size,
                                           task_file=args.tiledb_tasks_file,
                                           ref_fasta=args.ref_fasta,
                                           label_source=args.label_source_attribute,
@@ -187,9 +190,12 @@ def get_predictions_tiledb(args,model):
     return
 
 def get_predictions_bed(args,model):
-    test_generator=DataGenerator(data_path=args.data_path,
-                                 nonzero_bin_path=args.nonzero_bin_path,
-                                 universal_negative_path=args.universal_negative_path,
+    test_generator=DataGenerator(index_path=args.index_data_path,
+                                 input_path=args.input_data_path,
+                                 output_path=args.output_data_path,
+                                 index_tasks=args.index_tasks,
+                                 num_inputs=args.num_inputs,
+                                 num_outputs=args.num_outputs,
                                  ref_fasta=args.ref_fasta,
                                  batch_size=args.batch_size,
                                  add_revcomp=False,
@@ -197,6 +203,7 @@ def get_predictions_bed(args,model):
                                  expand_dims=args.expand_dims,
                                  tasks=args.tasks,
                                  shuffle=False)
+
     predictions=model.predict_generator(test_generator,
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
@@ -214,9 +221,12 @@ def get_predictions_bed(args,model):
             print("getting pre-relu outputs (preacts)")
             preact_model=Model(inputs=model.input,
                               outputs=model.layers[-1].output) 
-        test_generator=DataGenerator(args.data_path,
-                                     nonzero_bin_path=args.nonzero_bin_path,
-                                     universal_negative_path=args.universal_negative_path,
+        test_generator=DataGenerator(index_path=args.index_data_path,
+                                     input_path=args.input_data_path,
+                                     output_path=args.output_data_path,
+                                     index_tasks=args.index_data_path,
+                                     num_inputs=args.num_inputs,
+                                     num_outputs=args.num_outputs,
                                      ref_fasta=args.ref_fasta,
                                      add_revcomp=False,
                                      batch_size=args.batch_size,
@@ -239,18 +249,21 @@ def get_predictions_bed(args,model):
 
 def get_predictions_variant(args,model):
     test_generator=SNPGenerator(args.ref_col,
-                               args.flank,
-                               data_path=args.data_path,
-                               nonzero_bin_path=args.nonzero_bin_path,
-                               universal_negative_path=args.universal_negative_path,
-                               ref_fasta=args.ref_fasta,
-                               allele_col=args.ref_col,
-                               batch_size=args.batch_size,
-                               add_revcomp=False,
-                               chroms_to_use=args.predict_chroms,
-                               expand_dims=args.expand_dims,
-                               tasks=args.tasks,
-                               shuffle=False)
+                                args.flank,
+                                index_path=args.index_data_path,
+                                input_path=args.input_data_path,
+                                output_path=args.output_data_path,
+                                index_tasks=args.index_tasks,
+                                num_inputs=args.num_inputs,
+                                num_outputs=args.num_outputs,
+                                ref_fasta=args.ref_fasta,
+                                allele_col=args.ref_col,
+                                batch_size=args.batch_size,
+                                add_revcomp=False,
+                                chroms_to_use=args.predict_chroms,
+                                expand_dims=args.expand_dims,
+                                tasks=args.tasks,
+                                shuffle=False)
     ref_predictions=model.predict_generator(test_generator,
                                   max_queue_size=args.max_queue_size,
                                   workers=args.threads,
@@ -304,23 +317,34 @@ def parse_args():
     parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
     
     input_data_path=parser.add_argument_group("input_data_path")
-    input_data_path.add_argument('--data_path',default=None,help="bed regions, either as tsv or pandas")
-    input_data_path.add_argument("--nonzero_bin_path",default=None)
-    input_data_path.add_argument("--universal_negative_path",default=None)
+    input_data_path=parser.add_argument_group('input_data_path')
+    input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
+    input_data_path.add_argument("--index_tasks",nargs="*",default=None)    
+    input_data_path.add_argument("--input_data_path",nargs="+",default=None,help="seq or path to seqdataloader hdf5")
+    input_data_path.add_argument("--output_data_path",nargs="+",default=None,help="path to seqdataloader hdf5")
+    
     input_data_path.add_argument('--variant_bed',default=None)
     input_data_path.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
-    input_data_path.add_argument('--tiledb_tasks_file',default=None,help="path to tiledb database")
     input_data_path.add_argument('--ref_fasta')
 
-    tiledb_group=parser.add_argument_group("tiledb")
-    tiledb_group.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
-    tiledb_group.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    tiledb_group.add_argument("--label_subset_attribute",default=None)
-    tiledb_group.add_argument("--label_thresh",type=int,default=None) 
-    tiledb_group.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
-    tiledb_group.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
-    tiledb_group.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
-    tiledb_group.add_argument("--tiledb_stride",type=int,default=1)
+    tiledbgroup=parser.add_argument_group("tiledb")
+    tiledbgroup.add_argument("--tdb_outputs")
+    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
+    tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
+    
+    tiledbgroup.add_argument("--tdb_inputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",type=int,help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
+    tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
+
+    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task",action="append")
+    tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
+    tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
 
     input_filtering_params=parser.add_argument_group("input_filtering_params")    
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
@@ -352,6 +376,9 @@ def parse_args():
     model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
     model_params.add_argument('--squeeze_input_for_gru',action='store_true')
     model_params.add_argument("--expand_dims",default=True)
+    model_params.add_argument("--num_inputs",type=int)
+    model_params.add_argument("--num_outputs",type=int)
+    
     
     parallelization_params=parser.add_argument_group("parallelization")
     parallelization_params.add_argument("--threads",type=int,default=1)
@@ -408,8 +435,7 @@ def get_model(args):
 def get_predictions(args,model):
     if args.variant_bed is not None:
         predictions=get_predictions_variant(args,model)
-    elif args.tiledb_tasks_file is not None:
-        
+    elif args.tdb_indexer is not None:        
         predictions=get_predictions_tiledb(args,model)
     else:
         predictions=get_predictions_bed(args,model) 

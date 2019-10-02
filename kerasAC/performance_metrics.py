@@ -184,12 +184,6 @@ def get_performance_metrics_regression(predictions,true_y):
     return performance_stats  
 
 
-def get_performance_metrics_profile(model_predictions,
-                                    labels,
-                                    coords,
-                                    profile_model_tasks,
-                                    profile_model_task_indices):
-    return {} 
 
 
 def get_performance_metrics(predictions,args):

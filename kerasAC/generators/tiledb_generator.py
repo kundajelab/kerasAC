@@ -7,7 +7,7 @@ from random import shuffle
 import math
 from math import ceil, floor
 import pysam
-from .util import *
+from ..util import *
 import tiledb
 import pdb
 
@@ -33,38 +33,67 @@ def get_genome_size(chrom_sizes_file,chroms):
 
 class TiledbGenerator(Sequence):
     def __init__(self,
-                 batch_size,
-                 task_file,
                  ref_fasta,
-                 label_source,
-                 label_flank,
-                 label_aggregation,
-                 sequence_flank,
-                 partition_attribute_for_upsample,
+                 batch_size,
+                 tdb_indexer,
+                 tdb_partition_attribute_for_upsample,
+                 tdb_partition_thresh_for_upsample,
+                 tdb_inputs,
+                 tdb_input_source_attribute,
+                 tdb_input_flank,
+                 upsample_ratio,
+                 tdb_outputs,
+                 tdb_output_source_attribute,
+                 tdb_output_flank,
+                 tdb_input_aggregation=None,
+                 tdb_input_transformation=None,
+                 tdb_output_aggregation=None,
+                 tdb_output_tranformation=None,
+                 chroms=None,
+                 chrom_sizes=None,
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
-                 label_transformer=None,
-                 chrom_sizes=None,
-                 chroms=None,
-                 partition_thresh_for_upsample=1,
-                 upsample_ratio=0,
-                 revcomp=False,
                  pseudocount=0):
         '''
-        partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
-        partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
-        label_aggregation -- one of 'avg','max',None
+        tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
+        tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
+        tdb_input_aggregation/ tdb_output_aggregation -- one of 'avg','max',None
         '''
 
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
         self.ref_fasta=ref_fasta
         self.batch_size=batch_size
-        self.tasks=open(task_file,'r').read().strip().split('\n')
+        self.revcomp=revcomp
+        if self.revcomp==True:
+            self.batch_size=int(math.floor(self.batch_size/2))            
+
+        #identify chromosome information
         if chroms is not None:
             self.chroms_to_use=chroms
         else: 
             self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
+        self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
+        
+        #identify indices to upsample
+        self.tdb_indexer=tdb_indexer
+        self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
+        self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
+        
+        if upsample_ratio is not None:
+            self.upsample_ratio=upsample_ratio[0]
+            print("using upsample ratio of :"+str(self.upsample_ratio))
+            print("Warning! For tiledb inputs, only a single upsample_ratio is allowed")
+            self.upsampled_indices,self.upsampled_indices_len=self.get_upsampled_indices()
+            self.upsampled_indices_len=len(self.upsampled_indices)
+            num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
+            self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
+        else:
+            self.upsampled_indices_len=0
+            self.upsampled_indices=[]            
+        self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
+        self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
+        self.tasks=open(task_file,'r').read().strip().split('\n')
         self.data_arrays=self.open_tiledb_arrays_for_reading()
         self.label_source=label_source
         self.label_flank=label_flank
@@ -75,40 +104,34 @@ class TiledbGenerator(Sequence):
         self.chrom_edge_flank=max([self.label_flank,self.sequence_flank])
         self.partition_attribute_for_upsample=partition_attribute_for_upsample
         self.partition_thresh_for_upsample=partition_thresh_for_upsample
-        self.upsample_ratio=upsample_ratio
-        self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
-        if self.upsample_ratio > 0:
-            self.upsampled_indices=self.get_upsampled_indices()
-            self.upsampled_indices_len=len(self.upsampled_indices)
-            num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
-            self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
-        else:
-            self.upsampled_indices_len=0
-            self.upsampled_indices=[]            
-        self.revcomp=revcomp
-        if self.revcomp==True:
-            self.batch_size=int(math.floor(self.batch_size/2))            
-        self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
-        self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size
-        
+
+            
     def open_tiledb_arrays_for_reading(self):
         '''
         Opens tiledb arrays for each task/chromosome for reading  
         '''
         array_dict=dict()
+        array_dict['index']=dict()
+        array_dict['inputs']=dict()
+        array_dict['outputs']=dict()
+        index_tasks=open(self.index_path).read().strip().split('\n')
+        input_tasks=[open(self.input_path]
+        for index_task in index_tasks:
+            array_dict['index'][
         for chrom in self.chroms_to_use:
             array_dict[chrom]=dict()
             for task in self.tasks:
                 array_dict[chrom][task]= task+'.'+chrom
         return array_dict
-
-
+                                                                                            
+        
+        
     def get_upsampled_indices(self):
         #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
         upsampled_chroms=None
         upsampled_indices=None
 
-        for chrom in self.data_arrays:
+        for chrom in self.chroms_to_use:
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays[chrom]:
@@ -197,7 +220,11 @@ class TiledbGenerator(Sequence):
         else:
             X=X_non_upsampled
             y=y_non_upsampled
-        return X,y
+
+        #get any auxiliary inputs and outputs
+        aux_x=self.get_aux_x(upsampled_batch_indices,non_upsampled_batch_indices)
+        aux_y=self.get_aux_y(upsample_batch_indices,non_upsampled_batch_indices) 
+        return X+aux_x,y+aux_y
      
     def get_seqs(self,indices):
         seqs=[]
