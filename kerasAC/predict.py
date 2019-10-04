@@ -152,7 +152,7 @@ def write_predictions(args):
                     #one task only, store as task0
                     cur_out_f=str(cur_output_index)+'.task0.'+out_predictions_suffix
                     cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
-                    
+
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
@@ -326,9 +326,7 @@ def predict_on_batch_wrapper(args,model,test_generator):
         with Pool(processes=args.threads,initializer=init_worker) as pool: 
             while (processed < num_batches):
                 idset=range(processed,min([num_batches,processed+args.max_queue_size]))
-                print(idset) 
                 for result in pool.imap_unordered(get_batch_wrapper,idset):
-                    print("GOT ZE RESULT") 
                     X=result[0]
                     y=result[1]
                     coords=result[2]
@@ -338,14 +336,12 @@ def predict_on_batch_wrapper(args,model,test_generator):
                         print(str(processed)+"/"+str(num_batches))
                     #get the model predictions            
                     preds=model.predict_on_batch(X)
-                    print("GOT ZE MODEL PRED") 
                     if type(preds) is not list:
                         preds=[preds]
                     preds=[i.squeeze(axis=-1) for i in preds]
                     preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
                     label_queue.put(y)
-                    pred_queue.put(pred_dfs)
-                    print("PUT ZE RESULT") 
+                    pred_queue.put(preds_dfs)
                     
     except KeyboardInterrupt:
         #shutdown the pool
