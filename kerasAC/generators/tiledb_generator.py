@@ -45,15 +45,19 @@ class TiledbGenerator(Sequence):
                  tdb_outputs,
                  tdb_output_source_attribute,
                  tdb_output_flank,
+                 num_inputs,
+                 num_outputs,
                  tdb_input_aggregation=None,
                  tdb_input_transformation=None,
                  tdb_output_aggregation=None,
-                 tdb_output_tranformation=None,
+                 tdb_output_transformation=None,
                  chroms=None,
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
                  pseudocount=0,
+                 add_revcomp=False,
+                 expand_dims=True,
                  return_coords=False):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
@@ -65,10 +69,12 @@ class TiledbGenerator(Sequence):
         self.shuffle_epoch_end=shuffle_epoch_end
         self.ref_fasta=ref_fasta
         self.batch_size=batch_size
-        self.revcomp=revcomp
-        if self.revcomp==True:
-            self.batch_size=int(math.floor(self.batch_size/2))            
-
+        self.add_revcomp=add_revcomp
+        if self.add_revcomp==True:
+            self.batch_size=int(math.floor(self.batch_size/2))
+            
+        self.expand_dims=expand_dims
+        
         #identify chromosome information
         if chroms is not None:
             self.chroms_to_use=chroms
@@ -79,24 +85,31 @@ class TiledbGenerator(Sequence):
         #identify indices to upsample
         self.tdb_indexer=tdb_indexer
 
-
+        #store input params
+        self.num_inputs=num_inputs
         self.tdb_inputs=tdb_inputs
         self.tdb_input_source_attribute=tdb_input_source_attribute
         self.tdb_input_flank=tdb_input_flank
         self.tdb_input_aggregation=[str(i) for i in tdb_input_aggregation]
         self.tdb_input_transformation=[str(i) for i in tdb_input_transformation]
-        
+
+        #store output params
+        self.num_outputs=num_outputs
         self.tdb_outputs=tdb_outputs
         self.tdb_output_source_attribute=tdb_output_source_attribute
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
         self.data_arrays=self.open_tiledb_arrays_for_reading()        
+
+
+        #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
-        
-        if upsample_ratio is not None:
-            self.upsampled_indices,self.upsampled_indices_len=self.get_upsampled_indices()
+        assert type(upsample_ratio)==float
+        self.upsample_ratio=upsample_ratio
+        if self.upsample_ratio is not None:
+            self.get_upsampled_indices()
         else:
             self.upsampled_indices_len=0
             self.upsampled_indices=[]
@@ -118,7 +131,7 @@ class TiledbGenerator(Sequence):
         array_dict['outputs']={}
 
         #index tasks 
-        index_tasks=open(self.index_path).read().strip().split('\n')
+        index_tasks=open(self.tdb_indexer).read().strip().split('\n')
         for task in index_tasks:
             array_dict['index'][task]={} 
             for chrom in self.chroms_to_use:
@@ -217,7 +230,7 @@ class TiledbGenerator(Sequence):
             upsampled_indices=upsampled_indices.sample(frac=1)
             upsampled_indices=upsampled_indices.reset_index(drop=True)
             print("shuffling upsampled dataframes prior to start of training")
-            
+        self.upsampled_indices=upsampled_indices    
         self.upsampled_indices_len=len(self.upsampled_indices)
         num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
         self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
@@ -241,12 +254,12 @@ class TiledbGenerator(Sequence):
             if cur_input=="seq":                
                 #get the one-hot encoded sequence
                 cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
-                transformed_seq=self.transform_seq(cur_seq,self.input_transformation[cur_input_index])
+                transformed_seq=self.transform_seq(cur_seq,self.tdb_input_transformation[cur_input_index])
                 cur_x=one_hot_encode(transformed_seq)
             else:
                 #extract values from tdb
                 cur_vals=self.get_tdb_vals(coords,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
-                transformed_vals=self.transform_vals(cur_vals,self.input_transformation[cur_input_index])
+                transformed_vals=self.transform_vals(cur_vals,self.tdb_input_transformation[cur_input_index])
                 aggregate_vals=self.aggregate_vals(transformed_vals,self.input_aggregation[cur_input_index])
                 cur_x=aggregate_vals
                 
@@ -261,12 +274,12 @@ class TiledbGenerator(Sequence):
             if cur_output=="seq":
                 #get the one-hot encoded sequence
                 cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
-                transformed_seq=self.transform_seq(cur_seq,self.output_transformation[cur_output_index])
+                transformed_seq=self.transform_seq(cur_seq,self.tdb_output_transformation[cur_output_index])
                 cur_y=one_hot_encode(transformed_seq)
             else:
                 #extract values from tdb
                 cur_vals=self.get_tdb_vals(coords,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
-                transformed_vals=self.transform_vals(cur_vals,self.output_transformation[cur_output_index])
+                transformed_vals=self.transform_vals(cur_vals,self.tdb_output_transformation[cur_output_index])
                 aggregate_vals=self.aggregate_vals(transformed_vals,self.output_aggregation[cur_output_index])
                 cur_y=aggregate_vals
             y.append(cur_y)
@@ -284,7 +297,7 @@ class TiledbGenerator(Sequence):
         if self.non_upsampled_batch_size > 0:
             #select random indices from genome
             non_upsampled_batch_indices=self.get_nonupsample_batch_indices()
-        coords=pd.concatenate((upsampled_batch_indices,non_upsampled_batch_indice),axis=0)
+        coords=pd.concat((upsampled_batch_indices,non_upsampled_batch_indices),axis=0)
         return coords
     
      
@@ -292,10 +305,10 @@ class TiledbGenerator(Sequence):
         chroms=coords['chrom']
         start_pos=coords['pos']-flank
         end_pos=coords['pos']+flank
-        seqs=[self.ref.fetch(chroms[i],start_pos[i],end_pos[i]) for i in coords.shape[0]]
+        seqs=[self.ref.fetch(chroms.iloc[i],start_pos.iloc[i],end_pos.iloc[i]) for i in range(coords.shape[0])]
         return seqs
 
-    def transform_seq(self,seqs):
+    def transform_seq(self,seqs,transformation):
         if self.add_revcomp is True:
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
@@ -337,12 +350,14 @@ class TiledbGenerator(Sequence):
                 array_name=task_chrom_to_tdb[task][chrom]
                 with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
                     cur_vals=cur_array[start_position:end_position][attribute]
-                    vals[val_index,:,task
+                    vals[val_index,:,task]=cur_vals
                 cur_vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))                    
                 vals[batch_entry_index,:,task_index]=cur_vals
         return vals
     
     def transform_vals(self,vals,transformer):
+        if self.add_revcomp==True:
+            vals=np.concatenate((vals,vals),axis=0)
         if transformer == 'None':
             return vals
         elif transformer == 'asinh':
