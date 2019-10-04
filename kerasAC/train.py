@@ -199,6 +199,12 @@ def initializer_generators_hdf5(args):
     return train_generator, valid_generator 
 
 def initialize_generators_tiledb(args):
+    if self.upsample_ratio_list is not None:
+        upsample_ratio=self.upsample_ratio_list[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
+    else:
+        upsample_ratio=None
+        
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
@@ -218,7 +224,7 @@ def initialize_generators_tiledb(args):
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
-                                    upsample_ratio=args.upsample_ratio_list_train,
+                                    upsample_ratio=upsample_ratio,
                                     revcomp=args.revcomp)
     
     print("generated training data generator!")
@@ -230,7 +236,7 @@ def initialize_generators_tiledb(args):
                                     batch_size=args.batch_size,
                                     tdb_indexer=args.tdb_indexer,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
-                                    tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                    tdb_partition_thresh_for_upsample=upsample_thresh,
                                     tdb_inputs=args.tdb_inputs,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank_attribute,
@@ -241,7 +247,7 @@ def initialize_generators_tiledb(args):
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
-                                    upsample_ratio=args.upsample_ratio_list_eval,
+                                    upsample_ratio=upsample_ratio,
                                     revcomp=args.revcomp)
     
     print("generated validation data generator")

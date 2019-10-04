@@ -53,7 +53,8 @@ class TiledbGenerator(Sequence):
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
-                 pseudocount=0):
+                 pseudocount=0,
+                 return_coords=False):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
@@ -77,33 +78,34 @@ class TiledbGenerator(Sequence):
         
         #identify indices to upsample
         self.tdb_indexer=tdb_indexer
+
+
+        self.tdb_inputs=tdb_inputs
+        self.tdb_input_source_attribute=tdb_input_source_attribute
+        self.tdb_input_flank=tdb_input_flank
+        self.tdb_input_aggregation=[str(i) for i in tdb_input_aggregation]
+        self.tdb_input_transformation=[str(i) for i in tdb_input_transformation]
+        
+        self.tdb_outputs=tdb_outputs
+        self.tdb_output_source_attribute=tdb_output_source_attribute
+        self.tdb_output_flank=tdb_output_flank
+        self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
+        self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
+        self.data_arrays=self.open_tiledb_arrays_for_reading()        
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
         
         if upsample_ratio is not None:
-            self.upsample_ratio=upsample_ratio[0]
-            print("using upsample ratio of :"+str(self.upsample_ratio))
-            print("Warning! For tiledb inputs, only a single upsample_ratio is allowed")
             self.upsampled_indices,self.upsampled_indices_len=self.get_upsampled_indices()
-            self.upsampled_indices_len=len(self.upsampled_indices)
-            num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
-            self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
         else:
             self.upsampled_indices_len=0
-            self.upsampled_indices=[]            
+            self.upsampled_indices=[]
+            
         self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
-        self.tasks=open(task_file,'r').read().strip().split('\n')
-        self.data_arrays=self.open_tiledb_arrays_for_reading()
-        self.label_source=label_source
-        self.label_flank=label_flank
-        self.label_aggregation=label_aggregation
-        self.label_transformer=label_transformer
+
         self.pseudocount=pseudocount
-        self.sequence_flank=sequence_flank
-        self.chrom_edge_flank=max([self.label_flank,self.sequence_flank])
-        self.partition_attribute_for_upsample=partition_attribute_for_upsample
-        self.partition_thresh_for_upsample=partition_thresh_for_upsample
+        self.return_coords=return_coords
 
             
     def open_tiledb_arrays_for_reading(self):
@@ -111,36 +113,82 @@ class TiledbGenerator(Sequence):
         Opens tiledb arrays for each task/chromosome for reading  
         '''
         array_dict=dict()
-        array_dict['index']=dict()
-        array_dict['inputs']=dict()
-        array_dict['outputs']=dict()
+        array_dict['index']={}
+        array_dict['inputs']={}
+        array_dict['outputs']={}
+
+        #index tasks 
         index_tasks=open(self.index_path).read().strip().split('\n')
-        input_tasks=[open(self.input_path]
-        for index_task in index_tasks:
-            array_dict['index'][
-        for chrom in self.chroms_to_use:
-            array_dict[chrom]=dict()
-            for task in self.tasks:
-                array_dict[chrom][task]= task+'.'+chrom
+        for task in index_tasks:
+            array_dict['index'][task]={} 
+            for chrom in self.chroms_to_use:
+                array_dict['index'][task][chrom]=task+"."+chrom
+        #inputs 
+        for i in range(len(self.tdb_inputs)):
+            tdb_input=self.tdb_inputs[i] 
+            if tdb_input=="seq":
+                continue 
+            tdb_input_tasks=open(tdb_input).read().strip().split('\n')
+            tdb_input_array={}
+            for task in tdb_input_tasks:
+                tdb_input_array[task]={}
+                for chrom in self.chroms_to_use:
+                    tdb_input_array[task][chrom]=task+'.'+chrom
+            array_dict['inputs'][i]=tdb_input_array
+            
+        #outputs
+        for i in range(len(self.tdb_outputs)): 
+            tdb_output=self.tdb_outputs[i]
+            if tdb_output=="seq":
+                continue 
+            tdb_output_tasks=open(tdb_output).read().strip().split('\n')
+            tdb_output_array={}
+            for task in tdb_output_tasks:
+                tdb_output_array[task]={}
+                for chrom in self.chroms_to_use:
+                    tdb_output_array[task][chrom]=task+'.'+chrom
+            array_dict['outputs'][i]=tdb_output_array 
         return array_dict
-                                                                                            
-        
+    
+    def get_nonupsample_batch_indices(self):
+        '''
+        randomly select n positions from the genome 
+        '''
+        indices=random.sample(range(self.length),self.non_upsampled_batch_size)
+        #get the chroms and coords for each index
+        chroms=[]
+        chrom_pos=[]
+        for cur_index in indices:
+            for chrom_last_index in self.last_index_to_chrom:
+                if cur_index < chrom_last_index:
+                    #this is the chromosome to use!
+                    #make sure we don't slide off the edge of the chromosome 
+                    cur_chrom,cur_chrom_size=self.last_index_to_chrom[chrom_last_index]
+                    cur_chrom_pos=random.randint(self.chrom_edge_flank, cur_chrom_size-self.chrom_edge_flank)
+                    chroms.append(cur_chrom)
+                    chrom_pos.append(cur_chrom_pos)
+                    break 
+        cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
+        assert cur_batch.shape[0]==self.non_upsampled_batch_size
+        return cur_batch
+                                                                                                    
         
     def get_upsampled_indices(self):
         #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
         upsampled_chroms=None
         upsampled_indices=None
-
+        self.chrom_edge_flank=max([max(self.tdb_input_flank),max(self.tdb_output_flank)])
+        
         for chrom in self.chroms_to_use:
             upsampled_indices_chrom=None
             chrom_size=None
-            for task in self.data_arrays[chrom]:
-                with tiledb.DenseArray(self.data_arrays[chrom][task], mode='r') as cur_array:
-                    cur_vals=cur_array[:][self.partition_attribute_for_upsample]
+            for task in self.data_arrays['index']:
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
+                    cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
                 print("got values for cur task/chrom") 
-                upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.partition_thresh_for_upsample)
+                upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
                 print("got upsampled indices")
                 if upsampled_indices_chrom is None:
                     upsampled_indices_chrom=upsampled_indices_task_chrom
@@ -169,9 +217,11 @@ class TiledbGenerator(Sequence):
             upsampled_indices=upsampled_indices.sample(frac=1)
             upsampled_indices=upsampled_indices.reset_index(drop=True)
             print("shuffling upsampled dataframes prior to start of training")
-
-        print("finished generator init")
-        return upsampled_indices
+            
+        self.upsampled_indices_len=len(self.upsampled_indices)
+        num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
+        self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
+        return 
 
         
     def __len__(self):
@@ -180,8 +230,141 @@ class TiledbGenerator(Sequence):
 
     def __getitem__(self,idx):
         self.ref=pysam.FastaFile(self.ref_fasta)
-        return self.get_batch(idx)
         
+        #get the coordinates for the current batch
+        coords=self.get_coords(idx) #coords is a df with 'chrom' and 'pos' columns.
+
+        #get the inputs 
+        X=[]
+        for cur_input_index in range(self.num_inputs):
+            cur_input=self.tdb_inputs[cur_input_index]
+            if cur_input=="seq":                
+                #get the one-hot encoded sequence
+                cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
+                transformed_seq=self.transform_seq(cur_seq,self.input_transformation[cur_input_index])
+                cur_x=one_hot_encode(transformed_seq)
+            else:
+                #extract values from tdb
+                cur_vals=self.get_tdb_vals(coords,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
+                transformed_vals=self.transform_vals(cur_vals,self.input_transformation[cur_input_index])
+                aggregate_vals=self.aggregate_vals(transformed_vals,self.input_aggregation[cur_input_index])
+                cur_x=aggregate_vals
+                
+            if self.expand_dims==True:
+                cur_x=np.expand_dims(cur_x,axis=1)
+            X.append(cur_x)
+            
+        #get the outputs 
+        y=[]
+        for cur_output_index in range(self.num_outputs):
+            cur_output=self.tdb_outputs[cur_output_index]
+            if cur_output=="seq":
+                #get the one-hot encoded sequence
+                cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
+                transformed_seq=self.transform_seq(cur_seq,self.output_transformation[cur_output_index])
+                cur_y=one_hot_encode(transformed_seq)
+            else:
+                #extract values from tdb
+                cur_vals=self.get_tdb_vals(coords,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
+                transformed_vals=self.transform_vals(cur_vals,self.output_transformation[cur_output_index])
+                aggregate_vals=self.aggregate_vals(transformed_vals,self.output_aggregation[cur_output_index])
+                cur_y=aggregate_vals
+            y.append(cur_y)
+            
+        if self.return_coords is True:
+            return (X,y,coords)
+        else:
+            return (X,y) 
+    
+    def get_coords(self,idx):
+        upsampled_batch_start=idx*self.upsampled_batch_size
+        upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+        if self.upsampled_batch_size > 0:
+            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
+        if self.non_upsampled_batch_size > 0:
+            #select random indices from genome
+            non_upsampled_batch_indices=self.get_nonupsample_batch_indices()
+        coords=pd.concatenate((upsampled_batch_indices,non_upsampled_batch_indice),axis=0)
+        return coords
+    
+     
+    def get_seq(self,coords,flank):
+        chroms=coords['chrom']
+        start_pos=coords['pos']-flank
+        end_pos=coords['pos']+flank
+        seqs=[self.ref.fetch(chroms[i],start_pos[i],end_pos[i]) for i in coords.shape[0]]
+        return seqs
+
+    def transform_seq(self,seqs):
+        if self.add_revcomp is True:
+            seqs_rc=[revcomp(s) for s in seqs]
+            seqs=seqs+seqs_rc
+        return seqs
+    
+    def get_tdb_vals(self,coords,input_output_index,flank,is_input=False,is_output=False):
+        '''
+        extract the values from tileDB 
+        '''
+        assert is_input==True or is_outut==True
+        if is_input==True:
+            input_or_output="input"
+            attribute=self.tdb_input_source_attribute[input_output_index]
+        else:
+            input_or_output="output"
+            attribute=self.tdb_output_source_attribute[input_output_index] 
+            
+        chroms=coords['chrom']
+        start_positions=coords['pos']-flank
+        end_positions=coords['pos']+flank
+        
+        task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
+        tasks=task_chrom_to_tdb.keys()
+        num_tasks=len(tasks)
+        num_entries=coords.shape[0]
+        #prepopulate the values array with 0 
+        vals=np.zeros(num_entries,2*flank,num_tasks)
+        #define a context for querying tiledb
+        ctx=tiledb.Ctx()
+        #iterate through entries 
+        for val_index in range(num_vals):
+            
+            #iterate through tasks for each entry 
+            for task_index in range(num_tasks):
+                task=tasks[task_index] 
+                chrom=chroms[val_index]
+                start_position=start_positions[val_index]
+                end_position=end_positions[val_index]
+                array_name=task_chrom_to_tdb[task][chrom]
+                with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
+                    cur_vals=cur_array[start_position:end_position][attribute]
+                    vals[val_index,:,task
+                cur_vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))                    
+                vals[batch_entry_index,:,task_index]=cur_vals
+        return vals
+    
+    def transform_vals(self,vals,transformer):
+        if transformer == 'None':
+            return vals
+        elif transformer == 'asinh':
+            return np.asinh(labels,axis=1)
+        elif transformer == 'log10':
+            return np.log10(vals+self.pseudocount,axis=1)
+        elif transformer == 'log':
+            return np.log(vals+self.pseudocount,axis=1)
+        else:
+            raise Exception("transform_label_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
+    
+    def aggregate_vals(self,vals,aggregator):
+        if aggregator == 'None':
+            return vals
+        elif aggregator == 'average':
+            return np.mean(vals,axis=1)
+        elif aggregator == 'max':
+            return np.max(vals,axis=1)
+        else:
+            raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+aggregator)
+
+    
     def on_epoch_end(self):
         if self.shuffle==True:
             #shuffle the indices!
@@ -189,133 +372,4 @@ class TiledbGenerator(Sequence):
             df_indices=list(range(numrows))
             shuffle(df_indices)#this is an in-place operation
             df_indices=pd.Series(df_indices)
-            self.upsampled_indices=self.upsampled_indices.set_index(df_indices)
-            
-    def get_batch(self,idx):
-        upsampled_batch_start=idx*self.upsampled_batch_size
-        upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
-        X_upsampled=None
-        X_non_upsampled=None
-        
-        if self.upsampled_batch_size > 0:
-            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
-            #get the sequences
-            X_upsampled=self.get_seqs(upsampled_batch_indices)
-            #get the labels 
-            y_upsampled=self.get_labels(upsampled_batch_indices,self.upsampled_batch_size)
-            
-        if self.non_upsampled_batch_size > 0:
-            #select random indices from genome
-            non_upsampled_batch_indices=self.get_nonupsample_batch_indices()
-            X_non_upsampled=self.get_seqs(non_upsampled_batch_indices)
-            y_non_upsampled=self.get_labels(non_upsampled_batch_indices,self.non_upsampled_batch_size)
 
-        #combine upsampled & non_upsampled batches
-        if ((X_upsampled is not None) and (X_non_upsampled is not None)):
-            X=np.concatenate((X_upsampled, X_non_upsampled),axis=0)
-            y=np.concatenate((y_upsampled,y_non_upsampled),axis=0)
-        elif X_upsampled is not None:
-            X=X_upsampled
-            y=y_upsampled
-        else:
-            X=X_non_upsampled
-            y=y_non_upsampled
-
-        #get any auxiliary inputs and outputs
-        aux_x=self.get_aux_x(upsampled_batch_indices,non_upsampled_batch_indices)
-        aux_y=self.get_aux_y(upsample_batch_indices,non_upsampled_batch_indices) 
-        return X+aux_x,y+aux_y
-     
-    def get_seqs(self,indices):
-        seqs=[]
-        for index,row in indices.iterrows():
-            try:
-                start_coord=row['pos']-self.sequence_flank
-                end_coord=row['pos']+self.sequence_flank
-                cur_chrom=row['chrom']
-                if start_coord < 0:
-                    raise Exception("start coordinate for sequence is < 0")
-                if end_coord>=self.chrom_sizes[cur_chrom]:
-                    raise Exception("end coordiante for sequence ("+str(end_coord)+") is greater than the size of chromosome:"+str(cur_chrom))
-                seqs.append(self.ref.fetch(cur_chrom,start_coord,end_coord))
-            except:
-                #we are off the chromosome edge, just use all N's for the sequene in this edge case 
-                seqs.append("N"*2*self.sequence_flank)
-        if self.revcomp==True:
-            seqs=seqs+revcomp(seqs)
-        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        return seqs
-
-    def transform_label_vals(self,labels):
-        self.label_transformer=str(self.label_transformer)
-        if self.label_transformer == 'None':
-            return labels
-        elif self.label_transformer == 'asinh':
-            return np.asinh(labels)
-        elif self.label_transformer == 'log10':
-            return np.log10(labels+self.pseudocount)
-        elif self.label_transformer == 'log':
-            return np.log(labels+self.pseudocount)
-        else:
-            raise Exception("transform_label_vals argument must be one of None, asinh, log10, log; you provided:"+str(self.label_transformer)) 
-    
-    def aggregate_label_vals(self,labels):
-        self.label_aggregation=str(self.label_aggregation)
-        if self.label_aggregation == 'None':
-            return labels
-        elif self.label_aggregation == 'average':
-            return np.mean(labels)
-        elif self.label_aggregation == 'max':
-            return np.max(labels)
-        else:
-            raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+str(self.label_aggregation))
-
-    def get_labels(self,indices,batch_size):
-        '''
-        extract the labels from tileDB 
-        '''
-        #double the batch size implicitly if reverse-complemented inputs are being used for training 
-        label_vector_len=1
-        if self.label_aggregation == "None":
-            label_vector_len=2*self.label_flank 
-        
-        labels=np.zeros((batch_size,label_vector_len,len(self.tasks)))
-        batch_entry_index=0
-        for index,row in indices.iterrows():
-            cur_chrom=row['chrom']
-            cur_pos=row['pos']
-            cur_start=cur_pos-self.label_flank
-            cur_end=cur_pos+self.label_flank
-            for task_index in range(len(self.tasks)):
-                task=self.tasks[task_index]
-                ctx = tiledb.Ctx()
-                with tiledb.DenseArray(self.data_arrays[cur_chrom][task], mode='r',ctx=ctx) as cur_array:
-                    cur_vals=cur_array[cur_start:cur_end][self.label_source]
-                vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))                    
-                labels[batch_entry_index,:,task_index]=vals
-            batch_entry_index+=1
-        if self.revcomp==True:
-            labels=np.concatenate((labels,labels),axis=0)
-        return labels 
-
-    def get_nonupsample_batch_indices(self):
-        '''
-        randomly select n positions from the genome 
-        '''
-        indices=random.sample(range(self.length),self.non_upsampled_batch_size)
-        #get the chroms and coords for each index
-        chroms=[]
-        chrom_pos=[]
-        for cur_index in indices:
-            for chrom_last_index in self.last_index_to_chrom:
-                if cur_index < chrom_last_index:
-                    #this is the chromosome to use!
-                    #make sure we don't slide off the edge of the chromosome 
-                    cur_chrom,cur_chrom_size=self.last_index_to_chrom[chrom_last_index]
-                    cur_chrom_pos=random.randint(self.chrom_edge_flank, cur_chrom_size-self.chrom_edge_flank)
-                    chroms.append(cur_chrom)
-                    chrom_pos.append(cur_chrom_pos)
-                    break 
-        cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
-        assert cur_batch.shape[0]==self.non_upsampled_batch_size
-        return cur_batch

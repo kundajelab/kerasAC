@@ -53,7 +53,7 @@ class DataGenerator(Sequence):
                  num_outputs,
                  ref_fasta=None,
                  batch_size=128,
-                 add_revcomp=True,
+                 add_revcomp=False,
                  index_tasks=None,
                  tasks=None,
                  shuffled_ref_negatives=False,
@@ -62,9 +62,10 @@ class DataGenerator(Sequence):
                  expand_dims=True,
                  upsample_thresh_list=None,
                  upsample_ratio_list=None,
-                 shuffle=True):
-        
+                 shuffle=True,
+                 return_coords=False):
         self.lock = threading.Lock()
+        self.return_coords=return_coords
         self.expand_dims=expand_dims
         self.shuffle=shuffle
         self.batch_size=batch_size
@@ -111,7 +112,7 @@ class DataGenerator(Sequence):
         if self.upsample_thresh_list is not None:
             self.get_upsampled_indices()
         else:
-            self.indices=self.indices.index
+            self.indices=self.indices.index.tolist() 
             if self.shuffle == True:
                 np.random.shuffle(self.indices)
         print("generator initialized")
@@ -187,7 +188,7 @@ class DataGenerator(Sequence):
         lower_thresh_bound=self.upsample_thresh_list[ind]
         sub_batch_size=int(self.batch_size-sum(self.batch_sizes))
         self.batch_sizes.append(sub_batch_size)
-        sub_batch_coords=self.indices.loc[(self.indices>=lower_thresh_bound).any(axis=1)].index
+        sub_batch_coords=self.indices.loc[(self.indices>=lower_thresh_bound).any(axis=1)].index.tolist()
         len_sub_batch_coords=len(sub_batch_coords)
         self.upsampled_coord_indices[ind]=sub_batch_coords
         self.upsampled_numerical_indices[ind] = np.arange(len_sub_batch_coords)        
@@ -212,7 +213,7 @@ class DataGenerator(Sequence):
                 bed_entries = self.upsampled_coord_indices[ind][batch_indices].tolist() 
                 all_bed_entries+=bed_entries
         else:
-            all_bed_entries=self.indices[idx*self.batch_size:(idx+1)*self.batch_size].tolist() 
+            all_bed_entries=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
         return all_bed_entries
     
     def get_seq(self,coords):
@@ -274,7 +275,11 @@ class DataGenerator(Sequence):
                 cur_y=self.transform_vals(self.get_pd_vals(coords,cur_output))
             y.append(cur_y)
         #return the batch as an X,y tuple
-        return (X,y)
+        if self.return_coords is False: 
+            return (X,y)
+        else:
+            return (X,y,coords)
+        
 
 
     def on_epoch_end(self):
