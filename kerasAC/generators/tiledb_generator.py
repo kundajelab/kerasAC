@@ -10,6 +10,7 @@ import pysam
 from ..util import *
 import tiledb
 import pdb
+from collections import OrderedDict
 
 def get_genome_size(chrom_sizes_file,chroms):
     '''
@@ -125,15 +126,15 @@ class TiledbGenerator(Sequence):
         '''
         Opens tiledb arrays for each task/chromosome for reading  
         '''
-        array_dict=dict()
-        array_dict['index']={}
-        array_dict['inputs']={}
-        array_dict['outputs']={}
+        array_dict=OrderedDict()
+        array_dict['index']=OrderedDict()
+        array_dict['inputs']=OrderedDict()
+        array_dict['outputs']=OrderedDict() 
 
         #index tasks 
         index_tasks=open(self.tdb_indexer).read().strip().split('\n')
         for task in index_tasks:
-            array_dict['index'][task]={} 
+            array_dict['index'][task]=OrderedDict() 
             for chrom in self.chroms_to_use:
                 array_dict['index'][task][chrom]=task+"."+chrom
         #inputs 
@@ -142,9 +143,9 @@ class TiledbGenerator(Sequence):
             if tdb_input=="seq":
                 continue 
             tdb_input_tasks=open(tdb_input).read().strip().split('\n')
-            tdb_input_array={}
+            tdb_input_array=OrderedDict() 
             for task in tdb_input_tasks:
-                tdb_input_array[task]={}
+                tdb_input_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
                     tdb_input_array[task][chrom]=task+'.'+chrom
             array_dict['inputs'][i]=tdb_input_array
@@ -155,9 +156,9 @@ class TiledbGenerator(Sequence):
             if tdb_output=="seq":
                 continue 
             tdb_output_tasks=open(tdb_output).read().strip().split('\n')
-            tdb_output_array={}
+            tdb_output_array=OrderedDict()
             for task in tdb_output_tasks:
-                tdb_output_array[task]={}
+                tdb_output_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
                     tdb_output_array[task][chrom]=task+'.'+chrom
             array_dict['outputs'][i]=tdb_output_array 
@@ -280,11 +281,13 @@ class TiledbGenerator(Sequence):
                 #extract values from tdb
                 cur_vals=self.get_tdb_vals(coords,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
                 transformed_vals=self.transform_vals(cur_vals,self.tdb_output_transformation[cur_output_index])
-                aggregate_vals=self.aggregate_vals(transformed_vals,self.output_aggregation[cur_output_index])
+                aggregate_vals=self.aggregate_vals(transformed_vals,self.tdb_output_aggregation[cur_output_index])
                 cur_y=aggregate_vals
             y.append(cur_y)
             
         if self.return_coords is True:
+            if self.add_revcomp==True:
+                coords=pd.concat((coords,coords),axis=0)
             return (X,y,coords)
         else:
             return (X,y) 
@@ -318,12 +321,12 @@ class TiledbGenerator(Sequence):
         '''
         extract the values from tileDB 
         '''
-        assert is_input==True or is_outut==True
+        assert is_input==True or is_output==True
         if is_input==True:
-            input_or_output="input"
+            input_or_output="inputs"
             attribute=self.tdb_input_source_attribute[input_output_index]
         else:
-            input_or_output="output"
+            input_or_output="outputs"
             attribute=self.tdb_output_source_attribute[input_output_index] 
             
         chroms=coords['chrom']
@@ -331,28 +334,25 @@ class TiledbGenerator(Sequence):
         end_positions=coords['pos']+flank
         
         task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
-        tasks=task_chrom_to_tdb.keys()
+        tasks=list(task_chrom_to_tdb.keys())
         num_tasks=len(tasks)
         num_entries=coords.shape[0]
-        #prepopulate the values array with 0 
-        vals=np.zeros(num_entries,2*flank,num_tasks)
+        #prepopulate the values array with 0
+        vals=np.zeros((num_entries,2*flank,num_tasks))
         #define a context for querying tiledb
         ctx=tiledb.Ctx()
         #iterate through entries 
-        for val_index in range(num_vals):
-            
+        for val_index in range(num_entries):            
             #iterate through tasks for each entry 
             for task_index in range(num_tasks):
                 task=tasks[task_index] 
-                chrom=chroms[val_index]
-                start_position=start_positions[val_index]
-                end_position=end_positions[val_index]
+                chrom=chroms.iloc[val_index]
+                start_position=start_positions.iloc[val_index]
+                end_position=end_positions.iloc[val_index]
                 array_name=task_chrom_to_tdb[task][chrom]
                 with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
                     cur_vals=cur_array[start_position:end_position][attribute]
-                    vals[val_index,:,task]=cur_vals
-                cur_vals=self.aggregate_label_vals(self.transform_label_vals(cur_vals))                    
-                vals[batch_entry_index,:,task_index]=cur_vals
+                    vals[val_index,:,task_index]=cur_vals
         return vals
     
     def transform_vals(self,vals,transformer):
@@ -361,13 +361,13 @@ class TiledbGenerator(Sequence):
         if transformer == 'None':
             return vals
         elif transformer == 'asinh':
-            return np.asinh(labels,axis=1)
+            return np.arcsinh(vals)
         elif transformer == 'log10':
-            return np.log10(vals+self.pseudocount,axis=1)
+            return np.log10(vals+self.pseudocount)
         elif transformer == 'log':
-            return np.log(vals+self.pseudocount,axis=1)
+            return np.log(vals+self.pseudocount)
         else:
-            raise Exception("transform_label_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
+            raise Exception("transform_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
     
     def aggregate_vals(self,vals,aggregator):
         if aggregator == 'None':
@@ -377,7 +377,7 @@ class TiledbGenerator(Sequence):
         elif aggregator == 'max':
             return np.max(vals,axis=1)
         else:
-            raise Exception("label_aggregation argument must be one of None, average, max; you provided:"+aggregator)
+            raise Exception("aggregate_vals argument must be one of None, average, max; you provided:"+aggregator)
 
     
     def on_epoch_end(self):
