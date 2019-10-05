@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import h5py
 from .generators.basic_generator import *
-#from .generators.tiledb_generator import *
+from .generators.tiledb_generator import *
 from . import config
 import pdb
 from keras.callbacks import *
