@@ -288,6 +288,7 @@ class TiledbGenerator(Sequence):
         if self.return_coords is True:
             if self.add_revcomp==True:
                 coords=pd.concat((coords,coords),axis=0)
+            coords=[(row[0],row[1]) for index,row in coords.iterrows()]
             return (X,y,coords)
         else:
             return (X,y) 

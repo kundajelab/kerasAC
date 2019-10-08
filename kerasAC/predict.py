@@ -20,7 +20,7 @@ import tensorflow as tf
 from kerasAC.activations import softMaxAxis1
 from .calibrate import * 
 from .generators.basic_generator import *
-#from .generators.tiledb_predict_generator import * 
+from .generators.tiledb_predict_generator import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -52,21 +52,23 @@ def parse_args():
     input_data_path.add_argument('--ref_fasta')
 
     tiledbgroup=parser.add_argument_group("tiledb")
-    tiledbgroup.add_argument("--tdb_outputs")
+    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
     
     tiledbgroup.add_argument("--tdb_inputs",nargs="+")
-    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",type=int,help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
 
-    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task",action="append")
+    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
+    
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
 
@@ -254,22 +256,32 @@ def get_batch_wrapper(idx):
 
 def get_tiledb_predict_generator(args):
     global test_generator
-    test_generator=TiledbPredictGenerator(index_path=args.index_path,
-                                          input_path=args.input_path,
-                                          output_path=args.output_path,
+    if args.upsample_ratio_list_predict is not None:
+        upsample_ratio_predict=args.upsample_ratio_list_predict[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
+    else:
+        upsample_ratio_predict=None
+    test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
-                                          task_file=args.tiledb_tasks_file,
-                                          ref_fasta=args.ref_fasta,
-                                          label_source=args.label_source_attribute,
-                                          label_flank=args.label_flank,
-                                          label_aggregation=args.label_aggregation,
-                                          label_subset_attribute=args.label_subset_attribute,
-                                          label_thresh=args.label_thresh,
-                                          sequence_flank=args.sequence_flank,
+                                          tdb_indexer=args.tdb_indexer,
+                                          tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
+                                          tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                          upsample_ratio=upsample_ratio_predict,
+                                          tdb_inputs=args.tdb_inputs,
+                                          tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                          tdb_input_flank=args.tdb_input_flank,
+                                          tdb_outputs=args.tdb_outputs,
+                                          tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                          tdb_output_flank=args.tdb_output_flank,
+                                          num_inputs=args.num_inputs,
+                                          num_outputs=args.num_outputs,
+                                          tdb_input_aggregation=args.tdb_input_aggregation,
+                                          tdb_input_transformation=args.tdb_input_transformation,
+                                          tdb_output_aggregation=args.tdb_output_aggregation,
+                                          tdb_output_transformation=args.tdb_output_transformation,                                          
                                           tiledb_stride=args.tiledb_stride,
-                                          chrom_sizes_file=args.chrom_sizes,
-                                          chroms=args.predict_chroms,
-                                          return_coords=True)
+                                          chrom_sizes=args.chrom_sizes,
+                                          chroms=args.predict_chroms)
     print("created TiledbPredictGenerator")    
     return test_generator 
 def get_hdf5_predict_generator(args):
