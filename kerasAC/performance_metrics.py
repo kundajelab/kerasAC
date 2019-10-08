@@ -17,12 +17,12 @@ import pdb
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')
     parser.add_argument('--sample_N',type=int,default=None,help="sample N coordinates at random for scoring")
-    parser.add_argument('--labels_hdf5',nargs="+")
-    parser.add_argument('--predictions_hdf5',nargs="+")
+    parser.add_argument('--labels_hdf5',nargs="*",default=None)
+    parser.add_argument('--predictions_hdf5',nargs="*",default=None)
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
-    parser.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    parser.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    parser.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_classification_file',nargs="*",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_regression_file',nargs="*",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    parser.add_argument('--performance_metrics_profile_file',nargs="*",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     return parser.parse_args()
 
 
@@ -185,9 +185,16 @@ def get_performance_metrics_regression(predictions,true_y):
 
 
 
-def get_performance_metrics(predictions,args):
+def get_performance_metrics(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args)
+    if args.labels_hdf5 is not None:
+        assert args.predictions_hdf5 is not None
+        
+        
+    with open(args.predictions_pickle_to_load,'rb') as handle:
+        predictions=pickle.load(handle)
+    get_performance_metrics(predictions, args)
 
     
     labels=predictions['labels']
@@ -225,10 +232,6 @@ def write_performance_metrics(output_file,metrics_dict,tasks):
 def main():
     args=parse_args()
     get_performance_metrics(args)
-    
-    with open(args.predictions_pickle_to_load,'rb') as handle:
-        predictions=pickle.load(handle)
-    get_performance_metrics(predictions, args)
     
 if __name__=="__main__":
     main()
