@@ -17,6 +17,7 @@ import pdb
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')
     parser.add_argument('--sample_N',type=int,default=None,help="sample N coordinates at random for scoring")
+    parser.add_argument('--chunk_size',type=int,default=None,help="Number of "
     parser.add_argument('--labels_hdf5',nargs="*",default=None)
     parser.add_argument('--predictions_hdf5',nargs="*",default=None)
     parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
@@ -188,13 +189,20 @@ def get_performance_metrics_regression(predictions,true_y):
 def get_performance_metrics(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args)
+
+    #get predictions from hdf5
     if args.labels_hdf5 is not None:
         assert args.predictions_hdf5 is not None
-        
-        
-    with open(args.predictions_pickle_to_load,'rb') as handle:
-        predictions=pickle.load(handle)
-    get_performance_metrics(predictions, args)
+        num_datasets=len(args.labels_hdf5)
+        for i in range(num_datasets):
+            cur_labels=args.labels_hdf5[i]
+            cur_predictions=args.predictions_hdf5[i]
+            
+            
+    elif args.predictions_pickle_to_load is not None: 
+        with open(args.predictions_pickle_to_load,'rb') as handle:
+            predictions=pickle.load(handle)
+            get_performance_metrics(predictions, args)
 
     
     labels=predictions['labels']

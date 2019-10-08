@@ -58,7 +58,7 @@ class TiledbGenerator(Sequence):
                  shuffle_epoch_end=True,
                  pseudocount=0,
                  add_revcomp=False,
-                 expand_dims=True,
+                 expand_dims=False,
                  return_coords=False):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
@@ -295,12 +295,21 @@ class TiledbGenerator(Sequence):
     def get_coords(self,idx):
         upsampled_batch_start=idx*self.upsampled_batch_size
         upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+        upsampled_batch_indices=None
+        non_upsampled_batch_indices=None
         if self.upsampled_batch_size > 0:
             upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
         if self.non_upsampled_batch_size > 0:
             #select random indices from genome
             non_upsampled_batch_indices=self.get_nonupsample_batch_indices()
-        coords=pd.concat((upsampled_batch_indices,non_upsampled_batch_indices),axis=0)
+        if (upsampled_batch_indices is not None) and (non_upsampled_batch_indices is not None):
+            coords=pd.concat((upsampled_batch_indices,non_upsampled_batch_indices),axis=0)
+        elif upsampled_batch_indices is not None:
+            coords=upsampled_batch_indices
+        elif non_upsampled_batch_indices is not None:
+            coords=non_upsampled_batch_indices
+        else:
+            raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none") 
         return coords
     
      

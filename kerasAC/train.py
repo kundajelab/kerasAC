@@ -22,19 +22,19 @@ def parse_args():
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     
-    tiledbgroup.add_argument("--tdb_outputs")
+    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
-    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
-    tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
+    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggreagtion; one of None, 'avg','max'")
+    tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     
     tiledbgroup.add_argument("--tdb_inputs",nargs="+")
-    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",type=int,help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
-    tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
-    tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
+    tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
+    tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
 
-    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task",action="append")
+    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
         
@@ -81,7 +81,7 @@ def parse_args():
     batch_params.add_argument("--revcomp",action="store_true")
     batch_params.add_argument("--label_transformer",nargs="+",default=None,help="transformation to apply to label values")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
-    batch_params.add_argument("--expand_dims",default=True)
+    batch_params.add_argument("--expand_dims",default=False,action="store_true")
     batch_params.add_argument("--upsample_thresh_list_train",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_ratio_list_train",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_thresh_list_eval",type=float,nargs="*",default=None)
@@ -199,11 +199,16 @@ def initializer_generators_hdf5(args):
     return train_generator, valid_generator 
 
 def initialize_generators_tiledb(args):
-    if self.upsample_ratio_list is not None:
-        upsample_ratio=self.upsample_ratio_list[0]
+    if args.upsample_ratio_list_train is not None:
+        upsample_ratio_train=args.upsample_ratio_list_train[0]
         print("warning! only a single ratio for upsampling supported for tiledb as of now")
     else:
-        upsample_ratio=None
+        upsample_ratio_train=None
+    if args.upsample_ratio_list_eval is not None:
+        upsample_ratio_eval=args.upsample_ratio_list_eval[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
+    else:
+        upsample_ratio_eval=None
         
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
@@ -216,7 +221,7 @@ def initialize_generators_tiledb(args):
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_inputs=args.tdb_inputs,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
-                                    tdb_input_flank=args.tdb_input_flank_attribute,
+                                    tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     tdb_outputs=args.tdb_outputs,
@@ -224,11 +229,14 @@ def initialize_generators_tiledb(args):
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
-                                    upsample_ratio=upsample_ratio,
-                                    revcomp=args.revcomp)
+                                    upsample_ratio=upsample_ratio_train,
+                                    num_inputs=args.num_inputs,
+                                    num_outputs=args.num_outputs,
+                                    expand_dims=args.expand_dims,
+                                    add_revcomp=args.revcomp)
     
     print("generated training data generator!")
-    valid_generator=TiledbGenerator(chroms=args.valid_chroms,
+    valid_generator=TiledbGenerator(chroms=args.validation_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
@@ -236,10 +244,10 @@ def initialize_generators_tiledb(args):
                                     batch_size=args.batch_size,
                                     tdb_indexer=args.tdb_indexer,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
-                                    tdb_partition_thresh_for_upsample=upsample_thresh,
+                                    tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_inputs=args.tdb_inputs,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
-                                    tdb_input_flank=args.tdb_input_flank_attribute,
+                                    tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     tdb_outputs=args.tdb_outputs,
@@ -247,8 +255,11 @@ def initialize_generators_tiledb(args):
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
-                                    upsample_ratio=upsample_ratio,
-                                    revcomp=args.revcomp)
+                                    upsample_ratio=upsample_ratio_eval,
+                                    num_inputs=args.num_inputs,
+                                    num_outputs=args.num_outputs,
+                                    expand_dims=args.expand_dims,
+                                    add_revcomp=args.revcomp)
     
     print("generated validation data generator")
     return train_generator, valid_generator
