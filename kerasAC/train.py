@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--seed",type=int,default=1234)    
     parser.add_argument("--num_inputs",type=int)
     parser.add_argument("--num_outputs",type=int)
+    parser.add_argument("--use_multiprocessing",type=bool,default=True)
     
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
@@ -150,7 +151,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         validation_steps=args.num_valid/args.batch_size,
                         epochs=args.epochs,
                         verbose=1,
-                        use_multiprocessing=True,
+                        use_multiprocessing=args.use_multiprocessing,
                         workers=args.threads,
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,

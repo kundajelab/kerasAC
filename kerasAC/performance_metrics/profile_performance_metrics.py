@@ -1,4 +1,5 @@
 import pandas as pd
+from .utils import *
 #Performance metrics for profile models
 
 def parse_args():
@@ -31,15 +32,16 @@ def rep_concordance():
 def all_metrics_for_one_label_set(labels_hdf5,predictions_hdf5,rep1_bigwig,rep2_bigwig):
     pass
 
-def all_metrics(args):
+def get_performance_metrics_profile(predictions,labels):
+    pass
+
+def get_performance_metrics_profile_wrapper(args):
     if type(args)==type({}):
         args=argparse.Namespace()
-    
-
 
 def main():
     args=parse_args()
-    all_metrics(args) 
+    get_performance_metrics_profile_wrapper(args)
     
 if __name__=="__main__":
     main()
