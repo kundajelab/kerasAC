@@ -326,6 +326,9 @@ class TiledbGenerator(Sequence):
         for i in range(coords.shape[0]):
             try:
                 seq=self.ref.fetch(chroms.iloc[i],start_pos.iloc[i],end_pos.iloc[i])
+                if len(seq)<2*flank:
+                    delta=2*flank-len(seq)
+                    seq=seq+"N"*delta
             except:
                 seq="N"*2*flank
             seqs.append(seq) 
