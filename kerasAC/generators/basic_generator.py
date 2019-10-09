@@ -178,7 +178,7 @@ class DataGenerator(Sequence):
             
             #number of times the current sub-set of upsampled indices should be wrapped to get to num_indices values 
             num_wraps=math.ceil(self.num_indices/len_sub_batch_coords)
-            self.upsampled_numerical_indices[ind] = np.repeat(self.upsampled_numerical_indices[ind], num_wraps)[0:self.num_indices]
+            self.upsampled_numerical_indices[ind] = np.tile(self.upsampled_numerical_indices[ind], num_wraps)[0:self.num_indices]
             #shuffle the sub-set of indices, if specified 
             if self.shuffle == True:
                 np.random.shuffle(self.upsampled_numerical_indices[ind])
@@ -188,13 +188,13 @@ class DataGenerator(Sequence):
         lower_thresh_bound=self.upsample_thresh_list[ind]
         sub_batch_size=int(self.batch_size-sum(self.batch_sizes))
         self.batch_sizes.append(sub_batch_size)
-        sub_batch_coords=self.indices.loc[(self.indices>=lower_thresh_bound).any(axis=1)].index.tolist()
+        sub_batch_coords=self.indices.loc[(self.indices>=lower_thresh_bound).any(axis=1)].index
         len_sub_batch_coords=len(sub_batch_coords)
         self.upsampled_coord_indices[ind]=sub_batch_coords
         self.upsampled_numerical_indices[ind] = np.arange(len_sub_batch_coords)        
         #number of times the current sub-set of upsampled indices should be wrapped to get to num_indices values 
         num_wraps=math.ceil(self.num_indices/len_sub_batch_coords)
-        self.upsampled_numerical_indices[ind] = np.repeat(self.upsampled_numerical_indices[ind], num_wraps)[0:self.num_indices]
+        self.upsampled_numerical_indices[ind] = np.tile(self.upsampled_numerical_indices[ind], num_wraps)[0:self.num_indices]
         #shuffle the sub-set of indices, if specified 
         if self.shuffle == True:
             np.random.shuffle(self.upsampled_numerical_indices[ind])
@@ -210,7 +210,7 @@ class DataGenerator(Sequence):
             all_bed_entries=[]
             for ind,val in enumerate(self.batch_sizes):
                 batch_indices = self.upsampled_numerical_indices[ind][idx*val:(idx+1)*val]
-                bed_entries = self.upsampled_coord_indices[ind][batch_indices].tolist() 
+                bed_entries = self.upsampled_coord_indices[ind][batch_indices].tolist()
                 all_bed_entries+=bed_entries
         else:
             all_bed_entries=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]

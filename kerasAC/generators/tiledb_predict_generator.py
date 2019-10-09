@@ -70,25 +70,74 @@ class TiledbPredictGenerator(TiledbGenerator):
         self.tiledb_stride=tiledb_stride
         self.bed_regions=bed_regions
 
+    def get_upsampled_indices(self):
+        #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
+        upsampled_chroms=None
+        upsampled_indices=None
+        self.chrom_edge_flank=max([max(self.tdb_input_flank),max(self.tdb_output_flank)])
+        
+        for chrom in self.chroms_to_use:
+            upsampled_indices_chrom=None
+            chrom_size=None
+            for task in self.data_arrays['index']:
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
+                    cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
+                if chrom_size is None:
+                    chrom_size=cur_vals.shape[0]
+                print("got values for cur task/chrom") 
+                upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
+                print("got upsampled indices")
+                if upsampled_indices_chrom is None:
+                    upsampled_indices_chrom=upsampled_indices_task_chrom
+                else:
+                    upsampled_indices_chrom=np.union1d(upsampled_indices_chrom,upsampled_indices_task_chrom)
+                print("performed task union")
+                
+            #make sure we dont' run off the edges of the chromosome!
+            usampled_indices_chrom=upsampled_indices_chrom[upsampled_indices_chrom>self.chrom_edge_flank]
+            upsampled_indices_chrom=upsampled_indices_chrom[upsampled_indices_chrom<(self.chrom_sizes[chrom]-self.chrom_edge_flank)]
+            print("got indices to upsample for chrom:"+str(chrom))            
+            if upsampled_chroms is None:
+                upsampled_chroms=[chrom]*upsampled_indices_chrom.shape[0]
+                upsampled_indices=upsampled_indices_chrom
+            else:
+                upsampled_chroms=upsampled_chroms+[chrom]*upsampled_indices_chrom.shape[0]
+                upsampled_indices=np.concatenate((upsampled_indices,upsampled_indices_chrom),axis=0)
+            print("appended chrom indices to master list") 
+
+        upsampled_indices=pd.DataFrame.from_dict({'chrom':upsampled_chroms,
+                                                  'pos':upsampled_indices.squeeze()})
+
+        print("made upsampled index data frame")
+        if self.shuffle_epoch_start==True:
+            #shuffle rows & reset index
+            upsampled_indices=upsampled_indices.sample(frac=1)
+            upsampled_indices=upsampled_indices.reset_index(drop=True)
+            print("shuffling upsampled dataframes prior to start of training")
+        self.upsampled_indices=upsampled_indices    
+        self.upsampled_indices_len=len(self.upsampled_indices)
+        return 
+
+
     def get_coords(self,idx):
         if len(self.upsampled_indices)>0:
             upsampled_batch_start=idx*self.upsampled_batch_size
-            upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+            upsampled_batch_end=min([upsampled_batch_start+self.upsampled_batch_size,self.upsampled_indices.shape[0]])
             upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
             coords=upsampled_batch_indices
         else:
             #get genome position
-            startpos=idx*self.batch_size*self.stride
+            startpos=idx*self.batch_size*self.tiledb_stride
             #map to chromosome & chromosome position
             cur_chrom,chrom_start_pos=self.transform_idx_to_chrom_idx(startpos)
-            positions=range(chrom_start_pos,chrom_start_pos+self.batch_size*self.stride,self.stride)
-            coords=positions
+            coords=pd.DataFrame(range(chrom_start_pos,chrom_start_pos+self.batch_size*self.tiledb_stride,self.tiledb_stride),columns=['pos'])
+            coords['chrom']=cur_chrom
         return coords
 
     
     def __len__(self):
         if len(self.upsampled_indices) is 0: 
-            return int(ceil(self.length/(self.batch_size*self.stride)))
+            return int(ceil(self.length/(self.batch_size*self.tiledb_stride)))
         else:
             return int(ceil(self.upsampled_indices.shape[0] /self.batch_size))
 

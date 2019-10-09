@@ -25,9 +25,10 @@ def get_genome_size(chrom_sizes_file,chroms):
     for index,row in chrom_sizes_subset.iterrows():
         chrom_name=row[0]
         chrom_size=row[1]
-        chrom_sizes_subset_dict[chrom_name]=chrom_size 
+        chrom_sizes_subset_dict[chrom_name]=chrom_size
+        first_index=last_index 
         last_index+=chrom_size
-        last_index_to_chrom[last_index]=[chrom_name,chrom_size]
+        last_index_to_chrom[last_index]=[chrom_name,chrom_size,first_index]
     return chrom_sizes_subset_dict,last_index_to_chrom, genome_size
 
             
@@ -107,15 +108,18 @@ class TiledbGenerator(Sequence):
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
-        assert type(upsample_ratio)==float
+        if upsample_ratio is not None:
+            assert type(upsample_ratio)==float
         self.upsample_ratio=upsample_ratio
         if self.upsample_ratio is not None:
             self.get_upsampled_indices()
+            self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
         else:
+            self.upsampled_batch_size=0
             self.upsampled_indices_len=0
             self.upsampled_indices=[]
             
-        self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
+
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
 
         self.pseudocount=pseudocount
@@ -177,7 +181,7 @@ class TiledbGenerator(Sequence):
                 if cur_index < chrom_last_index:
                     #this is the chromosome to use!
                     #make sure we don't slide off the edge of the chromosome 
-                    cur_chrom,cur_chrom_size=self.last_index_to_chrom[chrom_last_index]
+                    cur_chrom,cur_chrom_size,cur_chrom_first_index=self.last_index_to_chrom[chrom_last_index]
                     cur_chrom_pos=random.randint(self.chrom_edge_flank, cur_chrom_size-self.chrom_edge_flank)
                     chroms.append(cur_chrom)
                     chrom_pos.append(cur_chrom_pos)
@@ -310,7 +314,7 @@ class TiledbGenerator(Sequence):
         elif non_upsampled_batch_indices is not None:
             coords=non_upsampled_batch_indices
         else:
-            raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none") 
+            raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none")
         return coords
     
      
@@ -318,7 +322,13 @@ class TiledbGenerator(Sequence):
         chroms=coords['chrom']
         start_pos=coords['pos']-flank
         end_pos=coords['pos']+flank
-        seqs=[self.ref.fetch(chroms.iloc[i],start_pos.iloc[i],end_pos.iloc[i]) for i in range(coords.shape[0])]
+        seqs=[]
+        for i in range(coords.shape[0]):
+            try:
+                seq=self.ref.fetch(chroms.iloc[i],start_pos.iloc[i],end_pos.iloc[i])
+            except:
+                seq="N"*2*flank
+            seqs.append(seq) 
         return seqs
 
     def transform_seq(self,seqs,transformation):
@@ -348,7 +358,7 @@ class TiledbGenerator(Sequence):
         num_tasks=len(tasks)
         num_entries=coords.shape[0]
         #prepopulate the values array with 0
-        vals=np.zeros((num_entries,2*flank,num_tasks))
+        vals=np.full((num_entries,2*flank,num_tasks),np.nan)
         #define a context for querying tiledb
         ctx=tiledb.Ctx()
         #iterate through entries 
@@ -358,11 +368,19 @@ class TiledbGenerator(Sequence):
                 task=tasks[task_index] 
                 chrom=chroms.iloc[val_index]
                 start_position=start_positions.iloc[val_index]
+                if np.isnan(start_position):
+                    continue
                 end_position=end_positions.iloc[val_index]
+                if np.isnan(end_position):
+                    continue 
+                
                 array_name=task_chrom_to_tdb[task][chrom]
                 with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
-                    cur_vals=cur_array[start_position:end_position][attribute]
-                    vals[val_index,:,task_index]=cur_vals
+                    try:
+                        cur_vals=cur_array[int(start_position):int(end_position)][attribute]
+                        vals[val_index,:,task_index]=cur_vals
+                    except:
+                        print("skipping: start_position:"+str(start_position)+" : end_position:"+str(end_position))
         return vals
     
     def transform_vals(self,vals,transformer):

@@ -58,8 +58,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
         #add in the gc content
         added=Add()([x,gc])
-        y = Dense(ntasks)(added)
-        outputs = Activation("sigmoid")(y)
+        outputs = Dense(ntasks)(added)
+
 
     else:
         x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(seq)
@@ -90,8 +90,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
         
         #add in the gc content
         added=Add()([x,gc])
-        y = Dense(ntasks)(added)
-        outputs = Activation("sigmoid")(y)
+        outputs = Dense(ntasks)(added)
+
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
