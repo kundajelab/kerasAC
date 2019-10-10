@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export OMP_NUM_THREADS=1
-export USE_SIMPLE_THREADED_LEVEL3=1
+#export OMP_NUM_THREADS=1
+#export USE_SIMPLE_THREADED_LEVEL3=1
 CUDA_VISIBLE_DEVICES=0 kerasAC_train \
 		    --batch_size 20 \
 		    --ref_fasta /mnt/data/annotations/by_release/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
@@ -28,10 +28,9 @@ CUDA_VISIBLE_DEVICES=0 kerasAC_train \
 		    --num_train 10000 \
 		    --num_valid 10000 \
 		    --num_tasks 1 \
-		    --threads 10 \
+		    --threads 40 \
 		    --max_queue_size 20 \
 		    --patience 3 \
 		    --patience_lr 2 \
 		    --model_hdf5 ATAC.pseudobulk.ADPD.Cluster24.profile.0 \
-		    --architecture_from_file test_model.py \
-		    --use_multiprocessing True
+		    --architecture_from_file test_model.py

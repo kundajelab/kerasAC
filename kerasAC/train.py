@@ -4,32 +4,55 @@ import imp
 import argparse
 import numpy as np
 import h5py
-from .generators import *
+from .generators.basic_generator import *
+from .generators.tiledb_generator import *
 from . import config
-from .tiledb_generators import * 
 import pdb
 from keras.callbacks import *
 from keras.utils import multi_gpu_model
 
 def parse_args():
     parser=argparse.ArgumentParser()
-
+    
+    parser.add_argument("--model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
+    parser.add_argument("--seed",type=int,default=1234)    
+    parser.add_argument("--num_inputs",type=int)
+    parser.add_argument("--num_outputs",type=int)
+    parser.add_argument("--use_multiprocessing",type=bool,default=True)
+    
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
-    tiledbgroup.add_argument("--label_source_attribute",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    tiledbgroup.add_argument("--label_flank",type=int,help="flank around bin center to use in generating labels")
-    tiledbgroup.add_argument("--label_aggregation",default=None,help="one of None, 'avg','max'")
-    tiledbgroup.add_argument("--sequence_flank",type=int,help="length of sequence around bin center to use in one-hot-encoding")
-    tiledbgroup.add_argument("--partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
-    tiledbgroup.add_argument("--partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    
+    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggreagtion; one of None, 'avg','max'")
+    tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
+    
+    tiledbgroup.add_argument("--tdb_inputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
+    tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
 
+    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
+    tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
+    tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+        
     input_data_path=parser.add_argument_group('input_data_path')
-    input_data_path.add_argument("--tiledb_tasks_file",default=None,help="tsv file containing paths to tiledb tasks")
-    input_data_path.add_argument("--data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
-    input_data_path.add_argument("--nonzero_bin_path",default=None,help="seqdataloader output file containing genome bins with non-zero values")
-    input_data_path.add_argument("--universal_negative_path",default=None,help="seqdataloader output file containing genome bins that are universal negatives")
-    input_data_path.add_argument("--train_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the training split")
-    input_data_path.add_argument("--valid_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the validation split")
+    input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
+    input_data_path.add_argument("--index_train_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the training split")
+    input_data_path.add_argument("--index_valid_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the validation split")
+    input_data_path.add_argument("--index_tasks",nargs="*",default=None)
+    
+    input_data_path.add_argument("--input_data_path",nargs="+",default=None,help="seq or path to seqdataloader hdf5")
+    input_data_path.add_argument("--input_train_path",nargs="+",default=None,help="seq or seqdataloader hdf5")
+    input_data_path.add_argument("--input_valid_path",nargs="+",default=None,help="seq or seqdataloader hdf5")
+
+    input_data_path.add_argument("--output_data_path",nargs="+",default=None,help="path to seqdataloader hdf5")
+    input_data_path.add_argument("--output_train_path",nargs="+",default=None,help="seqdataloader hdf5")
+    input_data_path.add_argument("--output_valid_path",nargs="+",default=None,help="seqdataloader hdf5")
+    
     input_data_path.add_argument("--ref_fasta",default="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.genome.fa")
     
     train_val_splits=parser.add_argument_group("train_val_splits")
@@ -57,14 +80,13 @@ def parse_args():
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
     batch_params.add_argument("--revcomp",action="store_true")
-    batch_params.add_argument("--label_transformer",default=None,help="transformation to apply to label values")
+    batch_params.add_argument("--label_transformer",nargs="+",default=None,help="transformation to apply to label values")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
-    batch_params.add_argument("--expand_dims",default=True)
-    batch_params.add_argument("--upsample_thresh_list",type=float,nargs="+",default=None)
-    batch_params.add_argument("--upsample_thresh",type=float, default=0)
-    batch_params.add_argument("--upsample_ratio_list",type=float,nargs="+",default=None)
-    batch_params.add_argument("--train_upsample", type=float, default=0)
-    batch_params.add_argument("--valid_upsample", type=float, default=0)
+    batch_params.add_argument("--expand_dims",default=False,action="store_true")
+    batch_params.add_argument("--upsample_thresh_list_train",type=float,nargs="*",default=None)
+    batch_params.add_argument("--upsample_ratio_list_train",type=float,nargs="*",default=None)
+    batch_params.add_argument("--upsample_thresh_list_eval",type=float,nargs="*",default=None)
+    batch_params.add_argument("--upsample_ratio_list_eval",type=float,nargs="*",default=None)
 
     epoch_params=parser.add_argument_group("epoch_params")
     epoch_params.add_argument("--epochs",type=int,default=40)
@@ -86,9 +108,6 @@ def parse_args():
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
     vis_params.add_argument("--tensorboard_logdir",default="logs")
-    
-    parser.add_argument("--model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
-    parser.add_argument("--seed",type=int,default=1234)    
     return parser.parse_args()
 
 def get_weights(args,train_generator):
@@ -132,7 +151,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         validation_steps=args.num_valid/args.batch_size,
                         epochs=args.epochs,
                         verbose=1,
-                        use_multiprocessing=True,
+                        use_multiprocessing=args.use_multiprocessing,
                         workers=args.threads,
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,
@@ -142,101 +161,152 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     outf=open(args.model_hdf5+".arch",'w')
     outf.write(architecture_string)
     print("complete!!")
+    
+def initializer_generators_hdf5(args):
+    #get upsampling parameters
+    index_train_path, index_valid_path, input_train_path, input_valid_path, output_train_path, output_valid_path=get_paths(args)
+    train_generator=DataGenerator(index_path=index_train_path,
+                                  input_path=input_train_path,
+                                  output_path=output_train_path,
+                                  index_tasks=args.index_tasks,
+                                  num_inputs=args.num_inputs,
+                                  num_outputs=args.num_outputs,
+                                  ref_fasta=args.ref_fasta,
+                                  batch_size=args.batch_size,
+                                  add_revcomp=args.revcomp,
+                                  chroms_to_use=args.train_chroms,
+                                  get_w1_w0=args.weighted,
+                                  expand_dims=args.expand_dims,
+                                  upsample_thresh_list=args.upsample_thresh_list_train,
+                                  upsample_ratio_list=args.upsample_ratio_list_train,
+                                  tasks=args.tasks)
+    
+    print("generated training data generator!")
+    valid_generator=DataGenerator(index_path=index_train_path,
+                                  input_path=input_train_path,
+                                  output_path=output_train_path,
+                                  index_tasks=args.index_tasks,
+                                  num_inputs=args.num_inputs,
+                                  num_outputs=args.num_outputs,
+                                  ref_fasta=args.ref_fasta,
+                                  batch_size=args.batch_size,
+                                  add_revcomp=args.revcomp,                        
+                                  upsample_thresh_list=args.upsample_thresh_list_eval,
+                                  upsample_ratio_list=args.upsample_ratio_list_eval,
+                                  chroms_to_use=args.validation_chroms,
+                                  expand_dims=args.expand_dims,
+                                  tasks=args.tasks)
+    print("generated validation data generator!")
+    return train_generator, valid_generator 
 
 def initialize_generators_tiledb(args):
+    if args.upsample_ratio_list_train is not None:
+        upsample_ratio_train=args.upsample_ratio_list_train[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
+    else:
+        upsample_ratio_train=None
+    if args.upsample_ratio_list_eval is not None:
+        upsample_ratio_eval=args.upsample_ratio_list_eval[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
+    else:
+        upsample_ratio_eval=None
+        
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    task_file=args.tiledb_tasks_file,
-                                    label_source=args.label_source_attribute,
-                                    label_flank=args.label_flank,
-                                    label_aggregation=args.label_aggregation,
-                                    sequence_flank=args.sequence_flank,
-                                    partition_attribute_for_upsample=args.partition_attribute_for_upsample,
-                                    partition_thresh_for_upsample=args.partition_thresh_for_upsample,
-                                    upsample_ratio=args.train_upsample,
-                                    revcomp=args.revcomp,
-                                    label_transformer=args.label_transformer)
-    print("generated training data generator!")
+                                    tdb_indexer=args.tdb_indexer,
+                                    tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
+                                    tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                    tdb_inputs=args.tdb_inputs,
+                                    tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                    tdb_input_flank=args.tdb_input_flank,
+                                    tdb_input_aggregation=args.tdb_input_aggregation,
+                                    tdb_input_transformation=args.tdb_input_transformation,
+                                    tdb_outputs=args.tdb_outputs,
+                                    tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                    tdb_output_flank=args.tdb_output_flank,
+                                    tdb_output_aggregation=args.tdb_output_aggregation,
+                                    tdb_output_transformation=args.tdb_output_transformation,
+                                    upsample_ratio=upsample_ratio_train,
+                                    num_inputs=args.num_inputs,
+                                    num_outputs=args.num_outputs,
+                                    expand_dims=args.expand_dims,
+                                    add_revcomp=args.revcomp)
     
+    print("generated training data generator!")
     valid_generator=TiledbGenerator(chroms=args.validation_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    task_file=args.tiledb_tasks_file,
-                                    label_source=args.label_source_attribute,
-                                    label_flank=args.label_flank,
-                                    label_aggregation=args.label_aggregation,
-                                    sequence_flank=args.sequence_flank,
-                                    partition_attribute_for_upsample=args.partition_attribute_for_upsample,
-                                    partition_thresh_for_upsample=args.partition_thresh_for_upsample,
-                                    upsample_ratio=args.valid_upsample,
-                                    revcomp=args.revcomp,
-                                    label_transformer=args.label_transformer)
+                                    tdb_indexer=args.tdb_indexer,
+                                    tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
+                                    tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                    tdb_inputs=args.tdb_inputs,
+                                    tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                    tdb_input_flank=args.tdb_input_flank,
+                                    tdb_input_aggregation=args.tdb_input_aggregation,
+                                    tdb_input_transformation=args.tdb_input_transformation,
+                                    tdb_outputs=args.tdb_outputs,
+                                    tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                    tdb_output_flank=args.tdb_output_flank,
+                                    tdb_output_aggregation=args.tdb_output_aggregation,
+                                    tdb_output_transformation=args.tdb_output_transformation,
+                                    upsample_ratio=upsample_ratio_eval,
+                                    num_inputs=args.num_inputs,
+                                    num_outputs=args.num_outputs,
+                                    expand_dims=args.expand_dims,
+                                    add_revcomp=args.revcomp)
+    
     print("generated validation data generator")
     return train_generator, valid_generator
 
 def get_paths(args):
-    if args.train_path is None:
-        train_path=args.data_path
+    if args.index_train_path is None:
+        index_train_path=args.index_data_path
     else:
-        train_path=args.train_path
-        
-    if args.valid_path is None:
-        valid_path=args.data_path
+        index_train_path=args.index_train_path        
+    if args.input_train_path is None:
+        input_train_path=args.input_data_path
     else:
-        valid_path=args.valid_path
-        
-    return train_path, valid_path
+        input_train_path=args.input_train_path        
+    if args.output_train_path is None:
+        output_train_path=args.output_data_path
+    else:
+        output_train_path=args.output_train_path        
+    if args.index_valid_path is None:
+        index_valid_path=args.index_data_path
+    else:
+        index_valid_path=args.index_valid_path
+    if args.input_valid_path is None:
+        input_valid_path=args.input_data_path
+    else:
+        input_valid_path=args.input_valid_path
+    if args.output_valid_path is None:
+        output_valid_path=args.output_data_path
+    else:
+        output_valid_path=args.output_valid_path        
+    return index_train_path, index_valid_path, input_train_path, input_valid_path, output_train_path, output_valid_path 
 
-def initialize_generators(args):
-    #get upsampling parameters
-    train_path, valid_path=get_paths(args)
-    
+def initialize_generators(args):    
     #data is being read in from tiledb for training 
-    if args.tiledb_tasks_file is not None:
+    if args.tdb_indexer is not None:
         return initialize_generators_tiledb(args)
+    else:
+        return initializer_generators_hdf5(args)
     
-    train_generator=DataGenerator(data_path=train_path,
-                                  nonzero_bin_path=args.nonzero_bin_path,
-                                  universal_negative_path=args.universal_negative_path,
-                                  ref_fasta=args.ref_fasta,
-                                  batch_size=args.batch_size,
-                                  add_revcomp=args.revcomp,
-                                  upsample_thresh=args.upsample_thresh,
-                                  upsample_ratio=args.train_upsample,
-                                  chroms_to_use=args.train_chroms,
-                                  get_w1_w0=args.weighted,
-                                  expand_dims=args.expand_dims,
-                                  upsample_thresh_list=args.upsample_thresh_list,
-                                  upsample_ratio_list=args.upsample_ratio_list,
-                                  tasks=args.tasks)
-    
-    print("generated training data generator!")
-    valid_generator=DataGenerator(data_path=valid_path,
-                                  nonzero_bin_path=args.nonzero_bin_path,
-                                  universal_negative_path=args.universal_negative_path,
-                                  ref_fasta=args.ref_fasta,
-                                  batch_size=args.batch_size,
-                                  add_revcomp=args.revcomp,                        
-                                  upsample_thresh=args.upsample_thresh,
-                                  upsample_ratio=args.valid_upsample,
-                                  chroms_to_use=args.validation_chroms,
-                                  expand_dims=args.expand_dims,
-                                  tasks=args.tasks)
-    print("generated validation data generator!")
-    return train_generator, valid_generator 
     
 def train(args):
     if type(args)==type({}):
         args=config.args_object_from_args_dict(args)
 
-    train_generator,valid_generator=initialize_generators(args)   
+
+    #create the generators
+    train_generator,valid_generator=initialize_generators(args)
     w1,w0=get_weights(args,train_generator)
     args.w1=w1
     args.w0=w0
@@ -255,6 +325,8 @@ def train(args):
         except:
             pass 
     print("compiled the model!")
+
+    
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
 
@@ -264,9 +336,4 @@ def main():
     
 
 if __name__=="__main__":
-    #import multiprocessing as mp
-    #try:
-    #    mp.set_start_method('forkserver')
-    #except RuntimeError:
-    #    pass
     main()

@@ -107,26 +107,31 @@ class TruePosGenerator(Sequence):
 #use wrappers for keras Sequence generator class to allow batch shuffling upon epoch end
 class DataGenerator(Sequence):
     def __init__(self,
-                 data_path=None,
-                 nonzero_bin_path=None,
-                 universal_negative_path=None,
+                 index_path,
+                 input_path,
+                 output_path,
+                 num_inputs,
+                 num_outputs,
                  ref_fasta=None,
                  batch_size=128,
                  add_revcomp=True,
+                 index_tasks=None,
                  tasks=None,
                  shuffled_ref_negatives=False,
-                 upsample_thresh=0,
-                 upsample_ratio=0,
                  chroms_to_use=None,
                  get_w1_w0=False,
                  expand_dims=True,
                  upsample_thresh_list=None,
                  upsample_ratio_list=None,
                  shuffle=True):
-
+        
         self.lock = threading.Lock()
+        self.expand_dims=expand_dims
         self.shuffle=shuffle
         self.batch_size=batch_size
+        self.ref_fasta=ref_fasta
+        self.chroms_to_use=chroms_to_use
+        
         #decide if reverse complement should be used
         self.add_revcomp=add_revcomp
         if add_revcomp==True:
@@ -139,101 +144,163 @@ class DataGenerator(Sequence):
         if self.shuffled_ref_negatives==True:
             self.batch_size=int(self.batch_size/2)
 
-        #open the reference file
-        self.ref_fasta=ref_fasta
-        self.chroms_to_use=chroms_to_use
-        self.data_path=data_path
-        self.nonzero_bin_path=nonzero_bin_path
-        self.universal_negative_path=universal_negative_path
-        if self.data_path is not None:
-            self.data=open_data_file(data_path=data_path,tasks=tasks,chroms_to_use=chroms_to_use)
-            self.indices=np.arange(self.data.shape[0])
-        else:
-            self.nonzero_bins=open_data_file(data_path=nonzero_bin_path,tasks=tasks,chroms_to_use=chroms_to_use)
-            self.universal_negatives=open_data_file(data_path=universal_negative_path,chroms_to_use=chroms_to_use)
-            self.indices=np.arange(self.nonzero_bins.shape[0]+self.universal_negatives.shape[0])
-            self.universal_negative_offset=self.nonzero_bins.shape[0]
-
+        #get the index, input, and output files 
+        self.index_tasks=index_tasks
+        self.tasks=tasks        
+        self.index_path=index_path,
+        self.input_path=input_path,
+        self.output_path=output_path,
+        self.num_inputs=num_inputs,
+        self.num_outputs=num_outputs,
+        self.file_to_pd=get_file_to_pd()        
+        self.indices=self.file_to_pd[self.index_path]
         num_indices=self.indices.shape[0]
+
+        #handle task-specific weights -- this is a bit outdated and may be removed in the future. 
         if get_w1_w0==True:
             assert self.data is not None
             w1,w0=get_weights(self.data)
             self.w1=w1
             self.w0=w0
-            #print(self.w1)
-
-        self.add_revcomp=add_revcomp
-        self.expand_dims=expand_dims
-
+            
         #set variables needed for upsampling the positives
-
-        self.upsample_ratio=upsample_ratio
-        self.upsample_thresh=upsample_thresh
         self.upsample_thresh_list=upsample_thresh_list
         self.upsample_ratio_list=upsample_ratio_list
-        self.upsample_data = {}
-        self.upsample_indices = {}
+        #generate the upsampled threshold index subgroups 
+        if self.upsample_thresh_list is not None:
+            self.get_upsampled_indices(num_indices)
+        else:
+            self.indices=self.indices.index
+            if self.shuffle == True:
+                np.random.shuffle(self.indices)
+
+    def get_file_to_pd(self):
+        '''
+        make sure all input/output/index files are loaded only once in case there's overlap 
+        generate a dictionary of file name to pandas data frame of file contents 
+        '''
+        file_to_df={}
+        file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=self.index_tasks,chroms_to_use=self.chroms_to_use)
+        for i in range(self.num_inputs):
+            cur_input=self.input_path[i]
+            if cur_input=="seq":
+                continue
+            if cur_input in file_to_df:
+                continue
+            file_to_df[self.input_path[i]]=open_data_file(data_path=cur_input,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
+        for i in range(self.num_outputs):
+            cur_output=self.output_path[i]
+            if cur_output in file_to_df:
+                continue
+            file_to_df[cur_output]=open_data_file(data_path=cur_output,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
+        return file_to_df
+            
+    def get_upsampled_indices(self,num_indices):
+        '''
+        several levels of upsampling are handled
+        self.upsample_thresh_list -- list of thresholds for upsampling the dataset 
+        self.upsample_ratio_list -- fraction of batch to be generated at each threshold 
+        '''
+
+        self.upsampled_coord_indices = {}
+        self.upsampled_numerical_indices = {}
         self.batch_sizes = []
         self.wraps = []
-        if self.upsample_thresh_list is not None:
-            if self.upsample_ratio_list is None:
-                self.upsample_ratio = 1 / (len(self.upsample_thresh_list) - 1)
-                self.upsample_ratio_list = [self.upsample_ratio for i in range(len(self.upsample_thresh_list) - 1)]
-            for ind,val in enumerate(self.upsample_thresh_list):
-                if ind < (len(self.upsample_thresh_list) - 1):
-                    if ind == (len(self.upsample_thresh_list) - 2):
-                        self.batch_sizes.append(int(self.batch_size - sum(self.batch_sizes)))
-                    else:
-                        self.batch_sizes.append(int(self.batch_size * self.upsample_ratio_list[ind]))
-                    self.upsample_data[ind] = self.data.loc[(self.data >= val).any(axis=1) & (self.data < self.upsample_thresh_list[ind+1]).any(axis=1)]
-                    self.upsample_indices[ind] = np.arange(self.upsample_data[ind].shape[0])
-                    self.wraps.append(math.ceil(num_indices/self.upsample_indices[ind].shape[0]))
-                    self.upsample_indices[ind] = np.repeat(self.upsample_indices[ind], self.wraps[ind])[0:num_indices]
-                    if self.shuffle == True:
-                        np.random.shuffle(self.upsample_indices[ind])
 
-            print("Batch Sizes: ", self.batch_sizes)
-
-        if self.upsample_ratio > 0:
-            if self.data_path is not None:
-                self.ones = self.data.loc[(self.data > self.upsample_thresh).any(axis=1)]
-                #extract the indices where all bins are 0
-                self.zeros = self.data.loc[(self.data <= self.upsample_thresh).all(axis=1)]
-            else:
-                #use the provided sets of nonzero bins and universal negatives
-                self.ones=self.nonzero_bins
-                self.zeros=self.universal_negatives
-
-            self.pos_batch_size = round(self.batch_size * self.upsample_ratio)
-            self.neg_batch_size = self.batch_size - self.pos_batch_size
-            self.pos_indices=np.arange(self.ones.shape[0])
-            self.neg_indices=np.arange(self.zeros.shape[0])
-
-            #wrap the positive and negative indices to reach size of self.indices
-            num_pos_wraps=math.ceil(num_indices/self.pos_indices.shape[0])
-            num_neg_wraps=math.ceil(num_indices/self.neg_indices.shape[0])
-            self.pos_indices=np.repeat(self.pos_indices,num_pos_wraps)[0:num_indices]
-            self.neg_indices=np.repeat(self.neg_indices,num_neg_wraps)[0:num_indices]
-            if self.shuffle==True:
-                np.random.shuffle(self.pos_indices)
-                np.random.shuffle(self.neg_indices)
-
+        print("upsample thresh list:"+str(self.upsample_thresh_list))
+        if self.upsample_ratio_list is None:
+            #all thresholds represented equally in the batch 
+            self.upsample_ratio = 1 / (len(self.upsample_thresh_list) - 1)
+            self.upsample_ratio_list = [self.upsample_ratio for i in range(len(self.upsample_thresh_list) - 1)]
+            print("upsample ratio list: " + str(self.upsample_ratio_list))
+            
+        for ind,val in enumerate(self.upsample_thresh_list):
+            #iterate through upsampling thresholds 
+            if ind < (len(self.upsample_thresh_list) - 1):
+                if ind == (len(self.upsample_thresh_list) - 2):
+                    #determine the  number of examples from the batch size that should be selected from this threshold group 
+                    self.batch_sizes.append(int(self.batch_size - sum(self.batch_sizes)))
+                else:
+                    self.batch_sizes.append(int(self.batch_size * self.upsample_ratio_list[ind]))
+                #identify the coordinates that fall into the current threshold group
+                self.upsampled_coord_indices[ind] = self.indices.loc[(self.indices >= val).any(axis=1) & (self.indices < self.upsample_thresh_list[ind+1]).any(axis=1)].index
+                self.upsampled_numerical_indices[ind] = np.arange(self.upsampled_coord_indices[ind].shape[0])
+                self.wraps.append(math.ceil(num_indices/self.upsampled_numerical_indices[ind].shape[0]))
+                self.upsampled_numerical_indices[ind] = np.repeat(self.upsampled_numerical_indices[ind], self.wraps[ind])[0:num_indices]
+                if self.shuffle == True:
+                    np.random.shuffle(self.upsampled_numerical_indices[ind])
+        return
+            
+        
     def __len__(self):
         return math.ceil(len(self.indices)/self.batch_size)
 
+    def get_coords(self,idx):
+        if self.upsample_thresh_list is not None:
+            all_bed_entries=[]
+            for ind,val in enumerate(self.batch_sizes):
+                batch_indices = self.upsample_indices[ind][idx*val:(idx+1)*val]
+                bed_entries = self.upsample_data[ind].index[batch_indices]
+                all_bed_entries+=bed_entries
+        else:
+            inds=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
+            all_bed_entries=self.indices[inds]
+        return all_bed_entries
+    
+    def get_seq(self,coords):
+        pass
+    
+    def get_pd_vals(self,coords):
+        pass
+    
+    def transform_seq(self,seq):
+        pass
+    
+    def one_hot_encode(self,seq):
+        pass
+    
+    def transform_vals(self,vals):
+        pass
+    
     def __getitem__(self,idx):
         with self.lock:
             ref=pysam.FastaFile(self.ref_fasta)
             self.ref=ref
-            if self.shuffled_ref_negatives==True:
-                return self.get_shuffled_ref_negatives_batch(idx)
-            elif self.upsample_ratio > 0:
-                return self.get_upsampled_positives_batch(idx)
-            elif self.upsample_ratio_list > 0:
-                return self.get_upsampled_positives_batch(idx)
-            else:
-                return self.get_basic_batch(idx)
+            
+            #get the coordinates for the current batch
+            coords=self.get_coords(idx)
 
+            #get the inputs
+            X=[]
+            for cur_input_index in range(self.num_inputs):
+                cur_input=self.input_path[cur_input_index]
+                if cur_input=="seq":
+                    X.append(self.one_hot_encode(self.transform_seq(self.get_seq(coords))))
+                else:
+                    #extract values from pandas df 
+                    X.append(self.transform_vals(self.get_pd_vals(coords)))
+            #get the outputs
+            y=[]
+            for cur_output_index in range(self.num_outputs):
+                cur_output=self.output_path[cur_output_index] 
+                if cur_ouput=="seq":
+                    y.append(self.one_hot_encode(self.transform_seq(self.get_seq(coords)))
+                else:
+                    y.append(self.tranform_vals(self.get_pd_vals(coords)))                    
+            #return the batch as an X,y tuple 
+            return (X,y)
+        
+            '''
+            if self.shuffled_ref_negatives==True:
+                (X_seq,y,bed_entries)=self.get_shuffled_ref_negatives_batch(idx)
+            elif self.upsample_ratio > 0:
+                (X_seq,y,bed_entries)=self.get_upsampled_positives_batch(idx)
+            elif self.upsample_ratio_list > 0:
+                (X_seq,y,bed_entries)=self.get_upsampled_positives_batch(idx)
+            else:
+                (X_seq,y,bed_entries)=self.get_basic_batch(idx)
+            ''' 
+                          
     def get_shuffled_ref_negatives_batch(self,idx):
         #get seq positions
         inds=self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
@@ -244,10 +311,13 @@ class DataGenerator(Sequence):
             #add in the reverse-complemented sequences for training.
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
-
+            bed_entries=bed_entries+bed_entries
+            
         #generate the corresponding negative set by dinucleotide-shuffling the sequences
         seqs_shuffled=[dinuc_shuffle(s) for s in seqs]
         seqs=seqs+seqs_shuffled
+        bed_entries=bed_entries+bed_entries
+        
         #one-hot-encode the fasta sequences
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
         x_batch=seqs
@@ -258,23 +328,24 @@ class DataGenerator(Sequence):
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
         y_shape=y_batch.shape
         y_batch=np.concatenate((y_batch,np.zeros(y_shape)))
-        return (x_batch,y_batch)
+        return (x_batch,y_batch,bed_entries)
 
     def get_upsampled_positives_batch(self,idx):
         #get seq positions
         if self.upsample_thresh_list is not None:
             seqs = []
             labels = []
+            all_bed_entries=[]
             for ind,val in enumerate(self.batch_sizes):
                 batch_indices = self.upsample_indices[ind][idx*val:(idx+1)*val]
                 bed_entries = self.upsample_data[ind].index[batch_indices]
                 seq_entries = [self.ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
                 seqs += seq_entries
+                all_bed_entries+=bed_entries
                 if ind == 0:
                     labels = self.upsample_data[ind].iloc[batch_indices].values
                 else:
                     labels = np.append(labels,self.upsample_data[ind].iloc[batch_indices].values)
-
             y_batch = np.array(labels)
             y_batch = np.expand_dims(y_batch,1)
 
@@ -292,10 +363,13 @@ class DataGenerator(Sequence):
             neg_seqs=[self.ref.fetch(i[0],i[1],i[2]) for i in neg_bed_entries]
             seqs=neg_seqs+pos_seqs
 
+            bed_entries=[(i[0],i[1],i[2]) for i in pos_bed_entries]+[(i[0],i[1],i[2]) for i in neg_bed_entries]
+            
         if self.add_revcomp==True:
             #add in the reverse-complemented sequences for training.
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
+            bed_entries+=bed_entries
 
         #one-hot-encode the fasta sequences
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
@@ -309,11 +383,11 @@ class DataGenerator(Sequence):
             y_batch_pos=self.ones.iloc[pos_inds]
             y_batch_neg=self.zeros.iloc[neg_inds]
             y_batch=np.concatenate((y_batch_neg,y_batch_pos),axis=0)
+            
         #add in the labels for the reverse complement sequences, if used
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
-
-        return (x_batch,y_batch)
+        return (x_batch,y_batch,bed_entries)
 
     def get_basic_batch(self,idx):
         #get seq positions
@@ -330,6 +404,8 @@ class DataGenerator(Sequence):
             #add in the reverse-complemented sequences for training.
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
+            bed_entries+=bed_entries
+            
         #one-hot-encode the fasta sequences
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
         x_batch=seqs
@@ -345,7 +421,7 @@ class DataGenerator(Sequence):
         #add in the labels for the reverse complement sequences, if used
         if self.add_revcomp==True:
             y_batch=np.concatenate((y_batch,y_batch),axis=0)
-        return (x_batch,y_batch)
+        return (x_batch,y_batch,bed_entries)
 
     def on_epoch_end(self):
         #if upsampling is being used, shuffle the positive and negative indices
@@ -358,19 +434,6 @@ class DataGenerator(Sequence):
                 np.random.shuffle(self.neg_indices)
             else:
                 np.random.shuffle(self.indices)
-
-    def get_labels(self):
-        if self.data_path is not None:
-            return self.data
-        else:
-            labels_nonzero=self.nonzero_bins
-            labels_universal_negatives=self.universal_negatives
-            for task in labels_nonzero.columns:
-                if task in ['CHROM','START','END']:
-                    continue
-                labels_universal_negatives[task]=np.zeros(labels_universal_negatives.shape[0])
-            labels=pd.concat([labels_nonzero,labels_universal_negatives])
-            return labels
 
 
 #generate batches of SNP data with specified allele column name and flank size

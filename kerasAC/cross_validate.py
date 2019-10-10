@@ -92,6 +92,7 @@ def cross_validate(args):
     base_performance_regression_file=args_dict['performance_metrics_regression_file']
     base_interpretation=args_dict['interpretation_outf']
     base_predictions_pickle=args_dict['predictions_pickle']
+    base_init_weights=args_dict['init_weights'] 
 
     all_splits=splits[args.assembly]
     if args.splits!=None:
@@ -107,7 +108,8 @@ def cross_validate(args):
         args_dict['train_chroms']=train_chroms
         args_dict['validation_chroms']=validation_chroms
         
-           
+        if base_init_weights is not None:
+            args_dict['init_wights']=base_init_weights+"."+str(split)
         #set the training arguments specific to this fold 
         args_dict['model_hdf5']=base_model_file+"."+str(split)
         print("Training model") 
