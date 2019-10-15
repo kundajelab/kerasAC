@@ -27,7 +27,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print(K.image_data_format())
 
     seq = Input(shape=(1,1000,4))
-    gc=Input(shape=(1,1,1))
+    gc=Input(shape=(1,))
     
     if (init_weights!=None):
         #load the weight initializations
