@@ -27,7 +27,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print(K.image_data_format())
 
     seq = Input(shape=(1,1000,4))
-    gc=Input(shape=(1,1,1))
+    gc=Input(shape=(1,))
     
     if (init_weights!=None):
         #load the weight initializations
@@ -95,11 +95,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    if w0!=None:
-        import kerasAC.custom_losses
-        loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
-    else:
-        loss="binary_crossentropy"
+    loss=ambig_binary_crossentropy
     model = Model(inputs = [seq,gc], outputs = outputs)
     model.compile(optimizer=adam,loss=loss)
     return model
