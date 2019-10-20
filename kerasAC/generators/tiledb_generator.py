@@ -201,10 +201,12 @@ class TiledbGenerator(Sequence):
             for task in self.data_arrays['index']:
                 with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
                     cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
+                    print(cur_vals[0:10])
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
                 print("got values for cur task/chrom") 
                 upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
+                print("upsampled_indices_task_chrom:"+str(upsampled_indices_task_chrom.shape))
                 print("got upsampled indices")
                 if upsampled_indices_chrom is None:
                     upsampled_indices_chrom=upsampled_indices_task_chrom
@@ -230,12 +232,16 @@ class TiledbGenerator(Sequence):
         print("made upsampled index data frame")
         if self.shuffle_epoch_start==True:
             #shuffle rows & reset index
+            print("shuffling upsampled dataframes prior to start of training")
             upsampled_indices=upsampled_indices.sample(frac=1)
             upsampled_indices=upsampled_indices.reset_index(drop=True)
-            print("shuffling upsampled dataframes prior to start of training")
         self.upsampled_indices=upsampled_indices    
         self.upsampled_indices_len=len(self.upsampled_indices)
-        num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
+        if self.upsampled_indices_len==0:
+            print("WARNING!!! You have requested upsampling, but none of the values in the tiledb self.tdb_partition_attribute_for_upsample exceed the threshold =self.tdb_partition_thresh_for_upsample, so no upsampling will be performed")
+            num_pos_wraps=0
+        else: 
+            num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
         self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
         return 
 
