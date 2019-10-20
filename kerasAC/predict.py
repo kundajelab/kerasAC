@@ -244,7 +244,10 @@ def get_batch_wrapper(idx):
     X,y,coords=test_generator[idx]
     if type(y) is not list:
         y=[y]
-    y=[i.squeeze(axis=-1) for i in y]
+    try:
+        y=[i.squeeze(axis=-1) for i in y]
+    except:
+        pass
     if type(X) is not list:
         X=[X]
     
