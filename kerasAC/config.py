@@ -49,6 +49,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['tasks']=None
     vars(args_object)['shuffle_epoch_start']=True
     vars(args_object)['shuffle_epoch_end']=True
+    vars(args_object)['revcomp']=False
     
     #prediction
     vars(args_object)['predict_chroms']=None

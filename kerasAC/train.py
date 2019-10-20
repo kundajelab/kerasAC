@@ -293,7 +293,8 @@ def get_paths(args):
     return index_train_path, index_valid_path, input_train_path, input_valid_path, output_train_path, output_valid_path 
 
 def initialize_generators(args):    
-    #data is being read in from tiledb for training 
+    #data is being read in from tiledb for training
+    print(args)
     if args.tdb_indexer is not None:
         return initialize_generators_tiledb(args)
     else:

@@ -66,7 +66,6 @@ class TiledbGenerator(Sequence):
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         tdb_input_aggregation/ tdb_output_aggregation -- one of 'avg','max',None
         '''
-
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
         self.ref_fasta=ref_fasta
@@ -196,7 +195,6 @@ class TiledbGenerator(Sequence):
         upsampled_chroms=None
         upsampled_indices=None
         self.chrom_edge_flank=max([max(self.tdb_input_flank),max(self.tdb_output_flank)])
-        
         for chrom in self.chroms_to_use:
             upsampled_indices_chrom=None
             chrom_size=None
