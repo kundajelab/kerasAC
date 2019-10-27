@@ -287,7 +287,7 @@ class DataGenerator(Sequence):
         if self.shuffle==True:
             if self.upsample_thresh_list is not None:
                 for ind,val in enumerate(self.batch_sizes):
-                    np.random.shuffle(self.upsample_indices[ind])
+                    np.random.shuffle(self.upsample_numerical_indices[ind])
             else:
                 np.random.shuffle(self.indices)
 
