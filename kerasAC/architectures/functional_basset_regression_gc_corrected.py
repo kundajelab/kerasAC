@@ -90,7 +90,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
         
         #add in the gc content
         added=Add()([x,gc])
-        outputs = Dense(ntasks)(added)
+        outputs= Dense(ntasks)(added)
 
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)

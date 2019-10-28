@@ -12,7 +12,7 @@ from .utils import *
 
 def get_performance_metrics_regression(predictions,true_y):
     print(predictions.shape)
-    print(true_y.shape) 
+    print(true_y.shape)
     assert predictions.shape==true_y.shape;
     assert len(predictions.shape)==2;
     [num_rows, num_cols]=true_y.shape 
