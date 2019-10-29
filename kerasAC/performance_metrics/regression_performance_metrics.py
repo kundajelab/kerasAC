@@ -29,7 +29,7 @@ def get_performance_metrics_regression(predictions,true_y):
         spearman_task_nonzero=spearmanr(non_zero_predicted,non_zero_true)
         pearson_task_nonzero=pearsonr(non_zero_predicted,non_zero_true)
         
-        if performance_stats==None:
+        if performance_stats is None:
             performance_stats={'spearmanr':[spearman_task],
                                'pearsonr':[pearson_task],
                                'spearmanr_nonzerobins':[spearman_task_nonzero],
@@ -37,8 +37,8 @@ def get_performance_metrics_regression(predictions,true_y):
         else:
             performance_stats['spearmanr'].append(spearman_task)
             performance_stats['pearsonr'].append(pearson_task)
-            performance_stats['spearman_nonzerobins'].append(spearman_task_nonzero)
-            performance_stats['pearson_nonzerobins'].append(pearson_task_nonzero)            
+            performance_stats['spearmanr_nonzerobins'].append(spearman_task_nonzero)
+            performance_stats['pearsonr_nonzerobins'].append(pearson_task_nonzero)            
     return performance_stats  
 
     
