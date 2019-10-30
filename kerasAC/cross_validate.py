@@ -3,7 +3,7 @@ from .config import args_object_from_args_dict
 from .train import *
 from .predict import *
 from .interpret import *
-from .performance_metrics import * 
+from .performance_metrics.performance_metrics import * 
 import argparse
 import pdb
 
@@ -66,7 +66,7 @@ def parse_args():
     model_params.add_argument('--json',help='json file for the model')
     model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
     model_params.add_argument('--squeeze_input_for_gru',action='store_true')
-    model_params.add_argument("--expand_dims",default=True)
+    model_params.add_argument("--expand_dims",default=False,action="store_true")
     model_params.add_argument("--num_inputs",type=int)
     model_params.add_argument("--num_outputs",type=int)
 
@@ -121,6 +121,10 @@ def parse_args():
     epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=True)
     epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=True)
 
+    vis_params=parser.add_argument_group("visualization")            
+    vis_params.add_argument("--tensorboard",action="store_true")
+    vis_params.add_argument("--tensorboard_logdir",default="logs")
+
     return parser.parse_args()
 
 def cross_validate(args):
@@ -136,7 +140,12 @@ def cross_validate(args):
     base_performance_classification_file=args_dict['performance_metrics_classification_file']
     base_performance_regression_file=args_dict['performance_metrics_regression_file']
     base_performance_profile_file=args_dict['performance_metrics_profile_file']
+
     base_predictions_and_labels_hdf5=args_dict['predictions_and_labels_hdf5']
+    preds_and_labels_split=base_predictions_and_labels_hdf5.split('/')
+    basename_preds_and_labels_split=preds_and_labels_split[-1]
+    prefix_preds_and_labels_split='/'.join(preds_and_labels_split[0:-1])
+    
     base_init_weights=args_dict['init_weights'] 
 
     all_splits=splits[args.assembly]
@@ -144,6 +153,7 @@ def cross_validate(args):
         all_splits=args.splits 
     for split in all_splits: 
         print("Starting split:"+str(split))
+
         test_chroms=splits[args.assembly][split]['test']
         validation_chroms=splits[args.assembly][split]['valid']
         train_chroms=list(set(chroms[args.assembly])-set(test_chroms+validation_chroms))
@@ -171,12 +181,27 @@ def cross_validate(args):
 
         #score the predictions
         print("scoring split:"+str(split))
+
+        score_suffix=basename_preds_and_labels_split+"."+str(split)
+        prefix_preds_and_labels_split='/'.join(preds_and_labels_split[0:-1])
+    
+        preds_to_score=[]
+        labels_to_score=[]
+        for cur_output in range(args.num_outputs):
+            for cur_task in range(args.num_tasks):
+                cur_preds=prefix_preds_and_labels_split+'/'+str(cur_output)+".task"+str(cur_task)+"."+score_suffix+".predictions"
+                cur_labels=prefix_preds_and_labels_split+'/'+str(cur_output)+".task"+str(cur_task)+"."+score_suffix+".labels"
+                preds_to_score.append(cur_preds)
+                labels_to_score.append(cur_labels)
+                
         if base_performance_classification_file!=None:
             args_dict['performance_metrics_classification_file']=base_performance_classification_file+"."+str(split)
         if base_performance_regression_file!=None:
             args_dict['performance_metrics_regression_file']=base_performance_regression_file+"."+str(split)
-        args_dict['predictions_hdf5']=args_dict['predictions_and_labels_hdf5']+'.predictions'
-        args_dict['labels_hdf5']=args_dict['predictions_and_labels_hdf5']+'.labels'
+        print(preds_to_score)
+        print(labels_to_score)
+        args_dict['predictions_hdf5']=preds_to_score
+        args_dict['labels_hdf5']=labels_to_score
         get_performance_metrics(args)
         
         

@@ -70,6 +70,8 @@ def get_performance_metrics(args):
             cur_predictions=args.predictions_hdf5[i]
             cur_metrics=metrics_from_hdf(cur_labels,cur_predictions,args)
             cur_tasks=args.tasks[i]
+            if type(cur_tasks) is not list:
+                cur_tasks=[cur_tasks]
             outfile=get_output_file(args,i)
             write_performance_metrics(outfile,cur_metrics,cur_tasks)
 
@@ -80,6 +82,8 @@ def get_performance_metrics(args):
             cur_pickle=args.predictions_pickle_to_load[i]
             cur_metrics=metrics_from_pickle(cur_pickle,args) 
             cur_tasks=args.tasks[i]
+            if type(cur_tasks) is not list:
+                cur_tasks=[cur_tasks]
             outfile=get_output_file(args,i)
             write_performance_metrics(outfile,cur_metrics,cur_tasks)
     
