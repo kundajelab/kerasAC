@@ -1,6 +1,6 @@
 import numpy as np ;
 from kerasAC.metrics import *
-from kerasAC.custom_losses import * 
+from kerasAC.custom_losses import *
 
 def getModelGivenModelOptionsAndWeightInits(args):
     #get the arguments
@@ -27,7 +27,6 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print(K.image_data_format())
 
     seq = Input(shape=(1,1000,4))
-    gc=Input(shape=(1,))
     
     if (init_weights!=None):
         #load the weight initializations
@@ -55,11 +54,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
         x = BatchNormalization(axis=1,weights=[data['14.fc1/BatchNorm/gamma:0'],data['13.fc1/BatchNorm/beta:0'],np.zeros(1000,),np.zeros(1000,)])(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
-
-        #add in the gc content
-        added=Add()([x,gc])
-        outputs = Dense(ntasks)(added)
-
+        y = Dense(ntasks)(x)
+        outputs = Activation("sigmoid")(y)
 
     else:
         x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(seq)
@@ -87,15 +83,12 @@ def getModelGivenModelOptionsAndWeightInits(args):
         x = BatchNormalization(axis=-1)(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
-        
-        #add in the gc content
-        added=Add()([x,gc])
-        outputs= Dense(ntasks)(added)
-
+        y = Dense(ntasks)(x)
+        outputs = Activation("sigmoid")(y)
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    loss=ambig_mean_squared_error 
-    model = Model(inputs = [seq,gc], outputs = outputs)
+    loss=ambig_binary_crossentropy
+    model = Model(inputs = [seq], outputs = outputs)
     model.compile(optimizer=adam,loss=loss)
     return model

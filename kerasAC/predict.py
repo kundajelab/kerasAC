@@ -40,8 +40,6 @@ import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
-    
-    input_data_path=parser.add_argument_group("input_data_path")
     input_data_path=parser.add_argument_group('input_data_path')
     input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
     input_data_path.add_argument("--index_tasks",nargs="*",default=None)    
@@ -78,11 +76,7 @@ def parse_args():
     input_filtering_params.add_argument("--tasks",nargs="*",default=None)
     
     output_params=parser.add_argument_group("output_params")
-    output_params.add_argument('--predictions_hdf5',help='name of hdf5 to save predictions',default=None)
-    output_params.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    
+    output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
     calibration_params=parser.add_argument_group("calibration_params")
     calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
     calibration_params.add_argument("--calibrate_regression",action="store_true",default=False)        
@@ -124,7 +118,7 @@ def write_predictions(args):
     separate predictions file for each output/task combination 
     '''
     try:
-        out_predictions_suffix=args.predictions_hdf5+".predictions" 
+        out_predictions_suffix=args.predictions_and_labels_hdf5+".predictions" 
         first=True
         while True:
             pred_df=pred_queue.get()
@@ -149,11 +143,11 @@ def write_predictions(args):
                         cur_pred_df_task=cur_pred_df[:,:,cur_task_index]
                         #get output file for current output/task combination
                         cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_predictions_suffix
-                        cur_pred_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                        cur_pred_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 else:
                     #one task only, store as task0
                     cur_out_f=str(cur_output_index)+'.task0.'+out_predictions_suffix
-                    cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                    cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
 
     except KeyboardInterrupt:
         #shutdown the pool
@@ -172,7 +166,7 @@ def write_labels(args):
     separate label file for each output/task combination
     '''
     try:
-        out_labels_suffix=args.predictions_hdf5+".labels" 
+        out_labels_suffix=args.predictions_and_labels_hdf5+".labels" 
         first=True
         while True:
             label_df=label_queue.get()
@@ -197,11 +191,11 @@ def write_labels(args):
                         cur_label_df_task=cur_label_df[:,:,cur_task_index]
                         #get output file for current output/task combination
                         cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_labels_suffix
-                        cur_label_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                        cur_label_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 else:
                     #one task only, store as task0
                     cur_out_f=str(cur_output_index)+'.task0.'+out_labels_suffix
-                    cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                    cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
@@ -353,7 +347,10 @@ def predict_on_batch_wrapper(args,model,test_generator):
                     preds=model.predict_on_batch(X)
                     if type(preds) is not list:
                         preds=[preds]
-                    preds=[i.squeeze(axis=-1) for i in preds]
+                    try:
+                        preds=[i.squeeze(axis=-1) for i in preds]
+                    except:
+                        pass 
                     preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
                     label_queue.put(y)
                     pred_queue.put(preds_dfs)
