@@ -15,6 +15,9 @@ def get_performance_metrics_regression(predictions,true_y):
     print(true_y.shape)
     assert predictions.shape==true_y.shape;
     assert len(predictions.shape)==2;
+    #make sure the chromosome regions are sorted in the same order in the prediction file and the label file
+    assert sum(predictions.index!=true_y.index)==0;
+
     [num_rows, num_cols]=true_y.shape 
     performance_stats=None
     for c in range(num_cols):
