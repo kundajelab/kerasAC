@@ -143,11 +143,11 @@ def write_predictions(args):
                         cur_pred_df_task=cur_pred_df[:,:,cur_task_index]
                         #get output file for current output/task combination
                         cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_predictions_suffix
-                        cur_pred_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                        cur_pred_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 else:
                     #one task only, store as task0
                     cur_out_f=str(cur_output_index)+'.task0.'+out_predictions_suffix
-                    cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                    cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
 
     except KeyboardInterrupt:
         #shutdown the pool
@@ -191,11 +191,11 @@ def write_labels(args):
                         cur_label_df_task=cur_label_df[:,:,cur_task_index]
                         #get output file for current output/task combination
                         cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_labels_suffix
-                        cur_label_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                        cur_label_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 else:
                     #one task only, store as task0
                     cur_out_f=str(cur_output_index)+'.task0.'+out_labels_suffix
-                    cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'index':30})
+                    cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
