@@ -52,8 +52,8 @@ def metrics_from_pickle(cur_pickle,args):
         return metrics_function(model_predictions,labels)
 
 def metrics_from_hdf(cur_labels, cur_predictions, args):
-    cur_labels=pd.read_hdf(cur_labels).values
-    cur_predictions=pd.read_hdf(cur_predictions).values
+    cur_labels=pd.read_hdf(cur_labels)
+    cur_predictions=pd.read_hdf(cur_predictions)
     metrics_function=get_metrics_function(args)
     return metrics_function(cur_predictions,cur_labels) 
 

@@ -86,6 +86,10 @@ class DataGenerator(Sequence):
 
         #get the index, input, and output files 
         self.index_tasks=index_tasks
+        if tasks is None:
+            tasks=[None]*num_inputs
+        else:
+            tasks=[i.split(',') for i in tasks]
         self.tasks=tasks        
         self.index_path=index_path
         self.input_path=input_path
@@ -133,13 +137,13 @@ class DataGenerator(Sequence):
                 continue
             if cur_input in file_to_df:
                 continue
-            file_to_df[self.input_path[i]]=open_data_file(data_path=cur_input,tasks=self.tasks,chroms_to_use=self.chroms_to_use)
+            file_to_df[self.input_path[i]]=open_data_file(data_path=cur_input,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
         for i in range(self.num_outputs):
             cur_output=self.output_path[i]
             print(cur_output)
             if cur_output in file_to_df:
                 continue
-            file_to_df[cur_output]=open_data_file(data_path=cur_output,tasks=self.tasks,chroms_to_use=self.chroms_to_use)
+            file_to_df[cur_output]=open_data_file(data_path=cur_output,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
         return file_to_df
             
     def get_upsampled_indices(self):
