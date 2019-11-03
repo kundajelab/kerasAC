@@ -99,7 +99,7 @@ def get_performance_metrics_classification(predictions,true_y):
     assert sum(predictions.index!=true_y.index)==0;
     [num_rows, num_cols]=true_y.shape
     if type(predictions)==pd.DataFrame:
-        predictions=preditions.values
+        predictions=predictions.values
         true_y=true_y.values
         
     performance_stats=None
