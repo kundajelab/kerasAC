@@ -18,7 +18,12 @@ def get_performance_metrics_regression(predictions,true_y):
     #make sure the chromosome regions are sorted in the same order in the prediction file and the label file
     assert sum(predictions.index!=true_y.index)==0;
 
-    [num_rows, num_cols]=true_y.shape 
+    [num_rows, num_cols]=true_y.shape
+    #convert dataframes to numpy arrays
+    if type(predictions)==pd.DataFrame: 
+        predictions=predictions.values
+        true_y=true_y.values
+    
     performance_stats=None
     for c in range(num_cols):
         true_y_for_task=np.squeeze(true_y[:,c])

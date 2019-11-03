@@ -207,6 +207,7 @@ def write_labels(args):
         # Kill remaining child processes
         kill_child_processes(os.getpid())
         raise e
+    return
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -246,7 +247,8 @@ def get_batch_wrapper(idx):
         X=[X]
     
     #represent coords w/ string, MultiIndex not supported in table append mode
-    coords=pd.MultiIndex.from_tuples(coords)
+    #set the column names for the MultiIndex 
+    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','START','END'])
     y=[pd.DataFrame(i,index=coords) for i in y]
     return [X,y,coords,idx]
 
