@@ -51,9 +51,9 @@ def parse_args():
     
     output_params=parser.add_argument_group("output_params")
     output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
-    output_params.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_classification_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_regression_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_profile_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     
     calibration_params=parser.add_argument_group("calibration_params")
     calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
