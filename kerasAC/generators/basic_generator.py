@@ -15,6 +15,7 @@ def get_weights(data):
     return w1,w0
 
 def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
+    print("running open_data_file with tasks:"+str(tasks))
     if data_path.endswith('.hdf5'):
         if tasks==None:
             data=pd.read_hdf(data_path)
@@ -90,7 +91,8 @@ class DataGenerator(Sequence):
             tasks=[None]*num_inputs
         else:
             tasks=[i.split(',') for i in tasks]
-        self.tasks=tasks        
+        self.tasks=tasks
+        print("TASKS:"+str(self.tasks))
         self.index_path=index_path
         self.input_path=input_path
         self.output_path=output_path

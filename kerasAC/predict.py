@@ -118,7 +118,7 @@ def write_predictions(args):
     separate predictions file for each output/task combination 
     '''
     try:
-        out_predictions_suffix=args.predictions_and_labels_hdf5+".predictions" 
+        out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
         first=True
         while True:
             pred_df=pred_queue.get()
@@ -133,22 +133,11 @@ def write_predictions(args):
                 mode='a'
                 append=True
             for cur_output_index in range(len(pred_df)):
-                cur_pred_df=pred_df[cur_output_index]
                 #get cur_pred_df for current output
-                if len(cur_pred_df.shape)>2:
-                    #tasks in last channel, and there is more than 1 task 
-                    num_tasks=cur_pred_df.shape[-1]
-                    for cur_task_index in range(num_tasks):
-                        #get df for current output/task combination
-                        cur_pred_df_task=cur_pred_df[:,:,cur_task_index]
-                        #get output file for current output/task combination
-                        cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_predictions_suffix
-                        cur_pred_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
-                else:
-                    #one task only, store as task0
-                    cur_out_f=str(cur_output_index)+'.task0.'+out_predictions_suffix
-                    cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
-
+                cur_pred_df=pred_df[cur_output_index]
+                cur_out_f='.'.join([out_predictions_prefix,str(cur_output_index)])
+                cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
@@ -166,7 +155,7 @@ def write_labels(args):
     separate label file for each output/task combination
     '''
     try:
-        out_labels_suffix=args.predictions_and_labels_hdf5+".labels" 
+        out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
         first=True
         while True:
             label_df=label_queue.get()
@@ -182,20 +171,9 @@ def write_labels(args):
                 append=True
             for cur_output_index in range(len(label_df)):
                 cur_label_df=label_df[cur_output_index]
-                #get cur_pred_df for current output
-                if len(cur_label_df.shape)>2:
-                    #tasks in last channel, and there is more than 1 task 
-                    num_tasks=cur_label_df.shape[-1]
-                    for cur_task_index in range(num_tasks):
-                        #get df for current output/task combination
-                        cur_label_df_task=cur_label_df[:,:,cur_task_index]
-                        #get output file for current output/task combination
-                        cur_out_f=str(cur_output_index)+'.task'+str(cur_task_index)+'.'+out_labels_suffix
-                        cur_label_df_task.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
-                else:
-                    #one task only, store as task0
-                    cur_out_f=str(cur_output_index)+'.task0.'+out_labels_suffix
-                    cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                cur_out_f='.'.join([out_labels_prefix,str(cur_output_index)])
+                cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
