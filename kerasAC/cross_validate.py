@@ -186,10 +186,12 @@ def cross_validate(args):
             preds_to_score.append(cur_preds)
             labels_to_score.append(cur_labels)
                 
-        if base_performance_classification_file!=None:
-            args_dict['performance_metrics_classification_file']=base_performance_classification_file+"."+str(split)
-        if base_performance_regression_file!=None:
-            args_dict['performance_metrics_regression_file']=base_performance_regression_file+"."+str(split)
+        if base_performance_classification_file is not None:
+            args_dict['performance_metrics_classification_file']=[perf_file+"."+str(split) for perf_file in base_performance_classification_file]
+        elif base_performance_regression_file is not None:
+            args_dict['performance_metrics_regression_file']=[perf_file +'.'+str(split) for perf_file in base_performance_regression_file]
+        elif base_performance_profile_file is not None:
+            args_dict['performance_metrics_profile_file']=[perf_file +'.'+str(split) for perf_file in base_performance_profile_file]
         print(preds_to_score)
         print(labels_to_score)
         args_dict['predictions_hdf5']=preds_to_score
