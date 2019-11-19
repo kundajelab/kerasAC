@@ -14,6 +14,7 @@ from .utils import *
 
 def auroc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     try:
+        true_y_for_task_filtered=[int(round(i)) for i in true_y_for_task_filtered]
         task_auroc = roc_auc_score(y_true=true_y_for_task_filtered,
                                    y_score=predictions_for_task_filtered)
     except Exception as e:
@@ -26,6 +27,7 @@ def auroc_func(predictions_for_task_filtered, true_y_for_task_filtered):
 def auprc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     # sklearn only supports 2 classes (0,1) for the auPRC calculation
     try:
+        true_y_for_task_filtered=[int(round(i)) for i in true_y_for_task_filtered]
         task_auprc=average_precision_score(true_y_for_task_filtered, predictions_for_task_filtered)
     except:
         print("Could not calculate auPRC:")

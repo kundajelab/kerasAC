@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('--performance_metrics_classification_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_regression_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_profile_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    parser.add_argument('--tasks',nargs="+",action='append')
+    parser.add_argument('--tasks',nargs="+",action='append',default=None)
     return parser.parse_args()
 
 def get_metrics_function(args):
@@ -69,7 +69,10 @@ def get_performance_metrics(args):
             cur_labels=args.labels_hdf5[i]
             cur_predictions=args.predictions_hdf5[i]
             cur_metrics=metrics_from_hdf(cur_labels,cur_predictions,args)
-            cur_tasks=args.tasks[i]
+            if args.tasks is None:
+                cur_tasks=[j for j in range(cur_predictions.shape[1])]
+            else:
+                cur_tasks=args.tasks[i]
             if type(cur_tasks) is not list:
                 cur_tasks=[cur_tasks]
             outfile=get_output_file(args,i)
@@ -80,8 +83,11 @@ def get_performance_metrics(args):
         num_datasets=len(args.predictions_pickle_to_load)
         for i in range(num_datasets):
             cur_pickle=args.predictions_pickle_to_load[i]
-            cur_metrics=metrics_from_pickle(cur_pickle,args) 
-            cur_tasks=args.tasks[i]
+            cur_metrics=metrics_from_pickle(cur_pickle,args)
+            if args.tasks is None:
+                cur_tasks=[j for j in range(cur_predictions.shape[1])]
+            else:
+                cur_tasks=args.tasks[i]
             if type(cur_tasks) is not list:
                 cur_tasks=[cur_tasks]
             outfile=get_output_file(args,i)
