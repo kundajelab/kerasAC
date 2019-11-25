@@ -20,7 +20,8 @@ class SNPGenerator(Sequence):
                  ref_fasta,
                  rsid_col=None,
                  compute_gc=False,
-                 batch_size=1000):
+                 batch_size=1000,
+                 expand_dims=True):
         self.bed_path=bed_path
         self.bed=pd.read_csv(self.bed_path,header=0,sep='\t')
         self.num_snps=self.bed.shape[0]
@@ -36,6 +37,7 @@ class SNPGenerator(Sequence):
         self.ref_fasta=ref_fasta
         self.batch_size=batch_size
         self.lock=threading.Lock()
+        self.expand_dims=expand_dims
 
 
     def __getitem__(self,idx):
@@ -68,10 +70,12 @@ class SNPGenerator(Sequence):
                 rsids.append(index)
             index+=1 
         seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+        if self.expand_dims==True:
+            seqs=np.expand_dims(seqs,axis=1) 
         if self.compute_gc==False:
             return [rsid,seqs]
         else:
-            gc=np.asarray(gc)
+            gc=np.expand_dims(np.asarray(gc),axis=1)
             return [rsids,[seqs,gc]]
 
     def compute_gc_func(self,seq):

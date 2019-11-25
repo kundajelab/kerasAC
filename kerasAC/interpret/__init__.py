@@ -57,8 +57,8 @@ import numpy as np
 
 def input_grad(model,X,target_layer_idx=-2,input_to_use=0):
     print("WARNING: this function provides aggregated gradients across tasks. Not recommended for multi-tasked models")
-    from keras import backend as K 
-    fn = K.function(model.inputs, K.gradients(model.layers[target_layer_idx].output, model.inputs))    
+    from keras import backend as K
+    fn = K.function(model.inputs, K.gradients(model.layers[target_layer_idx].output, model.inputs))
     return fn(X)[input_to_use]
 
 def deeplift_zero_ref(X,score_func,batch_size=200,task_idx=0):        

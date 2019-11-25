@@ -367,7 +367,6 @@ class TiledbGenerator(Sequence):
         #prepopulate the values array with 0
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
         #define a context for querying tiledb
-        ctx=tiledb.Ctx()
         #iterate through entries 
         for val_index in range(num_entries):            
             #iterate through tasks for each entry 
@@ -382,7 +381,7 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
+                with tiledb.DenseArray(array_name, mode='r',ctx=tiledb.Ctx()) as cur_array:
                     try:
                         cur_vals=cur_array[int(start_position):int(end_position)][attribute]
                         vals[val_index,:,task_index]=cur_vals
