@@ -13,8 +13,10 @@ def main():
     tasks=None
     for split in range(args.nsplits):
         try:
-            aggregate_dict[split]=dict() 
-            data=open(args.file_name_prefix+str(split)+args.file_name_suffix,'r').read().strip().split('\n')
+            aggregate_dict[split]=dict()
+            fname=args.file_name_prefix+str(split)+args.file_name_suffix
+            print(fname)
+            data=open(fname,'r').read().strip().split('\n')
             if tasks is None:
                 header=data[0].split('\t')
                 tasks=header
