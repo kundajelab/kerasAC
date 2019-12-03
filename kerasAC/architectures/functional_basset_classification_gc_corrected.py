@@ -20,7 +20,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     from keras.layers.normalization import BatchNormalization
     from keras.regularizers import l1, l2
     from keras import backend as K
-    from keras.layers import Input, Add
+    from keras.layers import Input, Concatenate
     from keras.models import Model
 
     K.set_image_data_format('channels_last')
@@ -57,7 +57,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
         x = Dropout(0.3)(x)
 
         #add in the gc content
-        added=Add()([x,gc])
+        added=Concatenate(axis=-1)([x,gc])
         y = Dense(ntasks)(added)
         outputs = Activation("sigmoid")(y)
 
@@ -89,7 +89,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
         x = Dropout(0.3)(x)
         
         #add in the gc content
-        added=Add()([x,gc])
+        added=Concatenate(axis=-1)([x,gc])
         y = Dense(ntasks)(added)
         outputs = Activation("sigmoid")(y)
 
