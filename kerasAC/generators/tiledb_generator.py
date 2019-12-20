@@ -199,7 +199,7 @@ class TiledbGenerator(Sequence):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx()) as cur_array:
                     cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
                     print(cur_vals[0:10])
                 if chrom_size is None:
@@ -296,7 +296,7 @@ class TiledbGenerator(Sequence):
         if self.return_coords is True:
             if self.add_revcomp==True:
                 coords=pd.concat((coords,coords),axis=0)
-            coords=[(row[0],row[1]) for index,row in coords.iterrows()]
+            coords=[(row[0],row[1]-self.tdb_output_flank[0],row[1]+self.tdb_output_flank[0]) for index,row in coords.iterrows()]
             return (X,y,coords)
         else:
             return (X,y) 
@@ -381,12 +381,19 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                with tiledb.DenseArray(array_name, mode='r',ctx=tiledb.Ctx()) as cur_array:
+                done=False
+                while done==False:
                     try:
-                        cur_vals=cur_array[int(start_position):int(end_position)][attribute]
-                        vals[val_index,:,task_index]=cur_vals
+                        cur_array=tiledb.DenseArray(array_name,mode='r',ctx=tiledb.Ctx())
+                        done=True
                     except:
-                        print("skipping: start_position:"+str(start_position)+" : end_position:"+str(end_position))
+                        done=False
+                try:
+                    cur_vals=cur_array[int(start_position):int(end_position)][attribute]
+                    vals[val_index,:,task_index]=cur_vals
+                except:
+                    print("skipping: start_position:"+str(start_position)+" : end_position:"+str(end_position))
+                cur_array.close() 
         return vals
     
     def transform_vals(self,vals,transformer):

@@ -103,7 +103,7 @@ def parse_args():
     parallelization_params=parser.add_argument_group("parallelization")
     parallelization_params.add_argument("--threads",type=int,default=1)
     parallelization_params.add_argument("--max_queue_size",type=int,default=100)
-    parallelization_params.add_argument("--multi_gpu",action="store_true",default=False) 
+    parallelization_params.add_argument("--num_gpus",type=int,default=1)
 
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
@@ -319,12 +319,12 @@ def train(args):
     except:
         raise Exception("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
-    if args.multi_gpu==True:
-        try:
-            model=multi_gpu_model(model)
-            print("Training on all available GPU's. Set args.multi_gpu = False to avoid this") 
+    if args.num_gpus >1:
+       try:
+            model=multi_gpu_model(model,gpus=args.num_gpus)
+            print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
         except:
-            pass 
+            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
     print("compiled the model!")
 
     

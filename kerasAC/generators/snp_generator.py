@@ -53,6 +53,8 @@ class SNPGenerator(Sequence):
             left_flank_start=max([0,cur_pos-self.flank_size])
             left_flank_end=cur_pos
             snp_allele=entry[self.allele_col]
+            if len(snp_allele)>1:
+                snp_allele=snp_allele[0]
             right_flank_start=cur_pos+1
             right_flank_end=cur_pos+self.flank_size
             left_flank=self.ref.fetch(cur_chrom,left_flank_start,left_flank_end)

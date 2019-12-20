@@ -32,7 +32,8 @@ import pickle
 import numpy as np 
 import keras 
 from keras.losses import *
-from keras.models import Model 
+from keras.models import Model
+from keras.utils import multi_gpu_model
 from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
@@ -225,7 +226,7 @@ def get_batch_wrapper(idx):
         X=[X]
     
     #represent coords w/ string, MultiIndex not supported in table append mode
-    #set the column names for the MultiIndex 
+    #set the column names for the MultiIndex
     coords=pd.MultiIndex.from_tuples(coords,names=['CHR','START','END'])
     y=[pd.DataFrame(i,index=coords) for i in y]
     return [X,y,coords,idx]
@@ -392,7 +393,13 @@ def get_model(args):
         from keras.models import load_model
         model=load_model(args.model_hdf5,custom_objects=custom_objects)
     print("got model architecture")
-    print("loaded model weights")   
+    print("loaded model weights")
+    if args.num_gpus >1:
+        try:
+            model=multi_gpu_model(model,gpus=args.num_gpus)
+                print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
+        except:
+            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
     return model
 
 
