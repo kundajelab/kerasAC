@@ -1,9 +1,12 @@
 from __future__ import division, print_function, absolute_import
 import importlib
 import imp
+import os
+import tempfile
 import argparse
 import numpy as np
 import h5py
+import boto3
 from .generators.basic_generator import *
 from .generators.tiledb_generator import *
 from . import config
@@ -14,7 +17,7 @@ from keras.utils import multi_gpu_model
 def parse_args():
     parser=argparse.ArgumentParser()
     
-    parser.add_argument("--model_hdf5",help="output model file that is generated at the end of training (in hdf5 format)")
+    parser.add_argument("--model_prefix",help="output model file that is generated at the end of training (in hdf5 format)")
     parser.add_argument("--seed",type=int,default=1234)    
     parser.add_argument("--num_inputs",type=int)
     parser.add_argument("--num_outputs",type=int)
@@ -130,17 +133,30 @@ def get_weights(args,train_generator):
     return w1,w0
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
-    model_output_path = args.model_hdf5
-    checkpointer = ModelCheckpoint(filepath=model_output_path, verbose=1, save_best_only=True)
+    #accomodate storage on s3
+    if args.model_prefix.startswith('s3'):
+        #store in local temporary file
+        model_output_path_string=os.path.basename(args.model_prefix)
+        model_output_path_hdf5=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".hdf5")
+        model_output_path_logs=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".log")        
+        model_output_path_arch=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".arch")
+        model_output_path_weights=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".weights")        
+    else: 
+        model_output_path_string = args.model_prefix
+        model_output_path_hdf5=model_output_path_string+".hdf5"
+        model_output_path_logs=model_output_path_string+".log"
+        model_output_path_arch=model_output_path_string+".arch"
+        model_output_path_weights=model_output_path_string+".weights"
+
+    
+    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5.name, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
-    csvlogger = CSVLogger(args.model_hdf5+".log", append = True)
+    csvlogger = CSVLogger(model_output_path_logs.name, append = True)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
     if args.tensorboard==True:
         from keras.callbacks import TensorBoard
-        #create the specified logdir
-        import os
-        cur_logdir='/'.join([args.tensorboard_logdir,args.model_hdf5+'.tb'])
+        cur_logdir='/'.join([args.tensorboard_logdir,model_output_path_string.split('/')[-1]+'.tb'])
         if not os.path.exists(cur_logdir):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
@@ -156,10 +172,24 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,
                         shuffle=False)
-    model.save_weights(model_output_path+".weights")
+    model.save_weights(model_output_path_weights)
     architecture_string=model.to_json()
-    outf=open(args.model_hdf5+".arch",'w')
-    outf.write(architecture_string)
+    with open(model_output_path_arch,'w') as outf:
+        outf.write(architecture_string)
+    #sync to s3 if needed
+    if args.model_prefix.startswith('s3://'):
+        #sync log, model hdf5, weight file, arch file
+        s3_client=boto3.client(service_name='s3')
+        bucket=args.model_prefix.strip('s3://').split('/')[0]
+        s3_prefix="/".join(self.model_prefix.strip("s3://").split("/")[1::])
+        s3_hdf5=s3_prefix+'.hdf5'
+        s3_arch=s3_prefix+'.arch'
+        s3_log=s3_prefix+'.log'
+        s3_weights=s3_prefix+'.weights'
+        s3_client.upload_file(model_output_path_hdf5,bucket,s3_hdf5)
+        s3_client.upload_file(model_output_path_arch,bucket,s3_arch)
+        s3_client.upload_file(model_output_path_weights,bucket,s3_weights)
+        s3_client.upload_file(model_output_path_logs,bucket,s3_log)  
     print("complete!!")
     
 def initializer_generators_hdf5(args):
@@ -321,10 +351,10 @@ def train(args):
     model=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
     if args.num_gpus >1:
        try:
-            model=multi_gpu_model(model,gpus=args.num_gpus)
-            print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
-        except:
-            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
+           model=multi_gpu_model(model,gpus=args.num_gpus)
+           print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
+       except:
+           print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
     print("compiled the model!")
 
     

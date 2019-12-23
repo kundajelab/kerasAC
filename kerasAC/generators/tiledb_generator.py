@@ -10,13 +10,26 @@ import pysam
 from ..util import *
 import tiledb
 import pdb
+import boto3
 from collections import OrderedDict
 
 def get_genome_size(chrom_sizes_file,chroms):
     '''
     get size of chromosomes to train on 
     '''
-    chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
+    print(chrom_sizes_file) 
+    if chrom_sizes_file.startswith('s3://'): 
+        s3=boto3.resource('s3')
+        bucket_name=chrom_sizes_file.lstrip("s3://").split('/')[0]
+        itemname="/".join(chrom_sizes_file.lstrip("s3://").split("/")[1::])
+        print("bucket name:"+str(bucket_name))
+        print("item name:"+str(itemname))
+        obj=s3.Object(bucket_name,itemname)
+        chrom_sizes=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+        chrom_sizes=pd.DataFrame([i.split('\t') for i in chrom_sizes])
+        chrom_sizes[1]=chrom_sizes[1].astype('int32') 
+    else:
+        chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
     chrom_sizes_subset=chrom_sizes[chrom_sizes[0].isin(chroms)]
     chrom_sizes_subset_dict=dict() 
     genome_size=chrom_sizes_subset[1].sum()
@@ -68,13 +81,24 @@ class TiledbGenerator(Sequence):
         '''
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
-        self.ref_fasta=ref_fasta
+        #get local copy of s3 reference sequence
+        if ref_fasta.startswith('s3://'):
+            s3 = boto3.client('s3')
+            bucket=ref_fasta.lstrip('s3://').split('/')[0]
+            bucket_file="/".join(ref_fasta.lstrip("s3://").split("/")[1::])
+            fname=ref_fasta.lstrip("s3://").split("/")[-1] 
+            s3.download_file(bucket, bucket_file,fname)
+            self.ref_fasta=fname
+        else: 
+            self.ref_fasta=ref_fasta
         self.batch_size=batch_size
         self.add_revcomp=add_revcomp
         if self.add_revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
             
         self.expand_dims=expand_dims
+        self.config=tiledb.Config()
+        self.config['vfs.s3.region']='us-west-1'
         
         #identify chromosome information
         if chroms is not None:
@@ -123,7 +147,6 @@ class TiledbGenerator(Sequence):
 
         self.pseudocount=pseudocount
         self.return_coords=return_coords
-
             
     def open_tiledb_arrays_for_reading(self):
         '''
@@ -134,8 +157,17 @@ class TiledbGenerator(Sequence):
         array_dict['inputs']=OrderedDict()
         array_dict['outputs']=OrderedDict() 
 
-        #index tasks 
-        index_tasks=open(self.tdb_indexer).read().strip().split('\n')
+        #index tasks
+        if self.tdb_indexer.startswith("s3://"):
+            s3=boto3.resource('s3')
+            bucket_name=self.tdb_indexer.lstrip("s3://").split('/')[0]
+            itemname="/".join(self.tdb_indexer.lstrip("s3://").split("/")[1::])
+            print("bucket name:"+str(bucket_name))
+            print("item name:"+str(itemname))
+            obj=s3.Object(bucket_name,itemname)
+            index_tasks=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+        else: 
+            index_tasks=open(self.tdb_indexer).read().strip().split('\n')
         for task in index_tasks:
             array_dict['index'][task]=OrderedDict() 
             for chrom in self.chroms_to_use:
@@ -157,10 +189,20 @@ class TiledbGenerator(Sequence):
         for i in range(len(self.tdb_outputs)): 
             tdb_output=self.tdb_outputs[i]
             if tdb_output=="seq":
-                continue 
-            tdb_output_tasks=open(tdb_output).read().strip().split('\n')
+                continue
+            if tdb_output.startswith("s3://"):
+                s3=boto3.resource('s3')
+                bucket_name=tdb_output.lstrip("s3://").split('/')[0]
+                itemname="/".join(tdb_output.lstrip("s3://").split("/")[1::])
+                print("bucket name:"+str(bucket_name))
+                print("item name:"+str(itemname))
+                obj=s3.Object(bucket_name,itemname)
+                tdb_output_tasks=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+            else: 
+                tdb_output_tasks=open(tdb_output).read().strip().split('\n')
             tdb_output_array=OrderedDict()
             for task in tdb_output_tasks:
+                print(task)
                 tdb_output_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
                     tdb_output_array[task][chrom]=task+'.'+chrom
@@ -199,9 +241,9 @@ class TiledbGenerator(Sequence):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx()) as cur_array:
+                print(self.data_arrays['index'][task][chrom])
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx(config=self.config)) as cur_array:
                     cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
-                    print(cur_vals[0:10])
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
                 print("got values for cur task/chrom") 
@@ -384,7 +426,7 @@ class TiledbGenerator(Sequence):
                 done=False
                 while done==False:
                     try:
-                        cur_array=tiledb.DenseArray(array_name,mode='r',ctx=tiledb.Ctx())
+                        cur_array=tiledb.DenseArray(array_name,mode='r',ctx=tiledb.Ctx(config=self.config))
                         done=True
                     except:
                         done=False

@@ -80,11 +80,12 @@ class TiledbPredictGenerator(TiledbGenerator):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx()) as cur_array:
+                print(task)
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx(config=self.config)) as cur_array:
                     cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
+                    print("got values for cur task/chrom") 
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
-                print("got values for cur task/chrom") 
                 upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
                 print("got upsampled indices")
                 if upsampled_indices_chrom is None:
