@@ -13,7 +13,9 @@ from . import config
 import pdb
 from keras.callbacks import *
 from keras.utils import multi_gpu_model
-
+import gc
+import multiprocessing
+multiprocessing.set_start_method('spawn', force=True)
 def parse_args():
     parser=argparse.ArgumentParser()
     
@@ -24,12 +26,11 @@ def parse_args():
     parser.add_argument("--use_multiprocessing",type=bool,default=True)
     
     tiledbgroup=parser.add_argument_group('tiledb')
-    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
-    
+    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")    
     tiledbgroup.add_argument("--tdb_outputs",nargs="+")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
-    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggreagtion; one of None, 'avg','max'")
+    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     
     tiledbgroup.add_argument("--tdb_inputs",nargs="+")
@@ -240,7 +241,16 @@ def initialize_generators_tiledb(args):
         print("warning! only a single ratio for upsampling supported for tiledb as of now")
     else:
         upsample_ratio_eval=None
-        
+    import tiledb
+    tdb_config=tiledb.Config()
+    tdb_config['vfs.s3.region']='us-west-1'
+    tdb_config["sm.check_coord_dups"]="false"
+    tdb_config["sm.check_coord_oob"]="false"
+    tdb_config["sm.check_global_order"]="false"
+    tdb_config["sm.num_reader_threads"]="50"
+    tdb_config["sm.num_async_threads"]="50"
+    tdb_config["vfs.num_threads"]="50"    
+    tdb_ctx=tiledb.Ctx(config=tdb_config)
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
@@ -264,7 +274,9 @@ def initialize_generators_tiledb(args):
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
                                     expand_dims=args.expand_dims,
-                                    add_revcomp=args.revcomp)
+                                    add_revcomp=args.revcomp,
+                                    tdb_config=tdb_config,
+                                    tdb_ctx=tdb_ctx)
     
     print("generated training data generator!")
     valid_generator=TiledbGenerator(chroms=args.validation_chroms,
@@ -290,7 +302,9 @@ def initialize_generators_tiledb(args):
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
                                     expand_dims=args.expand_dims,
-                                    add_revcomp=args.revcomp)
+                                    add_revcomp=args.revcomp,
+                                    tdb_config=tdb_config,
+                                    tdb_ctx=tdb_ctx)
     
     print("generated validation data generator")
     return train_generator, valid_generator
@@ -348,10 +362,12 @@ def train(args):
             architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
     except:
         raise Exception("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
+    model,optimizer,loss=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
     if args.num_gpus >1:
        try:
            model=multi_gpu_model(model,gpus=args.num_gpus)
+           #recompile
+           model.compile(optimizer=optimizer,loss=loss) 
            print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
        except:
            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
@@ -362,6 +378,7 @@ def train(args):
                      valid_generator,args)
 
 def main():
+    gc.freeze()
     args=parse_args()
     train(args)
     

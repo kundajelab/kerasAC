@@ -12,7 +12,7 @@ import tiledb
 import pdb
 import boto3
 from collections import OrderedDict
-
+import gc 
 def get_genome_size(chrom_sizes_file,chroms):
     '''
     get size of chromosomes to train on 
@@ -73,7 +73,9 @@ class TiledbGenerator(Sequence):
                  pseudocount=0,
                  add_revcomp=False,
                  expand_dims=False,
-                 return_coords=False):
+                 return_coords=False,
+                 tdb_config=None,
+                 tdb_ctx=None):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
@@ -97,8 +99,15 @@ class TiledbGenerator(Sequence):
             self.batch_size=int(math.floor(self.batch_size/2))
             
         self.expand_dims=expand_dims
-        self.config=tiledb.Config()
-        self.config['vfs.s3.region']='us-west-1'
+        #create tiledb configuration parameters (these have been found optimal for most use cases, but should set in a separate config file in the future)
+        if tdb_config is not None:
+            self.config=tdb_config
+        else:
+            self.config=tiledb.Config()
+        if tdb_ctx is not None:
+            self.ctx=tdb_ctx
+        else:
+            self.ctx=tiledb.Ctx(self.config)
         
         #identify chromosome information
         if chroms is not None:
@@ -242,7 +251,7 @@ class TiledbGenerator(Sequence):
             chrom_size=None
             for task in self.data_arrays['index']:
                 print(self.data_arrays['index'][task][chrom])
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=tiledb.Ctx(config=self.config)) as cur_array:
+                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=self.ctx) as cur_array:
                     cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
@@ -293,6 +302,7 @@ class TiledbGenerator(Sequence):
     
 
     def __getitem__(self,idx):
+        gc.unfreeze()
         self.ref=pysam.FastaFile(self.ref_fasta)
         
         #get the coordinates for the current batch
@@ -339,8 +349,10 @@ class TiledbGenerator(Sequence):
             if self.add_revcomp==True:
                 coords=pd.concat((coords,coords),axis=0)
             coords=[(row[0],row[1]-self.tdb_output_flank[0],row[1]+self.tdb_output_flank[0]) for index,row in coords.iterrows()]
+            print("returning batch!")
             return (X,y,coords)
         else:
+            print("returning batch!")
             return (X,y) 
     
     def get_coords(self,idx):
@@ -423,19 +435,10 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                done=False
-                while done==False:
-                    try:
-                        cur_array=tiledb.DenseArray(array_name,mode='r',ctx=tiledb.Ctx(config=self.config))
-                        done=True
-                    except:
-                        done=False
-                try:
+                
+                with tiledb.DenseArray(array_name,mode='r',ctx=self.ctx) as cur_array: 
                     cur_vals=cur_array[int(start_position):int(end_position)][attribute]
                     vals[val_index,:,task_index]=cur_vals
-                except:
-                    print("skipping: start_position:"+str(start_position)+" : end_position:"+str(end_position))
-                cur_array.close() 
         return vals
     
     def transform_vals(self,vals,transformer):
