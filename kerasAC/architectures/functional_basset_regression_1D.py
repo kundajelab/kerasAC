@@ -57,10 +57,10 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
-    if args.init_weights is True:
+    if args.init_weights is not None:
         #load model with custom objects 
         model=get_model(args)
-    elif args.from_checkpoint_arch is True :
+    elif args.from_checkpoint_arch is not None :
         model=get_model(args)
     else: 
         seq = Input(shape=(1000,4),name='input')
@@ -96,7 +96,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     loss=ambig_mean_squared_error
     model.compile(optimizer=adam,loss=loss)
     print("ARGS FROM CHECKPOINT WEIGHTS:"+str(args.from_checkpoint_weights))
-    if args.from_checkpoint_weights is True:
+    if args.from_checkpoint_weights is not None:
         model=get_model_weights(args,model=model)
         print("UPDATED MODEL WEIGHTS")
     return model,adam,loss
