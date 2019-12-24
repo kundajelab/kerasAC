@@ -18,7 +18,7 @@ def get_model(args):
         #load the model architecture from json
         json_string=open(args.from_checkpoint_arch,'r').read()
         model=model_from_json(json_string,custom_objects=custom_objects)
-    if args.init_weights!=None: 
+    if args.init_weights is not None: 
         #load from the hdf5
         from keras.models import load_model
         model=load_model(args.model_hdf5,custom_objects=custom_objects)
@@ -87,6 +87,6 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("compiling!")
     loss=ambig_binary_crossentropy    
     model.compile(optimizer=adam,loss=loss)        
-    if args.from_checkpoint_weights is True:
+    if args.from_checkpoint_weights is not None:
         model=get_model_weights(args,model=model)
     return model, adam,loss
