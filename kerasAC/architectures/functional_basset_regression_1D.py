@@ -27,11 +27,6 @@ def get_model(args):
         print("loaded model from hdf5:"+args.model_hdf5)
     return model
 
-def get_model_weights(args,model):
-    assert args.from_checkpoint_weights is not None
-    model.load_weights(args.from_checkpoint_weights,by_name=True)
-    print("loaded weights from:"+args.from_checkpoint_weights)
-    return model
 
 
 def getModelGivenModelOptionsAndWeightInits(args):
@@ -95,9 +90,5 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("compiling!")
     loss=ambig_mean_squared_error
     model.compile(optimizer=adam,loss=loss)
-    print("ARGS FROM CHECKPOINT WEIGHTS:"+str(args.from_checkpoint_weights))
-    if args.from_checkpoint_weights is not None:
-        model=get_model_weights(args,model=model)
-        print("UPDATED MODEL WEIGHTS")
     return model,adam,loss
 

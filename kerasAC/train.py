@@ -192,10 +192,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
         s3_arch=s3_prefix+'.arch'
         s3_log=s3_prefix+'.log'
         s3_weights=s3_prefix+'.weights'
-        s3_client.upload_file(model_output_path_hdf5,bucket,s3_hdf5)
-        s3_client.upload_file(model_output_path_arch,bucket,s3_arch)
-        s3_client.upload_file(model_output_path_weights,bucket,s3_weights)
-        s3_client.upload_file(model_output_path_logs,bucket,s3_log)  
+        s3_client.upload_file(model_output_path_hdf5_name,bucket,s3_hdf5)
+        s3_client.upload_file(model_output_path_arch_name,bucket,s3_arch)
+        s3_client.upload_file(model_output_path_weights_name,bucket,s3_weights)
+        s3_client.upload_file(model_output_path_logs_name,bucket,s3_log)  
     print("complete!!")
     
 def initializer_generators_hdf5(args):
@@ -376,6 +376,9 @@ def train(args):
            print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
        except:
            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
+    if args.from_checkpoint_weights is not None:
+        model.load_weights(args.from_checkpoint_weights,by_name=True)
+
     print("compiled the model!")
 
     

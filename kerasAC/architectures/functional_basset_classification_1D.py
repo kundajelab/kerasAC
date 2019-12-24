@@ -87,6 +87,4 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("compiling!")
     loss=ambig_binary_crossentropy    
     model.compile(optimizer=adam,loss=loss)        
-    if args.from_checkpoint_weights is not None:
-        model=get_model_weights(args,model=model)
     return model, adam,loss
