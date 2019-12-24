@@ -180,7 +180,8 @@ class TiledbGenerator(Sequence):
         for task in index_tasks:
             array_dict['index'][task]=OrderedDict() 
             for chrom in self.chroms_to_use:
-                array_dict['index'][task][chrom]=task+"."+chrom
+                #array_dict['index'][task][chrom]=task+"."+chrom
+               array_dict['index'][task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
         #inputs 
         for i in range(len(self.tdb_inputs)):
             tdb_input=self.tdb_inputs[i] 
@@ -191,7 +192,8 @@ class TiledbGenerator(Sequence):
             for task in tdb_input_tasks:
                 tdb_input_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
-                    tdb_input_array[task][chrom]=task+'.'+chrom
+                    #tdb_input_array[task][chrom]=task+'.'+chrom
+                    tdb_input_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
             array_dict['inputs'][i]=tdb_input_array
             
         #outputs
@@ -214,7 +216,8 @@ class TiledbGenerator(Sequence):
                 print(task)
                 tdb_output_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
-                    tdb_output_array[task][chrom]=task+'.'+chrom
+                    #tdb_output_array[task][chrom]=task+'.'+chrom
+                    tdb_output_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
             array_dict['outputs'][i]=tdb_output_array 
         return array_dict
     
@@ -250,9 +253,9 @@ class TiledbGenerator(Sequence):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                print(self.data_arrays['index'][task][chrom])
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=self.ctx) as cur_array:
-                    cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
+                #print(self.data_arrays['index'][task][chrom])
+                #with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=self.ctx) as cur_array:
+                cur_vals=self.data_arrays['index'][task][chrom][:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
                 print("got values for cur task/chrom") 
@@ -349,10 +352,10 @@ class TiledbGenerator(Sequence):
             if self.add_revcomp==True:
                 coords=pd.concat((coords,coords),axis=0)
             coords=[(row[0],row[1]-self.tdb_output_flank[0],row[1]+self.tdb_output_flank[0]) for index,row in coords.iterrows()]
-            print("returning batch!")
+            #print("returning batch!")
             return (X,y,coords)
         else:
-            print("returning batch!")
+            #print("returning batch!")
             return (X,y) 
     
     def get_coords(self,idx):
@@ -436,9 +439,11 @@ class TiledbGenerator(Sequence):
                 
                 array_name=task_chrom_to_tdb[task][chrom]
                 
-                with tiledb.DenseArray(array_name,mode='r',ctx=self.ctx) as cur_array: 
-                    cur_vals=cur_array[int(start_position):int(end_position)][attribute]
-                    vals[val_index,:,task_index]=cur_vals
+                #with tiledb.DenseArray(array_name,mode='r',ctx=self.ctx) as cur_array: 
+                #    cur_vals=cur_array[int(start_position):int(end_position)][attribute]
+                #    vals[val_index,:,task_index]=cur_vals
+                cur_vals=array_name[int(start_position):int(end_position)][attribute]
+                vals[val_index,:,task_index]=cur_vals
         return vals
     
     def transform_vals(self,vals,transformer):

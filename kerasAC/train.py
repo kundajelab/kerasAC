@@ -15,7 +15,7 @@ from keras.callbacks import *
 from keras.utils import multi_gpu_model
 import gc
 import multiprocessing
-multiprocessing.set_start_method('spawn', force=True)
+multiprocessing.set_start_method('forkserver', force=True)
 def parse_args():
     parser=argparse.ArgumentParser()
     
@@ -141,18 +141,23 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
         model_output_path_hdf5=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".hdf5")
         model_output_path_logs=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".log")        
         model_output_path_arch=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".arch")
-        model_output_path_weights=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".weights")        
+        model_output_path_weights=tempfile.NamedTemporaryFile(suffix=model_output_path_string+".weights")
+        model_output_path_hdf5_name=model_output_path_hdf5.name
+        model_output_path_logs_name=model_output_path_logs.name
+        model_output_path_arch_name=model_output_path_arch.name
+        model_output_path_weights_name=model_output_path_weights.name
+        
     else: 
         model_output_path_string = args.model_prefix
-        model_output_path_hdf5=model_output_path_string+".hdf5"
-        model_output_path_logs=model_output_path_string+".log"
-        model_output_path_arch=model_output_path_string+".arch"
-        model_output_path_weights=model_output_path_string+".weights"
+        model_output_path_hdf5_name=model_output_path_string+".hdf5"
+        model_output_path_logs_name=model_output_path_string+".log"
+        model_output_path_arch_name=model_output_path_string+".arch"
+        model_output_path_weights_name=model_output_path_string+".weights"
 
     
-    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5.name, verbose=1, save_best_only=True)
+    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
-    csvlogger = CSVLogger(model_output_path_logs.name, append = True)
+    csvlogger = CSVLogger(model_output_path_logs_name, append = True)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
     if args.tensorboard==True:
@@ -173,16 +178,16 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,
                         shuffle=False)
-    model.save_weights(model_output_path_weights)
+    model.save_weights(model_output_path_weights_name)
     architecture_string=model.to_json()
-    with open(model_output_path_arch,'w') as outf:
+    with open(model_output_path_arch_name,'w') as outf:
         outf.write(architecture_string)
     #sync to s3 if needed
     if args.model_prefix.startswith('s3://'):
         #sync log, model hdf5, weight file, arch file
         s3_client=boto3.client(service_name='s3')
         bucket=args.model_prefix.strip('s3://').split('/')[0]
-        s3_prefix="/".join(self.model_prefix.strip("s3://").split("/")[1::])
+        s3_prefix="/".join(args.model_prefix.strip("s3://").split("/")[1::])
         s3_hdf5=s3_prefix+'.hdf5'
         s3_arch=s3_prefix+'.arch'
         s3_log=s3_prefix+'.log'
