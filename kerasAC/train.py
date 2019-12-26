@@ -6,9 +6,11 @@ import tempfile
 import argparse
 import numpy as np
 import h5py
-import boto3
+from .s3_sync import *
 from .generators.basic_generator import *
 from .generators.tiledb_generator import *
+from .tiledb_config import *
+from .get_model import * 
 from . import config
 import pdb
 from keras.callbacks import *
@@ -66,16 +68,18 @@ def parse_args():
     train_val_splits.add_argument("--num_valid",type=int,default=150000)
 
     weights_params=parser.add_argument_group("weights_params")
-    weights_params.add_argument("--init_weights",default=None)
+    weights_params.add_argument("--load_model_hdf5")
+    weights_params.add_argument("--weights",default=None)
     weights_params.add_argument('--w1',nargs="*", type=float, default=None)
     weights_params.add_argument('--w0',nargs="*", type=float, default=None)
     weights_params.add_argument("--w1_w0_file",default=None)
     weights_params.add_argument("--save_w1_w0", default=None,help="output text file to save w1 and w0 to")
     weights_params.add_argument("--weighted",action="store_true",help="separate task-specific weights denoted with w1, w0 args are to be used")
-    weights_params.add_argument("--from_checkpoint_weights",default=None)
+    
     
     arch_params=parser.add_argument_group("arch_params")
-    arch_params.add_argument("--from_checkpoint_arch",default=None)
+    arch_params.add_argument("--json",default=None)
+    arch_params.add_argument("--yaml",default=None)
     arch_params.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
     arch_params.add_argument("--architecture_from_file",type=str,default=None)
     arch_params.add_argument("--num_tasks",type=int)
@@ -114,24 +118,6 @@ def parse_args():
     vis_params.add_argument("--tensorboard_logdir",default="logs")
     return parser.parse_args()
 
-def get_weights(args,train_generator):
-    w1=args.w1
-    w0=args.w0
-    w1_w0_file=args.w1_w0_file
-    if (args.weighted==True and (w1==None or w0==None) ):
-        if args.w1_w0_file==None:
-            w1=train_generator.w1
-            w0=train_generator.w0        
-            assert args.save_w1_w0 !=None
-            with open(args.save_w1_w0, 'w') as weight_file:
-                for i in range(len(w1)):
-                    weight_file.write(str(w1[i])+'\t'+str(w0[i])+'\n')
-        else:
-            w1_w0=np.loadtxt(args.w1_w0_file)
-            w1=list(w1_w0[:,0])
-            w0=list(w1_w0[:,1]) 
-        print("got weights!")
-    return w1,w0
 
 def fit_and_evaluate(model,train_gen,valid_gen,args):
     #accomodate storage on s3
@@ -185,17 +171,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     #sync to s3 if needed
     if args.model_prefix.startswith('s3://'):
         #sync log, model hdf5, weight file, arch file
-        s3_client=boto3.client(service_name='s3')
-        bucket=args.model_prefix.strip('s3://').split('/')[0]
-        s3_prefix="/".join(args.model_prefix.strip("s3://").split("/")[1::])
-        s3_hdf5=s3_prefix+'.hdf5'
-        s3_arch=s3_prefix+'.arch'
-        s3_log=s3_prefix+'.log'
-        s3_weights=s3_prefix+'.weights'
-        s3_client.upload_file(model_output_path_hdf5_name,bucket,s3_hdf5)
-        s3_client.upload_file(model_output_path_arch_name,bucket,s3_arch)
-        s3_client.upload_file(model_output_path_weights_name,bucket,s3_weights)
-        s3_client.upload_file(model_output_path_logs_name,bucket,s3_log)  
+        upload_s3_file(args.model_prefix+'.hdf5',model_output_path_hdf5_name)
+        upload_s3_file(args.model_prefix+'.arch',model_output_path_arch_name)
+        upload_s3_file(args.model_prefix+'.log',model_output_path_log_name)
+        upload_s3_file(args.model_prefix+'.weights',model_output_path_weights_name)                
     print("complete!!")
     
 def initializer_generators_hdf5(args):
@@ -247,14 +226,7 @@ def initialize_generators_tiledb(args):
     else:
         upsample_ratio_eval=None
     import tiledb
-    tdb_config=tiledb.Config()
-    tdb_config['vfs.s3.region']='us-west-1'
-    tdb_config["sm.check_coord_dups"]="false"
-    tdb_config["sm.check_coord_oob"]="false"
-    tdb_config["sm.check_global_order"]="false"
-    tdb_config["sm.num_reader_threads"]="50"
-    tdb_config["sm.num_async_threads"]="50"
-    tdb_config["vfs.num_threads"]="50"    
+    tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
@@ -357,34 +329,17 @@ def train(args):
 
     #create the generators
     train_generator,valid_generator=initialize_generators(args)
-    w1,w0=get_weights(args,train_generator)
+    
+    w1,w0=get_w1_w0_training(args,train_generator)
     args.w1=w1
     args.w0=w0
-    try:
-        if (args.architecture_from_file!=None):
-            architecture_module=imp.load_source('',args.architecture_from_file)
-        else:
-            architecture_module=importlib.import_module('kerasAC.architectures.'+args.architecture_spec)
-    except:
-        raise Exception("could not import requested architecture, is it installed in kerasAC/kerasAC/architectures? Is the file with the requested architecture specified correctly?")
-    model,optimizer,loss=architecture_module.getModelGivenModelOptionsAndWeightInits(args)
-    if args.num_gpus >1:
-       try:
-           model=multi_gpu_model(model,gpus=args.num_gpus)
-           #recompile
-           model.compile(optimizer=optimizer,loss=loss) 
-           print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
-       except:
-           print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
-    if args.from_checkpoint_weights is not None:
-        model.load_weights(args.from_checkpoint_weights,by_name=True)
-
-    print("compiled the model!")
-
-    
+    model=get_model(args)        
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
 
+    #remove any temporary s3 files
+    run_cleanup()
+    
 def main():
     gc.freeze()
     args=parse_args()

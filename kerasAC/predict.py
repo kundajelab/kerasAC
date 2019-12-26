@@ -20,7 +20,10 @@ import tensorflow as tf
 from kerasAC.activations import softMaxAxis1
 from .calibrate import * 
 from .generators.basic_generator import *
-from .generators.tiledb_predict_generator import * 
+from .generators.tiledb_predict_generator import *
+from .tiledb_config import *
+from .s3_sync import *
+from .get_model import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -89,7 +92,7 @@ def parse_args():
 
 
     model_params=parser.add_argument_group("model_params")
-    model_params.add_argument('--model_hdf5',help='hdf5 file that stores the model')
+    model_params.add_argument('--load_model_hdf5',help='hdf5 file that stores the model')
     model_params.add_argument('--weights',help='weights file for the model')
     model_params.add_argument('--yaml',help='yaml file for the model')
     model_params.add_argument('--json',help='json file for the model')
@@ -119,7 +122,12 @@ def write_predictions(args):
     separate predictions file for each output/task combination 
     '''
     try:
-        out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+        if args.predictions_and_labels_hdf5.startswith('s3://'):
+            #use a local version of the file and upload to s3 when finished
+            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+            out_predictions_prefix=filename.split('/')[-1]+".predictions"
+        else: 
+            out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
         first=True
         while True:
             pred_df=pred_queue.get()
@@ -156,7 +164,12 @@ def write_labels(args):
     separate label file for each output/task combination
     '''
     try:
-        out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
+        if args.predictions_and_labels_hdf5.startswith('s3://'):
+            #use a local version of the file and upload to s3 when finished
+            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+            out_labels_prefix=filename.split('/')[-1]+".labels"
+        else: 
+            out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
         first=True
         while True:
             label_df=label_queue.get()
@@ -200,18 +213,6 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
     for process in children:
         process.send_signal(sig)
         
-def get_weights(args):
-    w1=None
-    w0=None
-    if args.w1_w0_file!=None:
-        w1_w0=np.loadtxt(args.w1_w0_file)
-        w1=w1_w0[:,0]
-        w0=w1_w0[:,1]
-    if args.w1!=None:
-        w1=args.w1
-    if args.w0!=None:
-        w0=args.w0 
-    return w1,w0
 
 
 def get_batch_wrapper(idx):
@@ -239,6 +240,9 @@ def get_tiledb_predict_generator(args):
         print("warning! only a single ratio for upsampling supported for tiledb as of now")
     else:
         upsample_ratio_predict=None
+    import tiledb
+    tdb_config=get_default_config() 
+    tdb_ctx=tiledb.Ctx(config=tdb_config)
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
                                           tdb_indexer=args.tdb_indexer,
@@ -259,7 +263,9 @@ def get_tiledb_predict_generator(args):
                                           tdb_output_transformation=args.tdb_output_transformation,                                          
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
-                                          chroms=args.predict_chroms)
+                                          chroms=args.predict_chroms,
+                                          tdb_config=tdb_config,
+                                          tdb_ctx=tdb_ctx)
     print("created TiledbPredictGenerator")    
     return test_generator 
 def get_hdf5_predict_generator(args):
@@ -358,51 +364,6 @@ def predict_on_batch_wrapper(args,model,test_generator):
     pred_queue.close() 
     return
 
-def get_model(args):
-    from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1    
-    custom_objects={"recall":recall,
-                    "sensitivity":recall,
-                    "specificity":specificity,
-                    "fpr":fpr,
-                    "fnr":fnr,
-                    "precision":precision,
-                    "f1":f1,
-                    "ambig_binary_crossentropy":ambig_binary_crossentropy,
-                    "ambig_mean_absolute_error":ambig_mean_absolute_error,
-                    "ambig_mean_squared_error":ambig_mean_squared_error}
-    
-    w1,w0=get_weights(args)
-    if type(w1) in [np.ndarray, list]: 
-        loss_function=get_weighted_binary_crossentropy(w0,w1)
-        custom_objects["weighted_binary_crossentropy"]=loss_function
-    if args.yaml!=None:
-        from keras.models import model_from_yaml
-        #load the model architecture from yaml
-        yaml_string=open(args.yaml,'r').read()
-        model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
-        #load the model weights
-        model.load_weights(args.weights)
-    elif args.json!=None:
-        from keras.models import model_from_json
-        #load the model architecture from json
-        json_string=open(args.json,'r').read()
-        model=model_from_json(json_string,custom_objects=custom_objects)
-        model.load_weights(args.weights)
-    elif args.model_hdf5!=None: 
-        #load from the hdf5
-        from keras.models import load_model
-        model=load_model(args.model_hdf5,custom_objects=custom_objects)
-    print("got model architecture")
-    print("loaded model weights")
-    if args.num_gpus >1:
-        try:
-            model=multi_gpu_model(model,gpus=args.num_gpus)
-                print("Training on " +str(args.num_gpus)+" GPU's. Set args.multi_gpu = False to avoid this") 
-        except:
-            print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
-    return model
-
-
 
 def get_model_layer_functor(model,target_layer_idx):
     from keras import backend as K
@@ -468,12 +429,29 @@ def predict(args):
     print("joining prediction writer") 
     pred_writer.join()
 
-
+    #sync files to s3 if needed
+    if args.predictions_and_labels_hdf5.startswith('s3://'):
+        #use a local version of the file and upload to s3 when finished
+        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+        out_predictions_prefix=filename.split('/')[-1]+".predictions"
+        out_labels_prefix=filename.split('/')[-1]+".predictions"
+        #upload outputs for all tasks
+        import glob
+        to_upload=[]
+        for f in glob.glob(out_predictions_prefix+"*"):
+            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            upload_s3_file(s3_path,f)
+        for f in glob.glob(out_labels_prefix+"*"):
+            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            upload_s3_file(s3_path,f)
+        
     #perform calibration, if specified
     if perform_calibration is True:
         print("calibrating")
         calibrate(args)
-    
+
+    #clean up any s3 artifacts:
+    run_cleanup()
     
 def main():
     args=parse_args()

@@ -10,7 +10,7 @@ import pysam
 from ..util import *
 import tiledb
 import pdb
-import boto3
+from ..s3_sync import * 
 from collections import OrderedDict
 import gc 
 def get_genome_size(chrom_sizes_file,chroms):
@@ -18,14 +18,8 @@ def get_genome_size(chrom_sizes_file,chroms):
     get size of chromosomes to train on 
     '''
     print(chrom_sizes_file) 
-    if chrom_sizes_file.startswith('s3://'): 
-        s3=boto3.resource('s3')
-        bucket_name=chrom_sizes_file.lstrip("s3://").split('/')[0]
-        itemname="/".join(chrom_sizes_file.lstrip("s3://").split("/")[1::])
-        print("bucket name:"+str(bucket_name))
-        print("item name:"+str(itemname))
-        obj=s3.Object(bucket_name,itemname)
-        chrom_sizes=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+    if chrom_sizes_file.startswith('s3://'):
+        chrom_sizes=read_s3_file_contents(chrm_sizes_file).split('\n')
         chrom_sizes=pd.DataFrame([i.split('\t') for i in chrom_sizes])
         chrom_sizes[1]=chrom_sizes[1].astype('int32') 
     else:
@@ -85,12 +79,7 @@ class TiledbGenerator(Sequence):
         self.shuffle_epoch_end=shuffle_epoch_end
         #get local copy of s3 reference sequence
         if ref_fasta.startswith('s3://'):
-            s3 = boto3.client('s3')
-            bucket=ref_fasta.lstrip('s3://').split('/')[0]
-            bucket_file="/".join(ref_fasta.lstrip("s3://").split("/")[1::])
-            fname=ref_fasta.lstrip("s3://").split("/")[-1] 
-            s3.download_file(bucket, bucket_file,fname)
-            self.ref_fasta=fname
+            self.ref_fasta=download_s3_file(ref_fasta)
         else: 
             self.ref_fasta=ref_fasta
         self.batch_size=batch_size
@@ -168,13 +157,7 @@ class TiledbGenerator(Sequence):
 
         #index tasks
         if self.tdb_indexer.startswith("s3://"):
-            s3=boto3.resource('s3')
-            bucket_name=self.tdb_indexer.lstrip("s3://").split('/')[0]
-            itemname="/".join(self.tdb_indexer.lstrip("s3://").split("/")[1::])
-            print("bucket name:"+str(bucket_name))
-            print("item name:"+str(itemname))
-            obj=s3.Object(bucket_name,itemname)
-            index_tasks=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+            index_tasks=read_s3_file_contents(self.tdb_indexer).split('\n')
         else: 
             index_tasks=open(self.tdb_indexer).read().strip().split('\n')
         for task in index_tasks:
@@ -202,13 +185,7 @@ class TiledbGenerator(Sequence):
             if tdb_output=="seq":
                 continue
             if tdb_output.startswith("s3://"):
-                s3=boto3.resource('s3')
-                bucket_name=tdb_output.lstrip("s3://").split('/')[0]
-                itemname="/".join(tdb_output.lstrip("s3://").split("/")[1::])
-                print("bucket name:"+str(bucket_name))
-                print("item name:"+str(itemname))
-                obj=s3.Object(bucket_name,itemname)
-                tdb_output_tasks=obj.get()['Body'].read().decode('utf-8').strip().split('\n')
+                tdb_output_tasks=read_s3_file_contents(tdb_output).split('\n')
             else: 
                 tdb_output_tasks=open(tdb_output).read().strip().split('\n')
             tdb_output_array=OrderedDict()
