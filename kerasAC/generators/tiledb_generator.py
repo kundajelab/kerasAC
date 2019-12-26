@@ -19,7 +19,7 @@ def get_genome_size(chrom_sizes_file,chroms):
     '''
     print(chrom_sizes_file) 
     if chrom_sizes_file.startswith('s3://'):
-        chrom_sizes=read_s3_file_contents(chrm_sizes_file).split('\n')
+        chrom_sizes=read_s3_file_contents(chrom_sizes_file).split('\n')
         chrom_sizes=pd.DataFrame([i.split('\t') for i in chrom_sizes])
         chrom_sizes[1]=chrom_sizes[1].astype('int32') 
     else:
