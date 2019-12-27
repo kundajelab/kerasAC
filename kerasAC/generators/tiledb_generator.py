@@ -102,10 +102,13 @@ class TiledbGenerator(Sequence):
         #identify chromosome information
         if chroms is not None:
             self.chroms_to_use=chroms
-        else: 
-            self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
+        else:
+            if chrom_sizes.startswith("s3://"):
+                self.chroms_to_use=[i.split()[0] for i in read_s3_file_contents(chrom_sizes).strip().split('\n')]
+            else:
+                self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
         self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
-        
+        print("got genome size")
         #identify indices to upsample
         self.tdb_indexer=tdb_indexer
 
@@ -124,8 +127,9 @@ class TiledbGenerator(Sequence):
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
+        print("opening tiledb arrays for reading")
         self.data_arrays=self.open_tiledb_arrays_for_reading()        
-
+        print("opened arrays for reading") 
 
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
@@ -166,6 +170,7 @@ class TiledbGenerator(Sequence):
             for chrom in self.chroms_to_use:
                 #array_dict['index'][task][chrom]=task+"."+chrom
                array_dict['index'][task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
+        print("opened index arrays for reading") 
         #inputs 
         for i in range(len(self.tdb_inputs)):
             tdb_input=self.tdb_inputs[i] 
@@ -179,7 +184,7 @@ class TiledbGenerator(Sequence):
                     #tdb_input_array[task][chrom]=task+'.'+chrom
                     tdb_input_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
             array_dict['inputs'][i]=tdb_input_array
-            
+        print("opened input arrays for reading") 
         #outputs
         for i in range(len(self.tdb_outputs)): 
             tdb_output=self.tdb_outputs[i]
@@ -196,7 +201,8 @@ class TiledbGenerator(Sequence):
                 for chrom in self.chroms_to_use:
                     #tdb_output_array[task][chrom]=task+'.'+chrom
                     tdb_output_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
-            array_dict['outputs'][i]=tdb_output_array 
+            array_dict['outputs'][i]=tdb_output_array
+        print("opened output arrays for reading") 
         return array_dict
     
     def get_nonupsample_batch_indices(self):

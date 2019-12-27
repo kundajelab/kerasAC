@@ -60,21 +60,21 @@ def get_chroms(args,split):
         else:
             assert args.genome is not None
             assert args.fold is not None
-            return chroms[args.genome][args.fold]['train']
+            return splits[args.genome][args.fold]['train']
     elif split=='valid':
         if args.validation_chroms is not None:
             return args.validation_chroms
         else:
             assert args.genome is not None
             assert args.fold is not None
-            return chroms[args.genome][args.fold]['valid']
+            return splits[args.genome][args.fold]['valid']
     elif split=="test":
         if args.predict_chroms is not None:
             return args.predict_chroms
         else:
             assert args.genome is not None
             assert args.fold is not None
-            return chroms[args.genome][args.fold]['test']
+            return splits[args.genome][args.fold]['test']
     else:
         raise Exception("invalid split specified, must be one of train,valid,test; you gave:"+str(split))
     

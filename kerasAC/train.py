@@ -234,7 +234,7 @@ def initialize_generators_tiledb(args):
     tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
     train_chroms=get_chroms(args,split='train')
-    train_generator=TiledbGenerator(chroms=args.train_chroms,
+    train_generator=TiledbGenerator(chroms=train_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
