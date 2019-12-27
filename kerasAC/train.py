@@ -173,7 +173,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
         #sync log, model hdf5, weight file, arch file
         upload_s3_file(args.model_prefix+'.hdf5',model_output_path_hdf5_name)
         upload_s3_file(args.model_prefix+'.arch',model_output_path_arch_name)
-        upload_s3_file(args.model_prefix+'.log',model_output_path_log_name)
+        upload_s3_file(args.model_prefix+'.log',model_output_path_logs_name)
         upload_s3_file(args.model_prefix+'.weights',model_output_path_weights_name)                
     print("complete!!")
     
