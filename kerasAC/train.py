@@ -10,7 +10,8 @@ from .s3_sync import *
 from .generators.basic_generator import *
 from .generators.tiledb_generator import *
 from .tiledb_config import *
-from .get_model import * 
+from .get_model import *
+from .splits import * 
 from . import config
 import pdb
 from keras.callbacks import *
@@ -64,6 +65,8 @@ def parse_args():
     train_val_splits=parser.add_argument_group("train_val_splits")
     train_val_splits.add_argument("--train_chroms",nargs="*",default=None)
     train_val_splits.add_argument("--validation_chroms",nargs="*",default=None)
+    train_val_splits.add_argument("--genome",default=None)
+    train_val_splits.add_argument("--fold",type=int,default=None)    
     train_val_splits.add_argument("--num_train",type=int,default=700000)
     train_val_splits.add_argument("--num_valid",type=int,default=150000)
 
@@ -179,6 +182,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     
 def initializer_generators_hdf5(args):
     #get upsampling parameters
+    train_chroms=get_chroms(args,split='train')
     index_train_path, index_valid_path, input_train_path, input_valid_path, output_train_path, output_valid_path=get_paths(args)
     train_generator=DataGenerator(index_path=index_train_path,
                                   input_path=input_train_path,
@@ -189,7 +193,7 @@ def initializer_generators_hdf5(args):
                                   ref_fasta=args.ref_fasta,
                                   batch_size=args.batch_size,
                                   add_revcomp=args.revcomp,
-                                  chroms_to_use=args.train_chroms,
+                                  chroms_to_use=train_chroms,
                                   get_w1_w0=args.weighted,
                                   expand_dims=args.expand_dims,
                                   upsample_thresh_list=args.upsample_thresh_list_train,
@@ -197,6 +201,7 @@ def initializer_generators_hdf5(args):
                                   tasks=args.tasks)
     
     print("generated training data generator!")
+    valid_chroms=get_chroms(args,spit='valid')
     valid_generator=DataGenerator(index_path=index_train_path,
                                   input_path=input_train_path,
                                   output_path=output_train_path,
@@ -208,7 +213,7 @@ def initializer_generators_hdf5(args):
                                   add_revcomp=args.revcomp,                        
                                   upsample_thresh_list=args.upsample_thresh_list_eval,
                                   upsample_ratio_list=args.upsample_ratio_list_eval,
-                                  chroms_to_use=args.validation_chroms,
+                                  chroms_to_use=valid_chroms,
                                   expand_dims=args.expand_dims,
                                   tasks=args.tasks)
     print("generated validation data generator!")
@@ -228,6 +233,7 @@ def initialize_generators_tiledb(args):
     import tiledb
     tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
+    train_chroms=get_chroms(args,split='train')
     train_generator=TiledbGenerator(chroms=args.train_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
@@ -256,7 +262,8 @@ def initialize_generators_tiledb(args):
                                     tdb_ctx=tdb_ctx)
     
     print("generated training data generator!")
-    valid_generator=TiledbGenerator(chroms=args.validation_chroms,
+    valid_chroms=get_chroms(args,split='valid')
+    valid_generator=TiledbGenerator(chroms=valid_chroms,
                                     chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,

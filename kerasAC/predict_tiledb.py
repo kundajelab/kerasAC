@@ -23,7 +23,8 @@ from .generators.basic_generator import *
 from .generators.tiledb_predict_generator import *
 from .tiledb_config import *
 from .s3_sync import *
-from .get_model import * 
+from .get_model import *
+from .splits import *
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
@@ -76,6 +77,9 @@ def parse_args():
 
     input_filtering_params=parser.add_argument_group("input_filtering_params")    
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
+    input_filtering_params.add_argument("--genome",default=None)
+    input_filtering_params.add_argument("--fold",type=int,default=None)
+
     input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     input_filtering_params.add_argument("--tasks",nargs="*",default=None)
     
@@ -239,6 +243,7 @@ def get_tiledb_predict_generator(args):
     import tiledb
     tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
+    test_chroms=get_chroms(args,split='test')
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
                                           tdb_indexer=args.tdb_indexer,
@@ -259,7 +264,7 @@ def get_tiledb_predict_generator(args):
                                           tdb_output_transformation=args.tdb_output_transformation,                                          
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
-                                          chroms=args.predict_chroms,
+                                          chroms=test_chroms,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx)
     print("created TiledbPredictGenerator")    
