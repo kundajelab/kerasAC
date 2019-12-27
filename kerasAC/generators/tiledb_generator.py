@@ -80,6 +80,7 @@ class TiledbGenerator(Sequence):
         #get local copy of s3 reference sequence
         if ref_fasta.startswith('s3://'):
             self.ref_fasta=download_s3_file(ref_fasta)
+            fai=download_s3_file(ref_fasta+'.fai')
         else: 
             self.ref_fasta=ref_fasta
         self.batch_size=batch_size

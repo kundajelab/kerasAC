@@ -42,9 +42,12 @@ def read_s3_file_contents(s3_string):
     
 
 def run_cleanup():
-    if len(to_clean)>0:
-        for f in to_clean:
-            os.remove(f)
-            print("deleted local file:"+str(f))
-            
+    to_clean_set=list(set(to_clean))
+    if len(to_clean_set)>0:
+        for f in to_clean_set:
+            try:
+                os.remove(f)
+                print("deleted local file:"+str(f))
+            except:
+                continue
         

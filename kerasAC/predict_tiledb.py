@@ -103,10 +103,6 @@ def parse_args():
     model_params.add_argument("--num_outputs",type=int)
     model_params.add_argument("--num_gpus",type=int,default=1)
     
-    parallelization_params=parser.add_argument_group("parallelization")
-    parallelization_params.add_argument("--threads",type=int,default=1)
-    parallelization_params.add_argument("--max_queue_size",type=int,default=100)
-
     snp_params=parser.add_argument_group("snp_params")
     snp_params.add_argument('--background_freqs',default=None)
     snp_params.add_argument('--flank',default=500,type=int)
@@ -215,9 +211,7 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
         
 
 
-def get_batch_wrapper(inputs):
-    idx=inputs[0]
-    test_generator=inputs[1]
+def get_batch_wrapper(idx):
     X,y,coords=test_generator[idx]
     if type(y) is not list:
         y=[y]
@@ -232,7 +226,7 @@ def get_batch_wrapper(inputs):
     #set the column names for the MultiIndex
     coords=pd.MultiIndex.from_tuples(coords,names=['CHR','START','END'])
     y=[pd.DataFrame(i,index=coords) for i in y]
-    return [X,y,coords,idx]
+    return X,y,coords
 
 
 def get_tiledb_predict_generator(args):
@@ -270,95 +264,24 @@ def get_tiledb_predict_generator(args):
                                           tdb_ctx=tdb_ctx)
     print("created TiledbPredictGenerator")    
     return test_generator 
-def get_hdf5_predict_generator(args):
-    global test_generator 
-    test_generator=DataGenerator(index_path=args.index_data_path,
-                                 input_path=args.input_data_path,
-                                 output_path=args.output_data_path,
-                                 index_tasks=args.index_tasks,
-                                 num_inputs=args.num_inputs,
-                                 num_outputs=args.num_outputs,
-                                 ref_fasta=args.ref_fasta,
-                                 batch_size=args.batch_size,
-                                 add_revcomp=False,
-                                 chroms_to_use=args.predict_chroms,
-                                 expand_dims=args.expand_dims,
-                                 tasks=args.tasks,
-                                 shuffle=False,
-                                 return_coords=True)
-    return test_generator
-def get_variant_predict_generator(args):
-    global test_generator
-    test_generator=SNPGenerator(args.allele_col,
-                                args.flank,
-                                index_path=args.index_data_path,
-                                input_path=args.input_data_path,
-                                output_path=args.output_data_path,
-                                index_tasks=args.index_tasks,
-                                num_inputs=args.num_inputs,
-                                num_outputs=args.num_outputs,
-                                ref_fasta=args.ref_fasta,
-                                allele_col=args.ref_col,
-                                batch_size=args.batch_size,
-                                add_revcomp=False,
-                                chroms_to_use=args.predict_chroms,
-                                expand_dims=args.expand_dims,
-                                tasks=args.tasks,
-                                shuffle=False,
-                                return_coords=True)
-
-    return test_generator
-
-def get_generator(args):
-    if args.variant_bed is not None:
-        return get_variant_predict_generator(args)
-    elif args.tdb_indexer is not None:        
-        return get_tiledb_predict_generator(args)
-    else:
-        return get_hdf5_predict_generator(args)
 
 def predict_on_batch_wrapper(args,model,test_generator):
     num_batches=len(test_generator)
-    processed=0
-    try:
-        with Pool(processes=args.threads,initializer=init_worker) as pool: 
-            while (processed < num_batches):
-                idset=range(processed,min([num_batches,processed+args.max_queue_size]))
-                for result in pool.imap_unordered(get_batch_wrapper,[[i,test_generator] for i in idset]):
-                    X=result[0]
-                    y=result[1]
-                    coords=result[2]
-                    idx=result[3]
-                    processed+=1
-                    if processed%10==0:
-                        print(str(processed)+"/"+str(num_batches))
-                    #get the model predictions            
-                    preds=model.predict_on_batch(X)
-                    if type(preds) is not list:
-                        preds=[preds]
-                    try:
-                        preds=[i.squeeze(axis=-1) for i in preds]
-                    except:
-                        pass 
-                    preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
-                    label_queue.put(y)
-                    pred_queue.put(preds_dfs)
-                    
-    except KeyboardInterrupt:
-        #shutdown the pool
-        pool.terminate()
-        pool.join() 
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise 
-    except Exception as e:
-        print(e)
-        #shutdown the pool
-        pool.terminate()
-        pool.join()
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise e
+    for idx in range(num_batches):
+        if idx%100==0:
+            print(str(idx)+'/'+str(num_batches))
+        X,y,coords=get_batch_wrapper(idx)
+        #get the model predictions            
+        preds=model.predict_on_batch(X)
+        if type(preds) is not list:
+            preds=[preds]
+        try:
+            preds=[i.squeeze(axis=-1) for i in preds]
+        except:
+            pass 
+        preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
+        label_queue.put(y)
+        pred_queue.put(preds_dfs)
     print("finished with tiledb predictions!")
     label_queue.put("FINISHED")
     label_queue.close() 
@@ -393,7 +316,7 @@ def predict(args):
 
 
     #get the generator
-    test_generator=get_generator(args) 
+    test_generator=get_tiledb_predict_generator(args) 
     
     #get the model
     #if calibration is to be done, get the preactivation model 
@@ -434,17 +357,18 @@ def predict(args):
     #sync files to s3 if needed
     if args.predictions_and_labels_hdf5.startswith('s3://'):
         #use a local version of the file and upload to s3 when finished
-        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
-        out_predictions_prefix=filename.split('/')[-1]+".predictions"
-        out_labels_prefix=filename.split('/')[-1]+".predictions"
+        out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+        out_labels_prefix=args.predictions_and_labels_hdf5+".labels"
         #upload outputs for all tasks
         import glob
         to_upload=[]
         for f in glob.glob(out_predictions_prefix+"*"):
-            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            s3_path='/'.join(out_predictions_prefix.split('/')[0:-1]+[f.split('/')[-1]])
+            print(f+'-->'+s3_path)
             upload_s3_file(s3_path,f)
         for f in glob.glob(out_labels_prefix+"*"):
-            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            s3_path='/'.join(out_labels_prefix.split('/')[0:-1]+[f.split('/')[-1]])
+            print(f+'-->'+s3_path)
             upload_s3_file(s3_path,f)
         
     #perform calibration, if specified
