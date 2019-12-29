@@ -32,7 +32,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     x = Conv1D(filters=200,kernel_size=11,name='conv2')(x)
     x = BatchNormalization(axis=-1,name='bn2')(x)
     x = Activation('relu',name='relu2')(x)
-    x = MaxPooling1D(pool_size=4,name='maxpool1')(x)
+    x = MaxPooling1D(pool_size=4,name='maxpool2')(x)
 
     x = Conv1D(filters=200,kernel_size=7,name='conv2')(x)
     x = BatchNormalization(axis=-1,name='bn3')(x)
