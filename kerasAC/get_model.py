@@ -114,29 +114,28 @@ def load_model_weights(weight_file,model):
     else:
         s3_model_weights=weight_file
     import  h5py
-    with h5py.File(s3_model_weights,'r') as file:
-        try:
+    try:
+        model.load_weights(s3_model_weights,by_name=True)
+    except:
+        with h5py.File(s3_model_weights,'r') as file:
             weight_file=file['model_1']
-        except:
-            print(string(file.__dict__))
-            weight_file=file
-        for layer in model.layers:
-            try:
-                layer_weights=weight_file[layer.name]
-            except:
-                print('no weights files saved for layer:'+str(layer.name))
-                continue
-            try:
-                weights = []
-                # Extract weights
-                for term in layer_weights:
-                    if isinstance(layer_weights[term], h5py.Dataset):
-                        # Convert weights to numpy array and prepend to list
-                        weights.insert(0, np.array(layer_weights[term]))        
-                # Load weights to model
-                layer.set_weights(weights)
-                print("loaded weights for layer:"+str(layer.name))
-            except Exception as e:
-                print("Error: Could not load weights for layer:"+str(layer.name))
-                raise e
+            for layer in model.layers:
+                try:
+                    layer_weights=weight_file[layer.name]
+                except:
+                    print('no weights files saved for layer:'+str(layer.name))
+                    continue
+                try:
+                    weights = []
+                    # Extract weights
+                    for term in layer_weights:
+                        if isinstance(layer_weights[term], h5py.Dataset):
+                            # Convert weights to numpy array and prepend to list
+                            weights.insert(0, np.array(layer_weights[term]))        
+                    # Load weights to model
+                    layer.set_weights(weights)
+                    print("loaded weights for layer:"+str(layer.name))
+                except Exception as e:
+                    print("Error: Could not load weights for layer:"+str(layer.name))
+                    raise e
     return model 
