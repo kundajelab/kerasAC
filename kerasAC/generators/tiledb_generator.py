@@ -454,10 +454,9 @@ class TiledbGenerator(Sequence):
         elif aggregator == 'binary_max':
             #get the max in the interval, but cap it at one or 0
             raw_max=np.max(vals,axis=1)
-            if raw_max>=1:
-                return 1
-            else:
-                return 0 
+            raw_max[raw_max>1]=1
+            raw_max[raw_max<0]=0
+            return raw_max
         else:
             raise Exception("aggregate_vals argument must be one of None, average, max; you provided:"+aggregator)
 
