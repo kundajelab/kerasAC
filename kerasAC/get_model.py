@@ -115,7 +115,11 @@ def load_model_weights(weight_file,model):
         s3_model_weights=weight_file
     import  h5py
     with h5py.File(s3_model_weights,'r') as file:
-        weight_file=file['model_1']
+        try:
+            weight_file=file['model_1']
+        except:
+            print(string(file.__dict__))
+            weight_file=file
         for layer in model.layers:
             try:
                 layer_weights=weight_file[layer.name]
