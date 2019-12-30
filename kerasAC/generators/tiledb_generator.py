@@ -73,7 +73,7 @@ class TiledbGenerator(Sequence):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
-        tdb_input_aggregation/ tdb_output_aggregation -- one of 'avg','max',None
+        tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max',None
         '''
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
@@ -451,6 +451,13 @@ class TiledbGenerator(Sequence):
             return np.mean(vals,axis=1)
         elif aggregator == 'max':
             return np.max(vals,axis=1)
+        elif aggregator == 'binary_max':
+            #get the max in the interval, but cap it at one or 0
+            raw_max=np.max(vals,axis=1)
+            if raw_max>=1:
+                return 1
+            else:
+                return 0 
         else:
             raise Exception("aggregate_vals argument must be one of None, average, max; you provided:"+aggregator)
 
