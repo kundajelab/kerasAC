@@ -62,31 +62,23 @@ def recall_at_fdr_function(predictions_for_task_filtered,true_y_for_task_filtere
     for fdr_thresh_index in range(len(fdr_thresh_list)):
         if float(fdr_thresh_list[fdr_thresh_index])>1:
             fdr_thresh_list[fdr_thresh_index]=fdr_thresh_list[fdr_thresh_index]/100
-            
+    
     precision,recall,class_thresholds=precision_recall_curve(true_y_for_task_filtered,predictions_for_task_filtered)
     fdr=1-precision
 
     #remove the last values in recall and fdr, as the scipy precision_recall_curve function sets them to 0 automatically
     recall=np.delete(recall,-1)
     fdr=np.delete(fdr,-1)
-
-    #concatenate recall,fdr, thresholds along axis=1
-    recall=np.expand_dims(recall,axis=1)
-    fdr=np.expand_dims(fdr,axis=1)
-    class_thresholds=np.expand_dims(class_thresholds,axis=1)
-    data=np.concatenate((recall,fdr,class_thresholds),axis=1)
-
-    #sort by threshold
-    data=data[data[:,2].argsort()]
+    df=pd.DataFrame({'recall':recall,'fdr':fdr,'class_thresholds':class_thresholds})
+    df=df.sort_values(by=['fdr','recall','class_thresholds'])
 
     #get the recall, fdr at each thresh
     recall_thresholds=[]
     class_thresholds=[]
     for fdr_thresh in fdr_thresh_list:
         try:
-            data_index=np.max(np.nonzero(data[:,1]<=fdr_thresh))
-            recall_thresholds.append(data[data_index,0])
-            class_thresholds.append(data[data_index,2])
+            recall_thresholds.append(float(df[df.fdr<=fdr_thresh].tail(n=1)['recall']))
+            class_thresholds.append(float(df[df.fdr<=fdr_thresh].tail(n=1)['class_thresholds']))
         except:
             print("No class threshold can give requested fdr <=:"+str(fdr_thresh))
             recall_thresholds.append(np.nan)
