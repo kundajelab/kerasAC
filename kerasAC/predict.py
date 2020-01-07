@@ -101,7 +101,7 @@ def parse_args():
     model_params.add_argument('--json',help='json file for the model')
     model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
     model_params.add_argument('--squeeze_input_for_gru',action='store_true')
-    model_params.add_argument("--expand_dims",default=True)
+    model_params.add_argument("--expand_dims",default=False,action='store_true')
     model_params.add_argument("--num_inputs",type=int)
     model_params.add_argument("--num_outputs",type=int)
     model_params.add_argument("--num_gpus",type=int,default=1)
@@ -218,9 +218,7 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
         
 
 
-def get_batch_wrapper(inputs):
-    idx=inputs[0]
-    test_generator=inputs[1]
+def get_batch_wrapper(idx):
     X,y,coords=test_generator[idx]
     if type(y) is not list:
         y=[y]
@@ -329,7 +327,7 @@ def predict_on_batch_wrapper(args,model,test_generator):
         with Pool(processes=args.threads,initializer=init_worker) as pool: 
             while (processed < num_batches):
                 idset=range(processed,min([num_batches,processed+args.max_queue_size]))
-                for result in pool.imap_unordered(get_batch_wrapper,[[i,test_generator] for i in idset]):
+                for result in pool.imap_unordered(get_batch_wrapper,idset):
                     X=result[0]
                     y=result[1]
                     coords=result[2]

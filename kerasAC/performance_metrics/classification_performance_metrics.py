@@ -39,11 +39,11 @@ def get_accuracy_stats_for_task(predictions_for_task_filtered, true_y_for_task_f
     predictions_for_task_filtered_round = np.array([round(el) for el in predictions_for_task_filtered])
     accuratePredictions = predictions_for_task_filtered_round==true_y_for_task_filtered;
 
-    numPositives_forTask=np.sum(true_y_for_task_filtered==1,axis=0,dtype="float");
-    numNegatives_forTask=np.sum(true_y_for_task_filtered==0,axis=0,dtype="float"); 
+    numPositives_forTask=np.sum(true_y_for_task_filtered>0,axis=0,dtype="float");
+    numNegatives_forTask=np.sum(true_y_for_task_filtered<=0,axis=0,dtype="float"); 
 
-    accuratePredictions_positives = np.sum(accuratePredictions*(true_y_for_task_filtered==1),axis=0);
-    accuratePredictions_negatives = np.sum(accuratePredictions*(true_y_for_task_filtered==0),axis=0);
+    accuratePredictions_positives = np.sum(accuratePredictions*(true_y_for_task_filtered>0),axis=0);
+    accuratePredictions_negatives = np.sum(accuratePredictions*(true_y_for_task_filtered<=0),axis=0);
     unbalancedAccuracy_forTask = (accuratePredictions_positives + accuratePredictions_negatives)/(numPositives_forTask + numNegatives_forTask)
 
     positiveAccuracy_forTask = accuratePredictions_positives/numPositives_forTask
@@ -109,7 +109,9 @@ def get_performance_metrics_classification(predictions,true_y):
         true_y_for_task=np.squeeze(true_y[:,c])
         predictions_for_task=np.squeeze(predictions[:,c])
         predictions_for_task_filtered,true_y_for_task_filtered = remove_ambiguous_peaks(predictions_for_task,true_y_for_task)
-
+        print("predictions:"+str(predictions_for_task_filtered))
+        print("labels:"+str(true_y_for_task_filtered))
+        print(c) 
         accuracy_stats_task = get_accuracy_stats_for_task(predictions_for_task_filtered, true_y_for_task_filtered, c)
         auprc_task=auprc_func(predictions_for_task_filtered,true_y_for_task_filtered)
         auroc_task=auroc_func(predictions_for_task_filtered,true_y_for_task_filtered)

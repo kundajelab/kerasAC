@@ -253,7 +253,6 @@ class DataGenerator(Sequence):
         with self.lock:
             ref=pysam.FastaFile(self.ref_fasta)
             self.ref=ref
-            
         #get the coordinates for the current batch
         coords=self.get_coords(idx)
         #get the inputs
@@ -267,7 +266,6 @@ class DataGenerator(Sequence):
             else:
                 #extract values from pandas df 
                 cur_x=self.transform_vals(self.get_pd_vals(coords,cur_input))
-            #print(cur_x.shape)
             X.append(cur_x)
         #get the outputs
         y=[]

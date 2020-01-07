@@ -18,7 +18,8 @@ def parse_args():
     parser.add_argument('--performance_metrics_classification_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_regression_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     parser.add_argument('--performance_metrics_profile_file',nargs="+",help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    parser.add_argument('--tasks',nargs="+",action='append',default=None)
+    parser.add_argument('--tasks',nargs="+",default=None,help="comma-separated list of task names for each dataset to score")
+    parser.add_argument('--task_indices',nargs="+",type=int,default=None) 
     return parser.parse_args()
 
 def get_metrics_function(args):
@@ -41,19 +42,19 @@ def get_output_file(args,i):
     else:
         raise Exception("one of --performance_metrics_classification_file, --performance_metrics_regression_file, --performance_metrics_profile_file must be provided")
     
-def metrics_from_pickle(cur_pickle,args):
+def metrics_from_pickle(cur_pickle,tasks,args):
     with open(cur_pickle,'rb') as handle:
         predictions=pickle.load(handle)
-        labels=predictions['labels']
-        model_predictions=predictions['predictions']
+        labels=predictions['labels'][tasks]
+        model_predictions=predictions['predictions'][tasks]
         if 'calibrated_predictions' in predictions.keys():
-            model_predictions=predictions['calibrated_predictions']
+            model_predictions=predictions['calibrated_predictions'][tasks]
         metrics_function=get_metrics_function(args)
         return metrics_function(model_predictions,labels)
 
-def metrics_from_hdf(cur_labels, cur_predictions, args):
-    cur_labels=pd.read_hdf(cur_labels)
-    cur_predictions=pd.read_hdf(cur_predictions)
+def metrics_from_hdf(cur_labels, cur_predictions, tasks,args):
+    cur_labels=pd.read_hdf(cur_labels)[tasks]
+    cur_predictions=pd.read_hdf(cur_predictions)[tasks]
     metrics_function=get_metrics_function(args)
     return metrics_function(cur_predictions,cur_labels) 
 
@@ -68,13 +69,15 @@ def get_performance_metrics(args):
         for i in range(num_datasets):
             cur_labels=args.labels_hdf5[i]
             cur_predictions=args.predictions_hdf5[i]
-            cur_metrics=metrics_from_hdf(cur_labels,cur_predictions,args)
-            if args.tasks is None:
+            if args.task_indices is not None:
+                cur_tasks=args.task_indices[i]
+            elif args.tasks is not None:
+                cur_tasks=args.tasks[i].split(',')
+            else: 
                 cur_tasks=[j for j in range(cur_predictions.shape[1])]
-            else:
-                cur_tasks=args.tasks[i]
             if type(cur_tasks) is not list:
                 cur_tasks=[cur_tasks]
+            cur_metrics=metrics_from_hdf(cur_labels,cur_predictions,cur_tasks,args)
             outfile=get_output_file(args,i)
             write_performance_metrics(outfile,cur_metrics,cur_tasks)
 
@@ -83,13 +86,15 @@ def get_performance_metrics(args):
         num_datasets=len(args.predictions_pickle_to_load)
         for i in range(num_datasets):
             cur_pickle=args.predictions_pickle_to_load[i]
-            cur_metrics=metrics_from_pickle(cur_pickle,args)
-            if args.tasks is None:
-                cur_tasks=[j for j in range(cur_predictions.shape[1])]
-            else:
-                cur_tasks=args.tasks[i]
+            if args.task_indices is not None:
+                cur_tasks=args.task_indices[i]
+            elif args.tasks is not None:
+                cur_tasks=args.tasks[i].split(',')
+            else: 
+                cur_tasks=[j for j in range(cur_predictions.shape[1])]                
             if type(cur_tasks) is not list:
                 cur_tasks=[cur_tasks]
+            cur_metrics=metrics_from_pickle(cur_pickle,cur_tasks,args)
             outfile=get_output_file(args,i)
             write_performance_metrics(outfile,cur_metrics,cur_tasks)
     
