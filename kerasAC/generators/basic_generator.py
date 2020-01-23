@@ -20,7 +20,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
         if tasks==None:
             data=pd.read_hdf(data_path)
         else:
-            data=pd.read_hdf(data_path,columns=tasks)
+            data=pd.read_hdf(data_path,columns=['CHR','START','END']+[int(i) for i in tasks])
     else:
         #treat as bed file
         if tasks==None:

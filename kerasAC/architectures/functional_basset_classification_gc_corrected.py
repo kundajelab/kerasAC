@@ -7,8 +7,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     seed=args.seed
     w0=args.w0
     w1=args.w1
-    init_weights=args.init_weights
     ntasks=args.num_tasks
+    init_weights=args.init_weights
     
     np.random.seed(seed)
     import keras;

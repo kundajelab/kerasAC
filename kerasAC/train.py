@@ -18,7 +18,7 @@ from keras.callbacks import *
 from keras.utils import multi_gpu_model
 import gc
 import multiprocessing
-multiprocessing.set_start_method('forkserver', force=True)
+#multiprocessing.set_start_method('forkserver', force=True)
 def parse_args():
     parser=argparse.ArgumentParser()
     
@@ -73,6 +73,7 @@ def parse_args():
     weights_params=parser.add_argument_group("weights_params")
     weights_params.add_argument("--load_model_hdf5")
     weights_params.add_argument("--weights",default=None)
+    weights_params.add_argument("--init_weights",default=None,help="legacy, will be deprecated in next release") 
     weights_params.add_argument('--w1',nargs="*", type=float, default=None)
     weights_params.add_argument('--w0',nargs="*", type=float, default=None)
     weights_params.add_argument("--w1_w0_file",default=None)
@@ -201,7 +202,7 @@ def initializer_generators_hdf5(args):
                                   tasks=args.tasks)
     
     print("generated training data generator!")
-    valid_chroms=get_chroms(args,spit='valid')
+    valid_chroms=get_chroms(args,split='valid')
     valid_generator=DataGenerator(index_path=index_train_path,
                                   input_path=input_train_path,
                                   output_path=output_train_path,
