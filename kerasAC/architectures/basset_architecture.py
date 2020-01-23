@@ -1,7 +1,17 @@
 import numpy as np ;
-from kerasAC.metrics import * 
+from keras.constraints import max_norm
+from kerasAC.metrics import *
+from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
+from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,num_tasks,seed):
+
+def getModelGivenModelOptionsAndWeightInits(args):
+    seed=args.seed
+    w0=args.w0
+    w1=args.w1
+    ntasks=args.ntasks
+    init_weights=args.init_weights
+    
     np.random.seed(seed)
     import keras;
     from keras.models import Sequential
@@ -44,7 +54,7 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         model.add(Activation('relu'))
         model.add(Dropout(0.3))
 
-        model.add(Dense(1))
+        model.add(Dense(ntasks))
         model.add(Activation("sigmoid"))
 
     else:
@@ -75,15 +85,16 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         model.add(Activation('relu'))
         model.add(Dropout(0.3))
 
-        model.add(Dense(1))
+        model.add(Dense(ntasks))
         model.add(Activation("sigmoid"))
         
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-    import kerasAC.custom_losses
     print("compiling!")
     if w0!=None:
-        loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
+        loss=get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
     else:
-        loss="binary_crossentropy"
-    model.compile(optimizer=adam,loss=loss,metrics=[positive_accuracy,negative_accuracy,precision,recall])
+        loss=ambig_binary_crossentropy 
+    model.compile(optimizer=adam,
+                  loss=loss,
+                  metrics=[recall, specificity, fpr, fnr, precision, f1])
     return model

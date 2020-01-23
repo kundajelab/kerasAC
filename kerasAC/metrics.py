@@ -1,46 +1,91 @@
 #Note: this is ugly w/ use of tf & K --> needed to avoid custom keras modifications 
 import tensorflow as tf
 import keras.backend as K
-def spearman_corr(y_true,y_pred):
-    import K.contribs.metrics.streaming_pearson_correlation
-    return K.contribs.metrics.streaming_pearson_correlation(y_pred,y_true)
 
-def positive_accuracy(y_true,y_pred):
-    one_indices=tf.cast(tf.where(tf.equal(y_true,1.0)),'int32')
-    y_true_subset=tf.gather_nd(y_true,one_indices)
-    y_pred_subset=tf.gather_nd(y_pred,one_indices)
-    positive_accuracy=K.mean(tf.equal(y_true_subset,tf.round(y_pred_subset)))
-    return positive_accuracy
+pseudocount=0.01
 
 
-def negative_accuracy(y_true,y_pred):
-    one_indices=tf.cast(tf.where(tf.equal(y_true,0.0)),'int32')
-    y_true_subset=tf.gather_nd(y_true,one_indices)
-    y_pred_subset=tf.gather_nd(y_pred,one_indices)
-    negative_accuracy=K.mean(tf.equal(y_true_subset,tf.round(y_pred_subset)))
-    return negative_accuracy
-                                        
+def contingency_table(y, z):
+    """Note:  if y and z are not rounded to 0 or 1, they are ignored
+    """
+    y = K.cast(K.round(y), K.floatx())
+    z = K.cast(K.round(z), K.floatx())
+    
+    def count_matches(y, z):
+        return K.sum(K.cast(y, K.floatx()) * K.cast(z, K.floatx()))
+    
+    ones = K.ones_like(y)
+    zeros = K.zeros_like(y)
+    y_ones = K.equal(y, ones)
+    y_zeros = K.equal(y, zeros)
+    z_ones = K.equal(z, ones)
+    z_zeros = K.equal(z, zeros)
+    
+    tp = count_matches(y_ones, z_ones)
+    tn = count_matches(y_zeros, z_zeros)
+    fp = count_matches(y_zeros, z_ones)
+    fn = count_matches(y_ones, z_zeros)
+    return (tp, tn, fp, fn)
+
+def recall(y, z):
+    """True positive rate `tp / (tp + fn)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tp / (tp + fn+pseudocount)
+
+def tpr(y, z):
+    """
+    True positive rate `tp / (tp + fn)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tp / (tp + fn)
+
+def tnr(y, z):
+    """
+    True negative rate `tn / (tn + fp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tn / (tn + fp)
+
+def specificity(y, z):
+    """True negative rate `tn / (tn + fp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tn / (tn + fp+pseudocount)
 
 
-def precision(y_true, y_pred):
-    '''Calculates the precision, a metric for multi-label classification of
-    how many selected items are relevant.
-    '''
-    true_positives = K.sum(tf.round(K.clip(y_true * y_pred, 0, 1)))
-    predicted_positives =K.sum(tf.round(K.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + K.epsilon())
-    return precision
+def fpr(y, z):
+    """False positive rate `fp / (fp + tn)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return fp / (fp + tn+pseudocount)
 
 
-def recall(y_true, y_pred):
-    '''Calculates the recall, a metric for multi-label classification of
-    how many relevant items are selected.
-    '''
-    true_positives = K.sum(tf.round(K.clip(y_true * y_pred, 0, 1)))
-    possible_positives = K.sum(tf.round(K.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + K.epsilon())
-    return recall
-                                        
+def fnr(y, z):
+    """False negative rate `fn / (fn + tp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return fn / (fn + tp+pseudocount)
 
 
+def precision(y, z):
+    """Precision `tp / (tp + fp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return tp / (tp + fp+pseudocount)
+
+
+def fdr(y, z):
+    """False discovery rate `fp / (tp + fp)`
+    """
+    tp, tn, fp, fn = contingency_table(y, z)
+    return fp / (tp + fp+pseudocount)
+
+
+def f1(y, z):
+    """F1 score: `2 * (p * r) / (p + r)`, where p=precision and r=recall.
+    """
+    _recall = recall(y, z)
+    _prec = precision(y, z)
+    return 2 * (_prec * _recall) / (_prec + _recall+pseudocount)
 

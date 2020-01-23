@@ -1,6 +1,34 @@
-import kerasAC.metrics
-import kerasAC.activations 
-from kerasAC.accuracy_metrics import *
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+import time
+#graceful shutdown
+import psutil
+import signal 
+import os
+
+#multithreading
+#from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import Pool,Process, Queue 
+
+import warnings
+import numpy as np
+import pysam
+import pandas as pd
+
+import tensorflow as tf 
+from kerasAC.activations import softMaxAxis1
+from .calibrate import * 
+from .generators.basic_generator import *
+from .generators.tiledb_predict_generator import *
+from .tiledb_config import *
+from .s3_sync import *
+from .splits import *
+from .get_model import * 
+from kerasAC.config import args_object_from_args_dict
+from kerasAC.performance_metrics import *
+from kerasAC.custom_losses import *
+from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 import argparse
 import yaml 
 import h5py 
@@ -8,392 +36,432 @@ import pickle
 import numpy as np 
 import keras 
 from keras.losses import *
-from kerasAC.custom_losses import * 
+from keras.models import Model
+from keras.utils import multi_gpu_model
+from kerasAC.custom_losses import *
+from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
-def get_predictions_hdf5(args,model):
-    data=h5py.File(args.data,'r')    
-    if args.sequential==True: 
-        inputs=data['X']['default_input_mode_name']
-        outputs=data['Y']['default_output_mode_name']
-        output_task_names=None
-        individual_task_output_shape=outputs.shape
-        predictions=get_predictions_hdf5_sequenctial(data,args.batch_size,individual_task_output_shape,output_task_names,model)[0]
-    else:
-        inputs=data['X']
-        outputs=data['Y'] 
-        output_task_names=outputs.keys()
-        individual_task_output_shape=outputs.values()[0].shape
-        predictions= get_preditions_hdf5_functional(data,args.batch_size,individual_task_output_shape,output_task_names,model)[0]
-    return [predictions,outputs]
-
-def get_predictions_hdf5_functional(hdf5_source,batch_size,individual_task_output_shape,output_task_names,model):
-    if output_task_names==None:
-        return get_predictions_sequential(hdf5_source,batch_size,individual_task_output_shape,model)
-    num_generated=0
-    total_entries=hdf5_source.values()[0].shape[0]
-
-    input_modes=hdf5_source.keys() 
-    print("total entries:"+str(total_entries))
-    predictions={}
-    for task in output_task_names:
-        predictions[task]=np.zeros(individual_task_output_shape)
-    print("initialized output dictionary for predictions")    
-    while num_generated < total_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([total_entries,start_index+batch_size])
-        x_batch={}  
-        for input_mode in input_modes: 
-            x_batch[input_mode] = hdf5_source[input_mode][start_index:end_index,:,:,500:1500]
-            x_batch=np.transpose(x_batch,axes=(0,1,3,2))
-        predictions_batch=model.predict(x_batch)
-        #add the predictions to the dictionary
-        for task in output_task_names:
-            predictions[task][start_index:end_index]=predictions_batch[task]
-        num_generated+=(end_index-start_index)
-    return [predictions,None]
-
-def get_predictions_sequential_hdf5(hdf5_source,batch_size,individual_task_output_shape,model):
-    num_generated=0
-    total_entries=hdf5_source.shape[0]
-    print("total entries:"+str(total_entries))
-    predictions=np.zeros(individual_task_output_shape)
-    print("initialized output dictionary for predictions")    
-    while num_generated < total_entries:
-        print(str(num_generated)) 
-        start_index=num_generated
-        end_index=min([total_entries,start_index+batch_size])
-        x_batch=hdf5_source[start_index:end_index,:,:,500:1500]
-        x_batch=np.transpose(x_batch,axes=(0,1,3,2))
-        predictions_batch=model.predict(x_batch)
-        #add the predictions to the dictionary
-        predictions[start_index:end_index]=predictions_batch
-        num_generated+=(end_index-start_index)
-    return [predictions,None]
-
-def get_predictions_hammock(args,model):
-    import pysam
-    import pandas as pd
-    num_generated=0
-    ref=pysam.FastaFile(args.ref_fasta) 
-    data=pd.read_csv(args.data_hammock,header=None,sep='\t')
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
-    #iterate through batches and one-hot-encode on the fly
-    num_entries=data.shape[0]
-    predictions=None
-    all_names=[] 
-    while num_generated < num_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([num_entries,start_index+args.batch_size])
-        seqs=[]
-        names=[]
-        for i in range(start_index,end_index):
-            cur_row=data.iloc[i]
-            chrom=cur_row[0]
-            start_val=cur_row[1]
-            end_val=cur_row[2]
-            peak_metadata=cur_row[3].split(',') 
-            peak_name=','.join([peak_metadata[-3],peak_metadata[-2]])
-            if args.center_on_summit==True:
-                summit_offset=int(peak_metadata[-1].split('[')[1].split(']')[0])
-                summit_pos=start_val+summit_offset
-                start_val=summit_pos - args.flank
-                end_val=summit_pos+args.flank
-            if start_val<1:
-                start_val=1
-                end_val=1+2*args.flank 
-            peak_name='\t'.join([str(i) for i in [chrom,start_val,end_val,peak_name]])
-            names.append(peak_name)
-            try:
-                seq=ref.fetch(chrom,start_val,end_val)
-            except:
-                continue
-            seqs.append(seq)
-        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        if (args.squeeze_input_for_gru==False):
-            #expand dimension of 1
-            x=np.expand_dims(seqs,1)
-        else:
-            x=seqs
-        try:
-            predictions_batch=model.predict(x)
-        except:
-            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
-        #add the batch predictions to the full set of predictions
-        if type(predictions)==type(None):
-            predictions=predictions_batch
-        elif type(predictions)==np.ndarray:
-            predictions=np.concatenate((predictions,predictions_batch),axis=0)
-            print(predictions.shape)
-        elif type(predictions)==type({}):
-            for key in predictions_batch:
-                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
-        else:
-            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
-            pdb.set_trace()
-        all_names=all_names+names 
-        num_generated+=(end_index-start_index)
-        
-    return [predictions,data,all_names]
-
-def get_predictions_bed(args,model):
-    import pysam
-    import pandas as pd
-    num_generated=0
-    ref=pysam.FastaFile(args.ref_fasta)
-    data=pd.read_csv(args.data_bed,header=0,sep='\t',index_col=[0,1,2])
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
-    #iterate through batches and one-hot-encode on the fly
-    num_entries=data.shape[0]
-    predictions=None
-    while num_generated < num_entries:
-        print(str(num_generated))
-        start_index=num_generated
-        end_index=min([num_entries,start_index+args.batch_size])
-        bed_entries=[(data.index[i]) for i in range(start_index,end_index)]
-        seqs=[ref.fetch(i[0],i[1],i[2]) for i in bed_entries]
-        seqs=np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
-        if (args.squeeze_input_for_gru==False):
-            #expand dimension of 1
-            x=np.expand_dims(seqs,1)
-        else:
-            x=seqs
-        try:
-            predictions_batch=model.predict(x)
-        except:
-            print("could not get predictions -- chances are reference assembly is wrong, or bed region lies outside of chrom sizes") 
-        #add the batch predictions to the full set of predictions
-        if type(predictions)==type(None):
-            predictions=predictions_batch
-        elif type(predictions)==np.ndarray:
-            predictions=np.concatenate((predictions,predictions_batch),axis=0)
-            print(predictions.shape)
-        elif type(predictions)==type({}):
-            for key in predictions_batch:
-                predictions[key]=np.concatenate((predictions[key],predictions_batch[key]),axis=0)
-        else:
-            print("Unsupported data type for predictions: must be np.ndarray, None, or dictionary")
-            pdb.set_trace() 
-        num_generated+=(end_index-start_index)
-    #TODO: implement functionality to store peak coordinates as the "names" output 
-    return [predictions,data,None]
-
-def get_predictions_variant(args,model):
-    import pysam
-    ref=pysam.FastaFile(args.ref_fasta)
-    ltrdict = {'a':[1,0,0,0],'c':[0,1,0,0],'g':[0,0,1,0],'t':[0,0,0,1], 'n':[0,0,0,0],'A':[1,0,0,0],'C':[0,1,0,0],'G':[0,0,1,0],'T':[0,0,0,1],'N':[0,0,0,0]}
-    #assumes the bed file has `chrom start ref alt` entries
-    data=[i.split('\t') for i in open(args.variant_bed,'r').read().strip().split('\n')]
-    #original
-    seqs=[]
-    #snp
-    seqs_snp=[]
-    #n bases around snp (i.e. knock out an enhancer)
-    seqs_enhancer=[] 
-    for entry in data[1::]:
-        #introduce the specified variant 
-        start_pos=int(entry[1])-(args.flank)
-        end_pos=int(entry[1])+args.flank
-        seq=ref.fetch(entry[0],start_pos,end_pos)
-        seqs.append(seq)        
-        alt_allele=entry[3]
-        if alt_allele=="NA":
-            #randomly insert another base
-            ref_allele=seq[args.flank-1].upper()
-            options=['A','C','G','T']
-            options.remove(ref_allele)
-            alt_allele=options[random.randint(0,2)]
-        seq=seq[0:args.flank-1]+alt_allele+seq[args.flank:len(seq)]
-        seqs_snp.append(seq)
-
-        seq=np.array([ltrdict[x] for x in seq])
-        start_mask=args.flank-1-args.mask
-        end_mask=args.flank-1+args.mask
-        seq=seq*1.0
-        seq[start_mask:end_mask]=args.background_freqs
-        seqs_enhancer.append(seq)
-        
-    seqs=np.array([[ltrdict[x] for x in seq] for seq in seqs])    
-    seqs_snp=np.array([[ltrdict[x] for x in seq] for seq in seqs_snp])
-    seqs_enhancer=np.asarray(seqs_enhancer)
-
-    seqs=np.expand_dims(seqs,1)
-    seqs_snp=np.expand_dims(seqs_snp,1)
-    seqs_enhancer=np.expand_dims(seqs_enhancer,1)
-    
-    predictions_seqs=model.predict(seqs)
-    predictions_seqs_snp=model.predict(seqs_snp)
-    predictions_seqs_enhancer=model.predict(seqs_enhancer)
-    return [predictions_seqs,predictions_seqs_snp,predictions_seqs_enhancer]
+import pdb 
 
 def parse_args():
-    parser=argparse.ArgumentParser(description='Provide a model yaml & weights files & a dataset, get model predictions and accuracy metrics')
-    parser.add_argument('--model_hdf5',help='hdf5 file that stores the model')
-    parser.add_argument('--weights',help='weights file for the model')
-    parser.add_argument('--yaml',help='yaml file for the model')
-    parser.add_argument('--json',help='json file for the model')
-    parser.add_argument('--data_hdf5',help='hdf5 file that stores the data')
-    parser.add_argument('--data_bed')
-    parser.add_argument('--data_hammock',help='input file is in hammock format, with unique id for each peak')
-    parser.add_argument('--variant_bed')
-    parser.add_argument('--predictions_pickle',help='name of pickle to save predictions',default=None)
-    parser.add_argument('--accuracy_metrics_file',help='file name to save accuracy metrics',default=None)
-    parser.add_argument('--predictions_pickle_to_load',help="if predictions have already been generated, provide a pickle with them to just compute the accuracy metrics",default=None)
+    parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
+    input_data_path=parser.add_argument_group('input_data_path')
+    input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
+    input_data_path.add_argument("--index_tasks",nargs="*",default=None)    
+    input_data_path.add_argument("--input_data_path",nargs="+",default=None,help="seq or path to seqdataloader hdf5")
+    input_data_path.add_argument("--output_data_path",nargs="+",default=None,help="path to seqdataloader hdf5")
+    
+    input_data_path.add_argument('--variant_bed',default=None)
+    input_data_path.add_argument('--ref_fasta')
+
+    tiledbgroup=parser.add_argument_group("tiledb")
+    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
+    tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
+    
+    tiledbgroup.add_argument("--tdb_inputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
+    tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
+
+    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
+    tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
+    tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
+    
+    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
+
+    input_filtering_params=parser.add_argument_group("input_filtering_params")    
+    input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
+    input_filtering_params.add_argument("--genome",default=None)
+    input_filtering_params.add_argument("--fold",type=int,default=None)
+    input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
+    input_filtering_params.add_argument("--tasks",nargs="*",default=None)
+    
+    output_params=parser.add_argument_group("output_params")
+    output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
+    calibration_params=parser.add_argument_group("calibration_params")
+    calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
+    calibration_params.add_argument("--calibrate_regression",action="store_true",default=False)        
+    
+    weight_params=parser.add_argument_group("weight_params")
+    weight_params.add_argument('--w1',nargs="*",type=float)
+    weight_params.add_argument('--w0',nargs="*",type=float)
+    weight_params.add_argument("--w1_w0_file",default=None)
+
+
+    model_params=parser.add_argument_group("model_params")
+    model_params.add_argument('--load_model_hdf5',help='hdf5 file that stores the model')
+    model_params.add_argument('--weights',help='weights file for the model')
+    model_params.add_argument('--yaml',help='yaml file for the model')
+    model_params.add_argument('--json',help='json file for the model')
+    model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
+    model_params.add_argument('--squeeze_input_for_gru',action='store_true')
+    model_params.add_argument("--expand_dims",default=False,action='store_true')
+    model_params.add_argument("--num_inputs",type=int)
+    model_params.add_argument("--num_outputs",type=int)
+    model_params.add_argument("--num_gpus",type=int,default=1)
+    
+    parallelization_params=parser.add_argument_group("parallelization")
+    parallelization_params.add_argument("--threads",type=int,default=1)
+    parallelization_params.add_argument("--max_queue_size",type=int,default=100)
+
+    snp_params=parser.add_argument_group("snp_params")
+    snp_params.add_argument('--background_freqs',default=None)
+    snp_params.add_argument('--flank',default=500,type=int)
+    snp_params.add_argument('--mask',default=10,type=int)
+    snp_params.add_argument('--ref_col',type=int,default=None)
+    snp_params.add_argument('--alt_col',type=int,default=None)
+
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
-    parser.add_argument('--sequential',default=False,help='use this flag if your model is a sequential model',action="store_true")
-    parser.add_argument('--ref_fasta',default="/srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa")
-    parser.add_argument('--background_freqs',default=None)
-    parser.add_argument('--w1',nargs="*",type=float)
-    parser.add_argument('--w0',nargs="*",type=float)
-    parser.add_argument('--flank',default=500,type=int)
-    parser.add_argument('--mask',default=10,type=int)
-    parser.add_argument('--squeeze_input_for_gru',action='store_true')
-    parser.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     return parser.parse_args()
 
-def get_model(args):
-    custom_objects={"positive_accuracy":kerasAC.metrics.positive_accuracy,
-                    "negative_accuracy":kerasAC.metrics.negative_accuracy,
-                    "precision":kerasAC.metrics.precision,
-                    "recall":kerasAC.metrics.recall,
-                    "softMaxAxis1":kerasAC.activations.softMaxAxis1}
-    if args.w0!=None:
-        w0=args.w0
-        w1=args.w1
-        loss_function=get_weighted_binary_crossentropy(w0,w1)
-        custom_objects["weighted_binary_crossentropy"]=loss_function
+def write_predictions(args):
+    '''
+    separate predictions file for each output/task combination 
+    '''
     try:
-        if args.yaml!=None:
-            from keras.models import model_from_yaml
-            #load the model architecture from yaml
-            yaml_string=open(args.yaml,'r').read()
-            model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
-            #load the model weights
-            model.load_weights(args.weights)
-        elif args.json!=None:
-            from keras.models import model_from_json
-            #load the model architecture from json
-            json_string=open(args.json,'r').read()
-            model=model_from_json(json_string,custom_objects=custom_objects)
-            model.load_weights(args.weights)
-        elif args.model_hdf5!=None: 
-            #load from the hdf5
-            from keras.models import load_model
-            model=load_model(args.model_hdf5,custom_objects=custom_objects)
-        print("got model architecture")
-        print("loaded model weights")        
+        if args.predictions_and_labels_hdf5.startswith('s3://'):
+            #use a local version of the file and upload to s3 when finished
+            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+            out_predictions_prefix=filename.split('/')[-1]+".predictions"
+        else: 
+            out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+        first=True
+        while True:
+            pred_df=pred_queue.get()
+            if type(pred_df) == str: 
+                if pred_df=="FINISHED":
+                    return
+            if first is True:
+                mode='w'
+                first=False
+                append=False
+            else:
+                mode='a'
+                append=True
+            for cur_output_index in range(len(pred_df)):
+                #get cur_pred_df for current output
+                cur_pred_df=pred_df[cur_output_index]
+                cur_out_f='.'.join([out_predictions_prefix,str(cur_output_index)])
+                cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                
+    except KeyboardInterrupt:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        print(e)
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
+
+def write_labels(args):
+    '''
+    separate label file for each output/task combination
+    '''
+    try:
+        if args.predictions_and_labels_hdf5.startswith('s3://'):
+            #use a local version of the file and upload to s3 when finished
+            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+            out_labels_prefix=filename.split('/')[-1]+".labels"
+        else: 
+            out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
+        first=True
+        while True:
+            label_df=label_queue.get()
+            if type(label_df)==str:
+                if label_df=="FINISHED":
+                    return
+            if first is True:
+                mode='w'
+                first=False
+                append=False
+            else:
+                mode='a'
+                append=True
+            for cur_output_index in range(len(label_df)):
+                cur_label_df=label_df[cur_output_index]
+                cur_out_f='.'.join([out_labels_prefix,str(cur_output_index)])
+                cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                
+    except KeyboardInterrupt:
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        print(e)
+        #shutdown the pool
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
+    return
+
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(sig)
         
-    except: 
-        print("Failed to load model. HINT: if you're using weighted binary cross entropy loss, chances are you forgot to provide the --w0 or --w1 flags")
-    return model
 
-def get_predictions(args,model):
-    if args.data_hdf5!=None:
-        predictions=get_predictions_hdf5(args,model)
-    elif args.data_bed!=None:
-        predictions=get_predictions_bed(args,model)
-    elif args.variant_bed!=None:
-        predictions=get_predictions_variant(args,model)
-    elif args.data_hammock!=None:
-        predictions=get_predictions_hammock(args,model) 
+
+def get_batch_wrapper(idx):
+    X,y,coords=test_generator[idx]
+    if type(y) is not list:
+        y=[y]
+    try:
+        y=[i.squeeze(axis=-1) for i in y]
+    except:
+        pass
+    if type(X) is not list:
+        X=[X]
+    
+    #represent coords w/ string, MultiIndex not supported in table append mode
+    #set the column names for the MultiIndex
+    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','START','END'])
+    y=[pd.DataFrame(i,index=coords) for i in y]
+    return [X,y,coords,idx]
+
+
+def get_tiledb_predict_generator(args):
+    global test_generator
+    if args.upsample_ratio_list_predict is not None:
+        upsample_ratio_predict=args.upsample_ratio_list_predict[0]
+        print("warning! only a single ratio for upsampling supported for tiledb as of now")
     else:
-        raise Exception("input data must be specified by data_hdf5, data_bed, data_variant, or data_hammock")
-    print('got model predictions')
-    return predictions
+        upsample_ratio_predict=None
+    import tiledb
+    tdb_config=get_default_config() 
+    tdb_ctx=tiledb.Ctx(config=tdb_config)
+    test_chroms=get_chroms(args,split='test')
+    test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
+                                          batch_size=args.batch_size,
+                                          tdb_indexer=args.tdb_indexer,
+                                          tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
+                                          tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                          upsample_ratio=upsample_ratio_predict,
+                                          tdb_inputs=args.tdb_inputs,
+                                          tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                          tdb_input_flank=args.tdb_input_flank,
+                                          tdb_outputs=args.tdb_outputs,
+                                          tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                          tdb_output_flank=args.tdb_output_flank,
+                                          num_inputs=args.num_inputs,
+                                          num_outputs=args.num_outputs,
+                                          tdb_input_aggregation=args.tdb_input_aggregation,
+                                          tdb_input_transformation=args.tdb_input_transformation,
+                                          tdb_output_aggregation=args.tdb_output_aggregation,
+                                          tdb_output_transformation=args.tdb_output_transformation,                                          
+                                          tiledb_stride=args.tiledb_stride,
+                                          chrom_sizes=args.chrom_sizes,
+                                          chroms=test_chroms,
+                                          tdb_config=tdb_config,
+                                          tdb_ctx=tdb_ctx)
+    print("created TiledbPredictGenerator")    
+    return test_generator 
+def get_hdf5_predict_generator(args):
+    global test_generator
+    test_chroms=get_chroms(args,split='test')
+    test_generator=DataGenerator(index_path=args.index_data_path,
+                                 input_path=args.input_data_path,
+                                 output_path=args.output_data_path,
+                                 index_tasks=args.index_tasks,
+                                 num_inputs=args.num_inputs,
+                                 num_outputs=args.num_outputs,
+                                 ref_fasta=args.ref_fasta,
+                                 batch_size=args.batch_size,
+                                 add_revcomp=False,
+                                 chroms_to_use=test_chroms,
+                                 expand_dims=args.expand_dims,
+                                 tasks=args.tasks,
+                                 shuffle=False,
+                                 return_coords=True)
+    return test_generator
+def get_variant_predict_generator(args):
+    global test_generator
+    test_chroms=get_chroms(args,split='test')
+    test_generator=SNPGenerator(args.allele_col,
+                                args.flank,
+                                index_path=args.index_data_path,
+                                input_path=args.input_data_path,
+                                output_path=args.output_data_path,
+                                index_tasks=args.index_tasks,
+                                num_inputs=args.num_inputs,
+                                num_outputs=args.num_outputs,
+                                ref_fasta=args.ref_fasta,
+                                allele_col=args.ref_col,
+                                batch_size=args.batch_size,
+                                add_revcomp=False,
+                                chroms_to_use=test_chroms,
+                                expand_dims=args.expand_dims,
+                                tasks=args.tasks,
+                                shuffle=False,
+                                return_coords=True)
+    return test_generator
 
+def get_generator(args):
+    if args.variant_bed is not None:
+        return get_variant_predict_generator(args)
+    elif args.tdb_indexer is not None:        
+        return get_tiledb_predict_generator(args)
+    else:
+        return get_hdf5_predict_generator(args)
+
+def predict_on_batch_wrapper(args,model,test_generator):
+    num_batches=len(test_generator)
+    processed=0
+    try:
+        with Pool(processes=args.threads,initializer=init_worker) as pool: 
+            while (processed < num_batches):
+                idset=range(processed,min([num_batches,processed+args.max_queue_size]))
+                for result in pool.imap_unordered(get_batch_wrapper,idset):
+                    X=result[0]
+                    y=result[1]
+                    coords=result[2]
+                    idx=result[3]
+                    processed+=1
+                    if processed%10==0:
+                        print(str(processed)+"/"+str(num_batches))
+                    #get the model predictions            
+                    preds=model.predict_on_batch(X)
+                    if type(preds) is not list:
+                        preds=[preds]
+                    try:
+                        preds=[i.squeeze(axis=-1) for i in preds]
+                    except:
+                        pass 
+                    preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
+                    label_queue.put(y)
+                    pred_queue.put(preds_dfs)
+                    
+    except KeyboardInterrupt:
+        #shutdown the pool
+        pool.terminate()
+        pool.join() 
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise 
+    except Exception as e:
+        print(e)
+        #shutdown the pool
+        pool.terminate()
+        pool.join()
+        # Kill remaining child processes
+        kill_child_processes(os.getpid())
+        raise e
+    print("finished with tiledb predictions!")
+    label_queue.put("FINISHED")
+    label_queue.close() 
+    pred_queue.put("FINISHED")
+    pred_queue.close() 
+    return
+
+
+def get_model_layer_functor(model,target_layer_idx):
+    from keras import backend as K
+    inp=model.input
+    outputs=model.layers[target_layer_idx].output
+    functor=K.function([inp], [outputs])
+    return functor 
+
+def get_layer_outputs(functor,X):
+    return functor([X])
+
+def predict(args):
+    if type(args)==type({}):
+        args=args_object_from_args_dict(args) 
+    global pred_queue
+    global label_queue
+    
+    pred_queue=Queue()
+    label_queue=Queue()
+    
+    label_writer=Process(target=write_predictions,args=([args]))
+    pred_writer=Process(target=write_labels,args=([args]))
+    label_writer.start()
+    pred_writer.start() 
+
+
+    #get the generator
+    test_generator=get_generator(args) 
+    
+    #get the model
+    #if calibration is to be done, get the preactivation model 
+    model=get_model(args)
+    perform_calibration=args.calibrate_classification or args.calibrate_regression
+    if perform_calibration==True:
+        if args.calibrate_classification==True:
+            print("getting logits")
+            model=Model(inputs=model.input,
+                               outputs=model.layers[-2].output)
+        elif args.calibrate_regression==True:
+            print("getting pre-relu outputs (preacts)")
+            model=Model(inputs=model.input,
+                        outputs=model.layers[-1].output)
+            
+    #call the predict_on_batch_wrapper
+    predict_on_batch_wrapper(args,model,test_generator)
+
+    #drain the queue
+    try:
+        while not label_queue.empty():
+            print("draining the label Queue")
+            time.sleep(2)
+    except Exception as e:
+        print(e)
+    try:
+        while not pred_queue.empty():
+            print("draining the prediction Queue")
+            time.sleep(2)
+    except Exception as e:
+        print(e)
+    
+    print("joining label writer") 
+    label_writer.join()
+    print("joining prediction writer") 
+    pred_writer.join()
+
+    #sync files to s3 if needed
+    if args.predictions_and_labels_hdf5.startswith('s3://'):
+        #use a local version of the file and upload to s3 when finished
+        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+        out_predictions_prefix=filename.split('/')[-1]+".predictions"
+        out_labels_prefix=filename.split('/')[-1]+".predictions"
+        #upload outputs for all tasks
+        import glob
+        to_upload=[]
+        for f in glob.glob(out_predictions_prefix+"*"):
+            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            upload_s3_file(s3_path,f)
+        for f in glob.glob(out_labels_prefix+"*"):
+            s3_path='/'.join(args.predictions_and_labels_hdf5.split('/')[0:-1])+"/"+f
+            upload_s3_file(s3_path,f)
+        
+    #perform calibration, if specified
+    if perform_calibration is True:
+        print("calibrating")
+        calibrate(args)
+
+    #clean up any s3 artifacts:
+    run_cleanup()
+    
 def main():
     args=parse_args()
-    
-    #get the predictions
-    if args.predictions_pickle_to_load!=None:
-        #load the pickled predictions
-        with open(args.predictions_pickle_to_load,'rb') as handle:
-            predictions=pickle.load(handle)
-    else:
-        #get the model
-        model=get_model(args)
-        predictions=get_predictions(args,model)
-        
-        
-    if args.predictions_pickle!=None:
-        #pickle the predictions in case an error occurs downstream
-        #this will allow for easy recovery of model predictions without having to regenerate them
-        with open(args.predictions_pickle,'wb') as handle:
-            pickle.dump(predictions,handle,protocol=pickle.HIGHEST_PROTOCOL)
-        print("pickled the model predictions to file:"+str(args.predictions_pickle))
-        #also as text file
-        #np.savetxt(args.predictions_pickle+".truth.txt",predictions[1],delimiter='\t')
-        #np.savetxt(args.predictions_pickle+".predictions.txt",predictions[0],delimiter='\t')
-        #if predictions[2]!=None:
-        #    np.savetxt(args.predictions_pickle+".names.txt",predictions[2],delimiter='\t')
+    predict(args)
 
-    if args.accuracy_metrics_file!=None:
-        print('computing accuracy metrics...')
-        recallAtFDR50=dict()
-        recallAtFDR20=dict()
-        auroc_vals=dict()
-        auprc_vals=dict()
-        unbalanced_accuracy_vals=dict()
-        balanced_accuracy_vals=dict()
-        positives_accuracy_vals=dict()
-        negatives_accuracy_vals=dict()
-        num_positive_vals=dict()
-        num_negative_vals=dict()
-        
-        outputs=np.asarray(predictions[1])
-        predictions=predictions[0]
-        if not(isinstance(predictions,dict)):
-            predictions={'output':predictions}
-        if not(isinstance(outputs,dict)):
-            outputs={'output':outputs} 
-        for output_mode in predictions: 
-            #compute the accuracy metrics
-            recallAtFDR50[output_mode]=recall_at_fdr_function(predictions[output_mode],outputs[output_mode],50)
-            print('got recall at FDR50!') 
-            recallAtFDR20[output_mode]=recall_at_fdr_function(predictions[output_mode],outputs[output_mode],20)
-            print('got recall at FDR20!')
-            auroc_vals[output_mode]=auroc_func(predictions[output_mode],outputs[output_mode])
-            print('got auROC vals!')
-            auprc_vals[output_mode]=auprc_func(predictions[output_mode],outputs[output_mode])
-            print('got auPRC vals!')
-            unbalanced_accuracy_vals[output_mode]=unbalanced_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got unbalanced accuracy')
-            balanced_accuracy_vals[output_mode]=balanced_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got balanced accuracy')
-            positives_accuracy_vals[output_mode]=positives_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got positives accuracy')
-            negatives_accuracy_vals[output_mode]=negatives_accuracy(predictions[output_mode],outputs[output_mode])
-            print('got negative accuracy vals')
-            num_positive_vals[output_mode]=num_positives(predictions[output_mode],outputs[output_mode])
-            print('got number of positive values')
-            num_negative_vals[output_mode]=num_negatives(predictions[output_mode],outputs[output_mode])
-            print('got number of negative values')
-
-        #write accuracy metrics to output file: 
-        print('writing accuracy metrics to file...')
-        outf=open(args.accuracy_metrics_file,'w')
-        for key in recallAtFDR50.keys():
-            outf.write('recallAtFDR50\t'+str(key)+'\t'+'\t'.join([str(i) for i in recallAtFDR50[key]])+'\n')
-        for key in recallAtFDR20.keys():
-            outf.write('recallAtFDR20\t'+str(key)+'\t'+'\t'.join([str(i) for i in recallAtFDR20[key]])+'\n')
-        for key in auroc_vals.keys():
-            outf.write('auroc_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in auroc_vals[key]])+'\n')
-        for key in auprc_vals.keys():
-            outf.write('auprc_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in auprc_vals[key]])+'\n')
-        for key in unbalanced_accuracy_vals.keys():
-            outf.write('unbalanced_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in unbalanced_accuracy_vals[key]])+'\n')
-        for key in balanced_accuracy_vals.keys():
-            outf.write('balanced_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in balanced_accuracy_vals[key]])+'\n')
-        for key in positives_accuracy_vals.keys():
-            outf.write('positives_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in positives_accuracy_vals[key]])+'\n')
-        for key in negatives_accuracy_vals.keys():
-            outf.write('negatives_accuracy_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in negatives_accuracy_vals[key]])+'\n')    
-        for key in num_positive_vals.keys():
-            outf.write('num_positive_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_positive_vals[key]])+'\n')
-        for key in num_negative_vals.keys():
-            outf.write('num_negative_vals\t'+str(key)+'\t'+'\t'.join([str(i) for i in num_negative_vals[key]])+'\n')
-    
 
 if __name__=="__main__":
     main()

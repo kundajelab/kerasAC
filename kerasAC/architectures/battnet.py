@@ -21,8 +21,15 @@ def softMaxAxis1(x):
 
 #note: functional model
 #this is single-headed battnet (i.e. one attention head only) 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights=None,checkpoint_weights=None,checkpoint_args=None,ntasks=None):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the arguments
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    ntasks=args.ntasks
+    seed=args.seed
+    
+    np.random.seed(seed)
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
     inputs=Input(shape=(1000,4))    

@@ -1,8 +1,18 @@
+#functional factorized bassett? 
 import numpy as np ;
-from kerasAC.metrics import * 
+from keras.constraints import max_norm
+from kerasAC.metrics import *
+from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
+from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the arguments
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    seed=args.seed
+    
+    np.random.seed(seed)
     import keras;
     from keras.layers import (
         Activation, AveragePooling1D, BatchNormalization,
@@ -11,15 +21,13 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         PReLU, Add
     )
     from keras.models import Model
-    #from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-    #from keras.layers.convolutional import Conv2D, MaxPooling2D
     from keras.optimizers import Adadelta, SGD, RMSprop;
     import keras.losses;
     from keras.constraints import maxnorm;
     from keras.layers.normalization import BatchNormalization
     from keras.regularizers import l1, l2    
     from keras import backend as K
-    #K.set_image_data_format('channels_last')
+    K.set_image_data_format('channels_last')
     print(K.image_data_format())
 
     import collections
@@ -58,14 +66,10 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         if batch_norm:
             seq_preds = BatchNormalization()(seq_preds)
         seq_preds = Activation('relu')(seq_preds)
-        #seq_preds = Dropout(drop_rate)(seq_preds)
-    #seq_preds = Dropout(final_dropout)(seq_preds)
     seq_preds = Dense(num_tasks, name=final_layer_name)(seq_preds)
-    seq_preds = Activation('relu')(seq_preds)
+    seq_preds = Activation('sigmoid')(seq_preds)
     random_weight_model = Model(inputs=list(keras_inputs.values()), outputs=seq_preds)
-
     model = random_weight_model
-
 
     if (init_weights!=None):
         #load the weight initializations
@@ -73,8 +77,11 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    import kerasAC.custom_losses
-    loss = kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
-    model.compile(optimizer=adam,loss=loss, metrics=[positive_accuracy,negative_accuracy,precision,recall])
-
+    if w0!=None:
+        loss=get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
+    else:
+        loss=get_ambig_binary_crossentropy() 
+    model.compile(optimizer=adam,
+                  loss=loss,
+                  metrics=[recall, specificity, fpr, fnr, precision, f1])
     return model

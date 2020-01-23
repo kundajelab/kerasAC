@@ -1,6 +1,50 @@
 import sys, os
 import os.path
 from collections import OrderedDict
+import argparse
+import numpy as np 
+
+ltrdict = {'a':[1,0,0,0],
+           'c':[0,1,0,0],
+           'g':[0,0,1,0],
+           't':[0,0,0,1],
+           'n':[0,0,0,0],
+           'A':[1,0,0,0],
+           'C':[0,1,0,0],
+           'G':[0,0,1,0],
+           'T':[0,0,0,1],
+           'N':[0,0,0,0]}
+
+def one_hot_encode(seqs):
+    return np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])
+
+def dinuc_shuffle(seq):
+    #get list of dinucleotides
+    nucs=[]
+    for i in range(0,len(seq),2):
+        nucs.append(seq[i:i+2])
+    #generate a random permutation
+    random.shuffle(nucs)
+    return ''.join(nucs) 
+
+
+def revcomp(seq):
+    seq=seq[::-1].upper()
+    comp_dict=dict()
+    comp_dict['A']='T'
+    comp_dict['T']='A'
+    comp_dict['C']='G'
+    comp_dict['G']='C'
+    rc=[]
+    for base in seq:
+        if base in comp_dict:
+            rc.append(comp_dict[base])
+        else:
+            rc.append(base)
+    return ''.join(rc)
+
+
+
 
 
 
@@ -14,8 +58,6 @@ class DefaultOrderedDictWrapper(object):
         if key not in self.ordered_dict:
             self.ordered_dict[key] = self.factory() 
         return self.ordered_dict[key]
-
-
 
 def enum(**enums):
     class Enum(object):
@@ -38,3 +80,5 @@ def combine_enums(*enums):
     return enum(**new_enum_dict)
 
 
+    
+    

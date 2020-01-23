@@ -1,8 +1,17 @@
 import numpy as np ;
 from kerasAC.metrics import * 
+from kerasAC.custom_losses import *
+import pdb
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
-    np.random.seed(1234)
+def getModelGivenModelOptionsAndWeightInits(args):
+    #read in the args
+    seed=args.seed
+    ntasks=args.num_tasks
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    
+    np.random.seed(seed)
     import keras;
     from keras.models import Sequential
     from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
@@ -78,5 +87,6 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    model.compile(optimizer=adam,loss='mse',metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    loss=ambig_mean_squared_error
+    model.compile(optimizer=adam,loss=loss)
     return model

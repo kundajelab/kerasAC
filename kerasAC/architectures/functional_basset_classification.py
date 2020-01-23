@@ -1,10 +1,17 @@
 import numpy as np ;
 from kerasAC.metrics import *
+from kerasAC.custom_losses import *
 
-def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weights,checkpoint_args,ntasks,seed):
+def getModelGivenModelOptionsAndWeightInits(args):
+    #get the arguments
+    seed=args.seed
+    w0=args.w0
+    w1=args.w1
+    init_weights=args.init_weights
+    ntasks=args.num_tasks
+    
     np.random.seed(seed)
     import keras;
-    from keras.models import Sequential
     from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
     from keras.layers.convolutional import Conv2D, MaxPooling2D
     from keras.optimizers import Adadelta, SGD, RMSprop;
@@ -13,18 +20,18 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
     from keras.layers.normalization import BatchNormalization
     from keras.regularizers import l1, l2
     from keras import backend as K
-    from keras.layers import Input
+    from keras.layers import Input, Add
     from keras.models import Model
 
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
 
-    inputs = Input(shape=(1,1000,4))
-
+    seq = Input(shape=(1,1000,4))
+    
     if (init_weights!=None):
         #load the weight initializations
         data=np.load(init_weights);
-        x = Conv2D(filters=300,kernel_size=(1,19),weights=[data['0.Conv/weights:0'],np.zeros(300,)],padding="same")(inputs)
+        x = Conv2D(filters=300,kernel_size=(1,19),weights=[data['0.Conv/weights:0'],np.zeros(300,)],padding="same")(seq)
         x = BatchNormalization(axis=-1,weights=[data['2.BatchNorm/gamma:0'],data['1.BatchNorm/beta:0'],np.zeros(300,),np.zeros(300,)])(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,3))(x)
@@ -47,12 +54,11 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         x = BatchNormalization(axis=1,weights=[data['14.fc1/BatchNorm/gamma:0'],data['13.fc1/BatchNorm/beta:0'],np.zeros(1000,),np.zeros(1000,)])(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
-
-        x = Dense(1)(x)
-        outputs = Activation("sigmoid")(x)
+        y = Dense(ntasks)(x)
+        outputs = Activation("sigmoid")(y)
 
     else:
-        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(inputs)
+        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(seq)
         x = BatchNormalization(axis=-1)(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,3))(x)
@@ -77,17 +83,12 @@ def getModelGivenModelOptionsAndWeightInits(w0,w1,init_weights,checkpoint_weight
         x = BatchNormalization(axis=-1)(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
-
-        x = Dense(1)(x)
-        outputs = Activation("sigmoid")(x)
+        y = Dense(ntasks)(x)
+        outputs = Activation("sigmoid")(y)
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
-    if w0!=None:
-        import kerasAC.custom_losses
-        loss=kerasAC.custom_losses.get_weighted_binary_crossentropy(w0_weights=w0,w1_weights=w1)
-    else:
-        loss="binary_crossentropy"
-    model = Model(inputs = inputs, outputs = outputs)
-    model.compile(optimizer=adam,loss=loss,metrics=[positive_accuracy,negative_accuracy,precision,recall])
+    loss=ambig_binary_crossentropy
+    model = Model(inputs = [seq], outputs = outputs)
+    model.compile(optimizer=adam,loss=loss)
     return model

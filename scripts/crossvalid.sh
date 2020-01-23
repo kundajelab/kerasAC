@@ -1,0 +1,19 @@
+CUDA_VISIBLE_DEVICES=0 kerasAC_cross_validate --data_path /srv/scratch/annashch/deeplearning/form_inputs/gecco_seqdataloader/gecco.classificationlabels.SummitWithin200bpCenter.hdf5 \
+		    --model_hdf5 gecco.classification.SummitWithin200bpCenter \
+		    --assembly hg19 \
+		    --batch_size 256 \
+		    --train_upsample 0.3 \
+		    --valid_upsample 0.3 \
+		    --architecture_spec basset_architecture_multitask \
+		    --tensorboard_logdir logs \
+		    --tensorboard \
+		    --num_train 1000000 \
+		    --num_valid 250000 \
+		    --num_tasks 5 \
+		    --threads 30 \
+		    --max_queue_size 200 \
+		    --init_weights /srv/scratch/annashch/deeplearning/encode-roadmap.dnase_tf-chip.batch_256.params.npz \
+		    --weighted \
+		    --save_w1_w0 w1_w0_gecco.txt \
+		    --accuracy_metrics_file accuracy \
+		    --predictions_pickle predictions

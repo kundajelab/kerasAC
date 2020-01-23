@@ -4,16 +4,19 @@ config = {
     'include_package_data': True,
     'description': 'keras Accessibility Models (kerasAC)',
     'download_url': 'https://github.com/kundajelab/kerasAC',
-    'version': '1',
+    'version': '0.2',
     'packages': ['kerasAC'],
     'setup_requires': [],
-    'install_requires': ['numpy>=1.9', 'keras>=2.2', 'h5py'],
+    'install_requires': ['pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.2', 'h5py', 'pandas','pybigwig','deeplift','abstention'],
     'scripts': [],
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict=kerasAC.predict:main',
+                                         'kerasAC_predict_tdb=kerasAC.predict_tiledb:main',
                                          'kerasAC_curves=kerasAC.curves:main',
+                                         'kerasAC_score=kerasAC.performance_metrics.performance_metrics:main',
                                          'kerasAC_interpret=kerasAC.interpret:main',
-                                         'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main']},
+                                         'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main',
+                                         'kerasAC_cross_validate=kerasAC.cross_validate:main']},
     'name': 'kerasAC'
 }
 

@@ -14,9 +14,11 @@ def parse_args():
     parser.add_argument("--startpos",nargs="+",type=int)
     parser.add_argument("--endpos",nargs="+",type=int)
     parser.add_argument("--outf",default=None)
-    parser.add_argument("--outf_width",default=None)
-    parser.add_argument("--outf_length",default=None)
+    parser.add_argument("--outf_width",type=float,default=3)
+    parser.add_argument("--outf_length",type=float,default=25)
     parser.add_argument("--ref")
+    parser.add_argument("--minthresh",type=float,default=None)
+    parser.add_argument("--maxthresh",type=float,default=None) 
     return parser.parse_args() 
 def one_hot_encode_sequence(chrom,start,end,ref):    
     num_generated=0
@@ -52,10 +54,15 @@ def main():
         #extract the signal from the bigwig input file
         bw=pyBigWig.open(args.input_bigwig)
         scores=bw.values(cur_chrom,cur_startpos,cur_endpos)
+        if args.minthresh!=None:
+            scores=[max([i,args.minthresh]) for i in scores]
+        if args.maxthresh!=None:
+            scores=[max([i,args.maxthresh]) for i in scores]
+            
         #get the one-hot-encoded sequence in this interval
         seq=one_hot_encode_sequence(cur_chrom,cur_startpos,cur_endpos,args.ref)
         #generate the plot for the current interval
-        plot_seq_importance(scores, seq, figsize=(25, 3),outf=args.outf)
+        plot_seq_importance(scores, seq, figsize=(args.outf_length, args.outf_width),outf=args.outf)
 
 if __name__=="__main__":
     main()
