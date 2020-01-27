@@ -7,7 +7,7 @@ config = {
     'version': '0.2',
     'packages': ['kerasAC'],
     'setup_requires': [],
-    'install_requires': ['pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.2', 'h5py', 'pandas','pybigwig','deeplift','abstention'],
+    'install_requires': ['pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.2', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3'],
     'scripts': [],
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict=kerasAC.predict:main',
