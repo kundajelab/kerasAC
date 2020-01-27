@@ -346,13 +346,14 @@ def train(args):
                      valid_generator,args)
 
     #remove any temporary s3 files
+    print("running cleanup!") 
     run_cleanup()
     
 def main():
     gc.freeze()
     args=parse_args()
     train(args)
-    
+    print("Exiting!")
 
 if __name__=="__main__":
     main()
