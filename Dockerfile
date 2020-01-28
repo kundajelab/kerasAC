@@ -1,4 +1,4 @@
-FROM kundajelab/keras-tensorflow:latest
+FROM  kundajelab/anaconda-tensorflow-keras:latest
 MAINTAINER Anna Shcherbina <annashch@stanford.edu>
 
 #

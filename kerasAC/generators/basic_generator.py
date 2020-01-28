@@ -32,6 +32,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
             end_col=data.columns[2]
             data=pd.read_csv(data_path,header=0,sep='\t',usecols=[chrom_col,start_col,end_col]+tasks)
     print("loaded labels")
+    print(data.head())
     try:
         data=data.set_index(['CHR','START','END'])
         print('set index to CHR, START, END')

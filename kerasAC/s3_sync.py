@@ -43,6 +43,7 @@ def read_s3_file_contents(s3_string):
 
 def run_cleanup():
     to_clean_set=list(set(to_clean))
+    print("to_clean_set:"+str(to_clean_set))
     if len(to_clean_set)>0:
         for f in to_clean_set:
             try:
@@ -50,4 +51,5 @@ def run_cleanup():
                 print("deleted local file:"+str(f))
             except:
                 continue
+    return 
         
