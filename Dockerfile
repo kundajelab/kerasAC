@@ -5,9 +5,9 @@ MAINTAINER Anna Shcherbina <annashch@stanford.edu>
 # Install kerasAC and dependencies
 #
 RUN apt-get update
-RUN apt-get install -y libz-dev liblzma-dev gcc libcurl4 libcurl4-openssl-dev 		
-RUN pip install pysam \
-		tiledb>=0.5.2 \
+RUN apt-get install -y libz-dev liblzma-dev gcc libcurl4 libcurl4-openssl-dev samtools
+RUN pip install --upgrade pip
+RUN pip install tiledb>=0.5.2 \
 		psutil \
 		tables \
 		numpy>=1.9 \
@@ -19,7 +19,7 @@ RUN pip install pysam \
 		boto3 \
 		pyBigWig
 
-
+RUN pip install pysam 
 WORKDIR /opt
 RUN git clone https://github.com/kundajelab/kerasAC.git
 WORKDIR /opt/kerasAC
