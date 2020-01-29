@@ -18,7 +18,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     from keras.layers.normalization import BatchNormalization
     from keras.regularizers import l1, l2
     from keras import backend as K
-    from keras.layers import Input, Add
+    from keras.layers import Input, Concatenate
     from keras.models import Model
 
     padding = "same"
@@ -52,7 +52,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     x = Dropout(0.3,name='dropout_2')(x)
     outputs = Dense(ntasks,name='final_dense'+str(ntasks))(x)
     #outputs = Activation("sigmoid",name='activation_6')(y)
-    model = Model(inputs = [seq], outputs = outputs)
+    model = Model(inputs = [seq, gc], outputs = outputs)
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     print("compiling!")
     loss=ambig_binary_crossentropy    
