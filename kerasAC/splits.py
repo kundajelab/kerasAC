@@ -53,6 +53,36 @@ chroms['hg19']=hg19_chroms
 chroms['hg38']=hg19_chroms
 
 
+mm10_chroms = ['chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14','chr15','chr16','chr17','chr18','chr19','chrX','chrY']
+mm10_splits = dict()
+mm10_splits[0] = {'test':['chr1'],
+                             'valid':['chr10','chr8']}
+mm10_splits[1] = {'test':['chr19','chr2'],
+                             'valid':['chr1']}
+mm10_splits[2] = {'test':['chr3'],
+                             'valid':['chr19','chr2']}
+mm10_splits[3] = {'test':['chr13','chr6'],
+                             'valid':['chr3']}
+mm10_splits[4] = {'test':['chr5','chr16','chrY'],
+                             'valid':['chr13','chr6']}
+mm10_splits[5] = {'test':['chr4','chr15'],
+                             'valid':['chr5','chr16','chrY']}
+mm10_splits[6] = {'test':['chr7','chr18','chr14'],
+                             'valid':['chr4','chr15']}
+mm10_splits[7] = {'test':['chr11','chr17','chrX'],
+                             'valid':['chr7','chr18','chr14']}
+mm10_splits[8] = {'test':['chr12','chr9'],
+                             'valid':['chr11','chr17','chrX']}
+mm10_splits[9] = {'test':['chr10','chr8'],
+                             'valid':['chr12','chr9']}
+
+
+splits['mm10']=mm10_splits
+splits['mm9']=mm9_splits
+chroms['mm10']=mm10_splits
+chroms['mm9']=mm9_splits
+
+
 def get_chroms(args,split):
     if split=="train":
         if args.train_chroms is not None:
