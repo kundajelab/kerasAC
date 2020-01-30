@@ -76,11 +76,11 @@ mm10_splits[8] = {'test':['chr12','chr9'],
 mm10_splits[9] = {'test':['chr10','chr8'],
                              'valid':['chr12','chr9']}
 
-
+#mm9 & mm10 splits are the same
 splits['mm10']=mm10_splits
-splits['mm9']=mm9_splits
+splits['mm9']=mm10_splits
 chroms['mm10']=mm10_splits
-chroms['mm9']=mm9_splits
+chroms['mm9']=mm10_splits
 
 
 def get_chroms(args,split):
