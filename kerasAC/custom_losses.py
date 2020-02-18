@@ -35,7 +35,7 @@ def ambig_log_poisson(y_true,y_pred):
 
 
 #PROFILE MODEL LOSSES #
-'''
+
 def multinomial_nll(true_counts, logits):
     """Compute the multinomial negative log-likelihood
     Args:
@@ -66,4 +66,4 @@ class MultichannelMultinomialNLL(object):
 
     def get_config(self):
         return {"n": self.n}
-'''
+

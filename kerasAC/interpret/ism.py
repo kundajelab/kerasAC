@@ -1,15 +1,24 @@
 #utilities for running in-silico mutagenesis within dragonn.
-import pdb 
 import numpy as np
 from keras.models import Model
 
+def ism_wrapper(inputs):
+        X=inputs[0]
+        preact_function=inputs[1]
+        task_index=inputs[2]
+        target_layer_idx=inputs[3]
+        use_gc=inputs[4]
+        if use_gc==True:
+                return in_silico_mutagenesis_gc(preact_function,X,task_index,target_layer_idx)
+        else:
+                return in_silico_mutagenesis(preact_function,X,task_index,target_layer_idx)
 def get_preact_function(model,target_layer_idx):
         #load the model to predict preacts
         preact_model=Model(inputs=model.input,
                            outputs=model.layers[target_layer_idx].output)
         return preact_model.predict
 
-def in_silico_mutagenesis(model, X, task_index,target_layer_idx=-2,start_pos=None,end_pos=None):
+def in_silico_mutagenesis(preact_function, X, task_index,target_layer_idx=-2,start_pos=None,end_pos=None):
     """
     Parameters                               
     ----------                                
@@ -67,7 +76,7 @@ def in_silico_mutagenesis(model, X, task_index,target_layer_idx=-2,start_pos=Non
 
 
 
-def in_silico_mutagenesis_gc(model, X, task_index,target_layer_idx=-2,start_pos=None,end_pos=None):
+def in_silico_mutagenesis_gc(preact_function, X, task_index,target_layer_idx=-2,start_pos=None,end_pos=None):
     """
     Parameters                               
     ----------                                
@@ -78,7 +87,6 @@ def in_silico_mutagenesis_gc(model, X, task_index,target_layer_idx=-2,start_pos=
     (num_task, num_samples, sequence_length,num_bases) ISM score array.
     """
     print("WE ARE MAKING THE ASSUMPTION THAT THE SEQUENCE INPUT IS THE FIRST INPUT IN THE MODEL AND GC IS THE SECOND INPUT") 
-    preact_function=get_preact_function(model,target_layer_idx)
     #1. get the wildtype predictions (n,1)    
     wild_type_logits=np.expand_dims(preact_function(X)[:,task_index],axis=1)
     

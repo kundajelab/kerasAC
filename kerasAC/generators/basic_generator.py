@@ -102,7 +102,8 @@ class DataGenerator(Sequence):
         self.file_to_pd=self.get_file_to_pd()        
         self.indices=self.file_to_pd[self.index_path]
         self.num_indices=self.indices.shape[0]
-
+        print("indices:"+str(self.indices.head()))
+        print("num_indices:"+str(self.num_indices))
         #handle task-specific weights -- this is a bit outdated and may be removed in the future. 
         if get_w1_w0==True:
             assert self.data is not None
