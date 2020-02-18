@@ -68,7 +68,7 @@ def parse_args():
     snp_group.add_argument("--chrom_col")
     snp_group.add_argument("--pos_col")
     snp_group.add_argument("--ref_col")
-    snp_group.add_argument("--alt_col")
+    snp_group.add_argument("--alt_col",default=None)
     snp_group.add_argument("--rsid_col")
     
     
@@ -104,20 +104,40 @@ def get_generators(args):
                                    compute_gc=args.compute_gc,
                                    batch_size=args.batch_size,
                                    expand_dims=args.expand_dims)
-        alt_generator=SNPGenerator(args.input_bed_file,
-                                   args.chrom_col,
-                                   args.pos_col,
-                                   args.alt_col,
-                                   args.flank,
-                                   args.ref_fasta,
-                                   rsid_col=args.rsid_col,
-                                   compute_gc=args.compute_gc,
-                                   batch_size=args.batch_size,
-                                   expand_dims=args.expand_dims)
-        return [ref_generator,alt_generator],['ref','alt']
+        if args.alt_col is not None:
+            alt_generator=SNPGenerator(args.input_bed_file,
+                                       args.chrom_col,
+                                       args.pos_col,
+                                       args.alt_col,
+                                       args.flank,
+                                       args.ref_fasta,
+                                       rsid_col=args.rsid_col,
+                                       compute_gc=args.compute_gc,
+                                       batch_size=args.batch_size,
+                                       expand_dims=args.expand_dims)
+            return [ref_generator,alt_generator],['ref','alt']
+        else:
+            return [ref_generator],['ref']
     else:
         raise Exception('unsupported value provided for generator_type argument; must be one of "snp" or "basic"')
     
+def update_scores(batch_scores,bed_entries_batch,scores,bed_entries,args):
+    #updated bed_entries
+    if bed_entries is None:
+        bed_entries=np.asarray(bed_entries_batch)
+    else:
+        bed_entries=np.append(bed_entries,np.asarray(bed_entries_batch),axis=0)
+    if args.interp_method in ['ism','ism_gc']:
+        ism_vals_normed=batch_scores[0]
+        ism_vals_input_scaled=batch_scores[1]
+        if scores is None:
+            scores=[]
+            scores[0]=ism_vals_normed
+            scores[1]=ism_vals_input_scaled
+        else:
+            scores[0]=np.append(scores[0],ism_vals_normed,axis=0)
+            scores[1]=np.append(scores[1],ism_vals_input_scaled,axis=0)
+    return bed_entries,scores    
 
 def interpret(generator,model,args):
     print("starting interpretation...")
@@ -165,18 +185,10 @@ def interpret(generator,model,args):
 
     print("iterating...")
     for bed_entries_batch,X in generator:
-        print(X[0].shape)
-        print(len(X[1]))
-        print("getting scores for batch!")
         batch_scores=interp_methods[args.interp_method]([X]+static_inputs)
-    
-        if scores is None:
-            scores=batch_scores
-            bed_entries=bed_entries_batch
-        else:
-            scores=np.append(scores,batch_scores,axis=0)
-            bed_entries=np.append(bed_entries,bed_entries_batch,axis=0)
-    return bed_entries,scores    
+        bed_entries,scores=update_scores(batch_scores,bed_entries_batch,scores,bed_entries,args)
+    return bed_entries,scores
+
 
 def compute_interpretation_scores(args):
     if type(args)==type({}):
@@ -187,11 +199,10 @@ def compute_interpretation_scores(args):
     print("loaded model") 
     
     for index in range(len(generators)):
-        scores,bed_entries=interpret(generators[index],model,args)
+        bed_entries,scores=interpret(generators[index],model,args)
         print("writing output file")
         np.savez_compressed(args.output_npz_file+'.'+out_suffixes[index],bed_entries=bed_entries,interp_scores=scores)
-
-
+        
 def main():
     args=parse_args()
     compute_interpretation_scores(args) 

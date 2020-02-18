@@ -136,6 +136,5 @@ def in_silico_mutagenesis_gc(preact_function, X, task_index,target_layer_idx=-2,
     ism_vals_mean=np.expand_dims(np.mean(ism_vals,axis=3),axis=3)
     ism_vals_normed=ism_vals-ism_vals_mean
 
-    #get the allele with the most significant effect.
-    
+    #get the allele with the most significant effect.    
     return ism_vals_normed, ism_vals_normed*X[0] 
