@@ -142,6 +142,12 @@ def update_scores(batch_scores,bed_entries_batch,batch_inputs,scores,bed_entries
         else:
             scores[0]=np.append(scores[0],ism_vals_normed,axis=0)
             scores[1]=np.append(scores[1],ism_vals_input_scaled,axis=0)
+    else:
+        if scores is None:
+            scores=batch_scores[args.input_index_to_interpret]
+        else:
+            scores=np.append(scores[args.input_index_to_interpret],batch_scores,axis=0)
+    print(scores.shape)
     return bed_entries,scores,inputs_onehot    
 
 def interpret(generator,model,args):
