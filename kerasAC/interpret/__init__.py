@@ -121,12 +121,17 @@ def get_generators(args):
     else:
         raise Exception('unsupported value provided for generator_type argument; must be one of "snp" or "basic"')
     
-def update_scores(batch_scores,bed_entries_batch,scores,bed_entries,args):
+def update_scores(batch_scores,bed_entries_batch,batch_inputs,scores,bed_entries,inputs_onehot,args):
     #updated bed_entries
     if bed_entries is None:
         bed_entries=np.asarray(bed_entries_batch)
     else:
         bed_entries=np.append(bed_entries,np.asarray(bed_entries_batch),axis=0)
+    if inputs_onehot is None:
+        inputs_onehot=batch_inputs
+    else:
+        inputs_onehot=np.append(inputs_onehot,batch_inputs,axis=0)
+        
     if args.interp_method in ['ism','ism_gc']:
         ism_vals_normed=batch_scores[0]
         ism_vals_input_scaled=batch_scores[1]
@@ -137,12 +142,13 @@ def update_scores(batch_scores,bed_entries_batch,scores,bed_entries,args):
         else:
             scores[0]=np.append(scores[0],ism_vals_normed,axis=0)
             scores[1]=np.append(scores[1],ism_vals_input_scaled,axis=0)
-    return bed_entries,scores    
+    return bed_entries,scores,inputs_onehot    
 
 def interpret(generator,model,args):
     print("starting interpretation...")
     scores=None
     bed_entries=None
+    inputs_onehot=None
     #get static inputs for interpreting each batch 
     static_inputs=[]
     if args.interp_method in ['ism','ism_gc']:
@@ -186,8 +192,8 @@ def interpret(generator,model,args):
     print("iterating...")
     for bed_entries_batch,X in generator:
         batch_scores=interp_methods[args.interp_method]([X]+static_inputs)
-        bed_entries,scores=update_scores(batch_scores,bed_entries_batch,scores,bed_entries,args)
-    return bed_entries,scores
+        bed_entries,scores,inputs_onehot=update_scores(batch_scores,bed_entries_batch,X[0],scores,bed_entries,inputs_onehot,args)
+    return bed_entries,scores,inputs_onehot
 
 
 def compute_interpretation_scores(args):
@@ -199,9 +205,9 @@ def compute_interpretation_scores(args):
     print("loaded model") 
     
     for index in range(len(generators)):
-        bed_entries,scores=interpret(generators[index],model,args)
+        bed_entries,scores,inputs_onehot=interpret(generators[index],model,args)
         print("writing output file")
-        np.savez_compressed(args.output_npz_file+'.'+out_suffixes[index],bed_entries=bed_entries,interp_scores=scores)
+        np.savez_compressed(args.output_npz_file+'.'+out_suffixes[index],bed_entries=bed_entries,interp_scores=scores,inputs_onehot=inputs_onehot)
         
 def main():
     args=parse_args()
