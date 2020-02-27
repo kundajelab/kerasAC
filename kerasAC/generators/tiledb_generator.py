@@ -404,7 +404,6 @@ class TiledbGenerator(Sequence):
         task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
         tasks=list(task_chrom_to_tdb.keys())
         num_tasks=len(tasks)
-        print("num_tasks:"+str(num_tasks))
         num_entries=coords.shape[0]
         #prepopulate the values array with 0
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
@@ -465,7 +464,7 @@ class TiledbGenerator(Sequence):
 
     
     def on_epoch_end(self):
-        if self.shuffle==True:
+        if self.shuffle_epoch_end==True:
             #shuffle the indices!
             numrows=self.upsampled_indices.shape[0]
             df_indices=list(range(numrows))
