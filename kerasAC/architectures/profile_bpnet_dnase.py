@@ -26,13 +26,14 @@ def getModelGivenModelOptionsAndWeightInits(args):
     n_dil_layers=6
     conv1_kernel_size=21
     profile_kernel_size=75
-    num_tasks=2
     control_smoothing=[1, 50]
 
     #read in arguments
     seed=args.seed
     init_weights=args.init_weights 
     sequence_flank=args.tdb_input_flank[0]
+    num_tasks=args.num_tasks
+    
     seq_len=2*sequence_flank
     out_flank=args.tdb_output_flank[0]
     out_pred_len=2*out_flank
@@ -155,4 +156,5 @@ if __name__=="__main__":
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())
+    pdb.set_trace() 
     

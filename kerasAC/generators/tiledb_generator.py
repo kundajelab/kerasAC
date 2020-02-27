@@ -73,7 +73,7 @@ class TiledbGenerator(Sequence):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
-        tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max',None
+        tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max','sum',None
         '''
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
@@ -404,6 +404,7 @@ class TiledbGenerator(Sequence):
         task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
         tasks=list(task_chrom_to_tdb.keys())
         num_tasks=len(tasks)
+        print("num_tasks:"+str(num_tasks))
         num_entries=coords.shape[0]
         #prepopulate the values array with 0
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
@@ -457,8 +458,10 @@ class TiledbGenerator(Sequence):
             raw_max[raw_max>1]=1
             raw_max[raw_max<0]=0
             return raw_max
+        elif aggregator == 'sum':
+            return np.sum(vals,axis=1) 
         else:
-            raise Exception("aggregate_vals argument must be one of None, average, max; you provided:"+aggregator)
+            raise Exception("aggregate_vals argument must be one of None, average, max, sum; you provided:"+aggregator)
 
     
     def on_epoch_end(self):

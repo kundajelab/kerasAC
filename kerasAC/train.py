@@ -341,7 +341,7 @@ def train(args):
     w1,w0=get_w1_w0_training(args,train_generator)
     args.w1=w1
     args.w0=w0
-    model=get_model(args)        
+    model=get_model(args)
     fit_and_evaluate(model,train_generator,
                      valid_generator,args)
 
