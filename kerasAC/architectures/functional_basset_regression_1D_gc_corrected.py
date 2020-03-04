@@ -25,6 +25,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     K.set_image_data_format('channels_last')
     print(K.image_data_format())
     seq = Input(shape=(1000,4),name='data/genome_data_dir')
+    gc=Input(shape=(1,))
+
     x = Conv1D(filters=300,kernel_size=19,input_shape=(1000,4),padding=padding, name='conv1d_1')(seq)
     x = BatchNormalization(axis=-1,name='batch_normalization_1')(x)
     x = Activation('relu',name='activation_1')(x)
@@ -50,7 +52,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     x = BatchNormalization(axis=-1,name='batch_normalization_5')(x)
     x = Activation('relu',name='activation_5')(x)
     x = Dropout(0.3,name='dropout_2')(x)
-    outputs = Dense(ntasks,name='final_dense'+str(ntasks))(x)
+    added=Concatenate(axis=-1)([x,gc])
+    outputs = Dense(ntasks,name='final_dense'+str(ntasks))(added)
     #outputs = Activation("sigmoid",name='activation_6')(y)
     model = Model(inputs = [seq, gc], outputs = outputs)
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
