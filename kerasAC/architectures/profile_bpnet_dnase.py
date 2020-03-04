@@ -139,11 +139,11 @@ def getModelGivenModelOptionsAndWeightInits(args):
     model=Model(inputs=[inp],outputs=[profile_out,
                                      count_out])
     print("got model") 
-    loss=multinomial_nll
-    print("specified loss") 
-    model.compile(optimizer=Adam(),loss=loss)
-    print("compiled model") 
-    return model
+    model.compile(optimizer=Adam(),
+                    loss=[MultichannelMultinomialNLL(1),'mse'],
+                    loss_weights=[1, 1])
+    print("compiled model")
+    return model 
 
 
 if __name__=="__main__":

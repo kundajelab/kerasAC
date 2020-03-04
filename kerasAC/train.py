@@ -105,7 +105,7 @@ def parse_args():
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
     epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=True)
-    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=True)
+    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=False)
     
     #add functionality to train on individuals' allele frequencies
     snp_params=parser.add_argument_group("snp_params")
@@ -168,10 +168,13 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,
                         shuffle=False)
+    print('fit_generator complete') 
     model.save_weights(model_output_path_weights_name)
+    print('weights saved') 
     architecture_string=model.to_json()
     with open(model_output_path_arch_name,'w') as outf:
         outf.write(architecture_string)
+    print('saved model architecture') 
     #sync to s3 if needed
     if args.model_prefix.startswith('s3://'):
         #sync log, model hdf5, weight file, arch file

@@ -3,6 +3,7 @@ import imp
 
 from .s3_sync import *
 from .custom_losses import *
+from .metrics import *
 
 def get_w1_w0_training(args,train_generator):
     w1=args.w1
@@ -44,7 +45,7 @@ def get_w1_w0_prediction(args):
     return w1,w0
 
 def get_model(args):
-    from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1    
+    from keras.utils.generic_utils import get_custom_objects
     custom_objects={"recall":recall,
                     "sensitivity":recall,
                     "specificity":specificity,
@@ -54,12 +55,14 @@ def get_model(args):
                     "f1":f1,
                     "ambig_binary_crossentropy":ambig_binary_crossentropy,
                     "ambig_mean_absolute_error":ambig_mean_absolute_error,
-                    "ambig_mean_squared_error":ambig_mean_squared_error}
-    
+                    "ambig_mean_squared_error":ambig_mean_squared_error,
+                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL}        
     w1,w0=get_w1_w0_prediction(args)
     if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)
         custom_objects["weighted_binary_crossentropy"]=loss_function
+    get_custom_objects().update(custom_objects)
+    
     if args.yaml!=None:
         from keras.models import model_from_yaml
         #load the model architecture from yaml
@@ -67,7 +70,7 @@ def get_model(args):
             yaml_string=read_s3_file_contents(args.yaml)
         else: 
             yaml_string=open(args.yaml,'r').read()
-        model=model_from_yaml(yaml_string,custom_objects=custom_objects) 
+        model=model_from_yaml(yaml_string)#,custom_objects=custom_objects) 
     elif args.json!=None:
         from keras.models import model_from_json
         #load the model architecture from json
@@ -75,7 +78,7 @@ def get_model(args):
             json_string=read_s3_file_contents(args.json)
         else: 
             json_string=open(args.json,'r').read()
-        model=model_from_json(json_string,custom_objects=custom_objects)
+        model=model_from_json(json_string)#,custom_objects=custom_objects)
     elif args.load_model_hdf5!=None: 
         #load from the hdf5
         from keras.models import load_model
@@ -83,7 +86,7 @@ def get_model(args):
             model_hdf5=download_s3_file(args.load_model_hdf5)
         else:
             model_hdf5=args.load_model_hdf5
-        model=load_model(model_hdf5,custom_objects=custom_objects)
+        model=load_model(model_hdf5)
     else:
         #initialize model from user-supplied architecture
         try:

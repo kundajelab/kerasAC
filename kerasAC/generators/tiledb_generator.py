@@ -465,9 +465,6 @@ class TiledbGenerator(Sequence):
     
     def on_epoch_end(self):
         if self.shuffle_epoch_end==True:
-            #shuffle the indices!
-            numrows=self.upsampled_indices.shape[0]
-            df_indices=list(range(numrows))
-            shuffle(df_indices)#this is an in-place operation
-            df_indices=pd.Series(df_indices)
-
+            print("WARNING: SHUFFLING ON EPOCH END MAYBE SLOW:"+str(self.upsampled_indices.shape))
+            self.upsampled_indices=self.upsampled_indices.sample(frac=1)
+            self.upsampled_indices=self.upsampled_indices.reset_index(drop=True)

@@ -24,7 +24,8 @@ from .generators.tiledb_predict_generator import *
 from .tiledb_config import *
 from .s3_sync import *
 from .splits import *
-from .get_model import * 
+from .get_model import *
+from .custom_losses import * 
 from kerasAC.config import args_object_from_args_dict
 from kerasAC.performance_metrics import *
 from kerasAC.custom_losses import *
