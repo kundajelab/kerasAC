@@ -422,10 +422,6 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                print("array_name:"+str(array_name))
-                #with tiledb.DenseArray(array_name,mode='r',ctx=self.ctx) as cur_array: 
-                #    cur_vals=cur_array[int(start_position):int(end_position)][attribute]
-                #    vals[val_index,:,task_index]=cur_vals
                 cur_vals=array_name[int(start_position):int(end_position)][attribute]
                 vals[val_index,:,task_index]=cur_vals
         return vals
