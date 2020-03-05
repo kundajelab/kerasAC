@@ -73,7 +73,8 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  tdb_ctx=tdb_ctx)
         self.tiledb_stride=tiledb_stride
         self.bed_regions=bed_regions
-
+        print("created predict generator")
+        
     def get_upsampled_indices(self):
         #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
         upsampled_chroms=None
@@ -84,7 +85,6 @@ class TiledbPredictGenerator(TiledbGenerator):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                print(task)
                 cur_vals=self.data_arrays['index'][task][chrom][:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]

@@ -150,7 +150,8 @@ class TiledbGenerator(Sequence):
 
         self.pseudocount=pseudocount
         self.return_coords=return_coords
-            
+        print('created generator')
+        
     def open_tiledb_arrays_for_reading(self):
         '''
         Opens tiledb arrays for each task/chromosome for reading  
@@ -400,7 +401,6 @@ class TiledbGenerator(Sequence):
         chroms=coords['chrom']
         start_positions=coords['pos']-flank
         end_positions=coords['pos']+flank
-        
         task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
         tasks=list(task_chrom_to_tdb.keys())
         num_tasks=len(tasks)
@@ -422,7 +422,7 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                
+                print("array_name:"+str(array_name))
                 #with tiledb.DenseArray(array_name,mode='r',ctx=self.ctx) as cur_array: 
                 #    cur_vals=cur_array[int(start_position):int(end_position)][attribute]
                 #    vals[val_index,:,task_index]=cur_vals

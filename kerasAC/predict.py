@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import multiprocessing as mp
 import time
 #graceful shutdown
 import psutil
@@ -9,7 +11,7 @@ import os
 
 #multithreading
 #from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import Pool,Process, Queue 
+#from multiprocessing import Pool,Process, Queue 
 
 import warnings
 import numpy as np
@@ -210,7 +212,7 @@ def init_worker():
 
 def kill_child_processes(parent_pid, sig=signal.SIGTERM):
     try:
-        parent = psutil.Process(parent_pid)
+        parent = mp.Process(parent_pid)
     except psutil.NoSuchProcess:
         return
     children = parent.children(recursive=True)
@@ -325,7 +327,7 @@ def predict_on_batch_wrapper(args,model,test_generator):
     num_batches=len(test_generator)
     processed=0
     try:
-        with Pool(processes=args.threads,initializer=init_worker) as pool: 
+        with mp.Pool(processes=args.threads,initializer=init_worker) as pool: 
             while (processed < num_batches):
                 idset=range(processed,min([num_batches,processed+args.max_queue_size]))
                 for result in pool.imap_unordered(get_batch_wrapper,idset):
@@ -387,11 +389,11 @@ def predict(args):
     global pred_queue
     global label_queue
     
-    pred_queue=Queue()
-    label_queue=Queue()
+    pred_queue=mp.Queue()
+    label_queue=mp.Queue()
     
-    label_writer=Process(target=write_predictions,args=([args]))
-    pred_writer=Process(target=write_labels,args=([args]))
+    label_writer=mp.Process(target=write_predictions,args=([args]))
+    pred_writer=mp.Process(target=write_labels,args=([args]))
     label_writer.start()
     pred_writer.start() 
 
