@@ -105,6 +105,7 @@ def get_model(args):
             print("failed to instantiate multi-gpu model, defaulting to single-gpu model")
     model=load_model_weights(args.weights,model)
     print("prepared the model")
+    model.summary()
     return model
 
 def load_model_weights(weight_file,model):
