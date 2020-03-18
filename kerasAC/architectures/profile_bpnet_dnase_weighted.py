@@ -27,7 +27,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     conv1_kernel_size=21
     profile_kernel_size=75
     control_smoothing=[1, 50]
-    counts_loss_weight=311
+    loss_weight=250
     
     #read in arguments
     seed=args.seed
@@ -142,7 +142,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("got model") 
     model.compile(optimizer=Adam(),
                     loss=[MultichannelMultinomialNLL(1),'mse'],
-                    loss_weights=[counts_loss_weight,1])
+                    loss_weights=[loss_weight,1])
     print("compiled model")
     return model 
 
