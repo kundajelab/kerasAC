@@ -41,7 +41,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
     if chroms_to_use!=None:
         data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
     print("filtered on chroms_to_use")
-    print("data.shape:"+str(data.shape))
+    print("data.shape:"+str(data.shape), data.columns)
     return data
 
 
@@ -91,7 +91,7 @@ class DataGenerator(Sequence):
         if tasks is None:
             tasks=[None]*num_inputs
         else:
-            tasks=[i.split(',') for i in tasks]
+            tasks=[i.split(',') for i in tasks] + [None]*(num_inputs-1)
         self.tasks=tasks
         print("TASKS:"+str(self.tasks))
         self.index_path=index_path
@@ -131,8 +131,12 @@ class DataGenerator(Sequence):
         generate a dictionary of file name to pandas data frame of file contents 
         '''
         file_to_df={}
-        print(self.index_path) 
-        file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=self.index_tasks,chroms_to_use=self.chroms_to_use)
+        print(self.index_path)
+        print(self.tasks)
+        if self.tasks[0] is not None:
+            file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=[ti[0] for ti in self.tasks if ti is not None],chroms_to_use=self.chroms_to_use)
+        else:
+            file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=self.index_tasks,chroms_to_use=self.chroms_to_use)
         print("got index_path df") 
         for i in range(self.num_inputs):
             cur_input=self.input_path[i]
@@ -142,10 +146,12 @@ class DataGenerator(Sequence):
             if cur_input in file_to_df:
                 continue
             file_to_df[self.input_path[i]]=open_data_file(data_path=cur_input,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
+        print('got input')
         for i in range(self.num_outputs):
             cur_output=self.output_path[i]
             print(cur_output)
             if cur_output in file_to_df:
+                print('skipped output reading')
                 continue
             file_to_df[cur_output]=open_data_file(data_path=cur_output,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
         return file_to_df
