@@ -27,7 +27,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     conv1_kernel_size=21
     profile_kernel_size=75
     control_smoothing=[1, 50]
-
+    counts_loss_weight=311
+    
     #read in arguments
     seed=args.seed
     init_weights=args.init_weights 
@@ -141,7 +142,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("got model") 
     model.compile(optimizer=Adam(),
                     loss=[MultichannelMultinomialNLL(1),'mse'],
-                    loss_weights=[1, 1])
+                    loss_weights=[1, counts_loss_weight])
     print("compiled model")
     return model 
 
@@ -153,6 +154,7 @@ if __name__=="__main__":
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
+    parser.add_argument("--num_tasks",type=int,default=1)
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())

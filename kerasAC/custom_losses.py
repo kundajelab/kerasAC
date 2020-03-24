@@ -36,6 +36,18 @@ def ambig_log_poisson(y_true,y_pred):
 
 #PROFILE MODEL LOSSES #
 
+def get_loss_weights(tdb_path,chrom,label_attribute,ambig_attribute,upsample_attribute,tdb_partition_thresh_for_upsample):
+    import tiledb
+    from kerasAC.tiledb_config import get_default_config
+    import pdb 
+    tdb_config=get_default_config()
+    ctx=tiledb.Ctx(tdb_config)
+    tdb_array=tiledb.DenseArray(tdb_path+"."+chrom,mode='r',ctx=ctx)
+    print("opened:"+tdb_path+"."+chrom+" for reading")
+    vals=tdb_array[:]
+    print("got tdb vals")
+    #label_attribute
+
 def multinomial_nll(true_counts, logits):
     """Compute the multinomial negative log-likelihood
     Args:

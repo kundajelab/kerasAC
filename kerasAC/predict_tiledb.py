@@ -213,8 +213,6 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
     for process in children:
         process.send_signal(sig)
         
-
-
 def get_batch_wrapper(idx):
     X,y,coords=test_generator[idx]
     if type(y) is not list:
