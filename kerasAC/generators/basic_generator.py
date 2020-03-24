@@ -15,11 +15,12 @@ def get_weights(data):
     return w1,w0
 
 def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
+    print("running open_data_file with tasks:"+str(tasks))
     if data_path.endswith('.hdf5'):
         if tasks==None:
             data=pd.read_hdf(data_path)
         else:
-            data=pd.read_hdf(data_path,columns=tasks)
+            data=pd.read_hdf(data_path,columns=['CHR','START','END']+tasks)
     else:
         #treat as bed file
         if tasks==None:
@@ -31,6 +32,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
             end_col=data.columns[2]
             data=pd.read_csv(data_path,header=0,sep='\t',usecols=[chrom_col,start_col,end_col]+tasks)
     print("loaded labels")
+    print(data.head())
     try:
         data=data.set_index(['CHR','START','END'])
         print('set index to CHR, START, END')
@@ -39,7 +41,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
     if chroms_to_use!=None:
         data=data[np.in1d(data.index.get_level_values(0), chroms_to_use)]
     print("filtered on chroms_to_use")
-    print("data.shape:"+str(data.shape))
+    print("data.shape:"+str(data.shape), data.columns)
     return data
 
 
@@ -89,8 +91,9 @@ class DataGenerator(Sequence):
         if tasks is None:
             tasks=[None]*num_inputs
         else:
-            tasks=[i.split(',') for i in tasks]
-        self.tasks=tasks        
+            tasks=[i.split(',') for i in tasks] + [None]*(num_inputs-1)
+        self.tasks=tasks
+        print("TASKS:"+str(self.tasks))
         self.index_path=index_path
         self.input_path=input_path
         self.output_path=output_path
@@ -99,7 +102,8 @@ class DataGenerator(Sequence):
         self.file_to_pd=self.get_file_to_pd()        
         self.indices=self.file_to_pd[self.index_path]
         self.num_indices=self.indices.shape[0]
-
+        print("indices:"+str(self.indices.head()))
+        print("num_indices:"+str(self.num_indices))
         #handle task-specific weights -- this is a bit outdated and may be removed in the future. 
         if get_w1_w0==True:
             assert self.data is not None
@@ -127,8 +131,12 @@ class DataGenerator(Sequence):
         generate a dictionary of file name to pandas data frame of file contents 
         '''
         file_to_df={}
-        print(self.index_path) 
-        file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=self.index_tasks,chroms_to_use=self.chroms_to_use)
+        print(self.index_path)
+        print(self.tasks)
+        if self.tasks[0] is not None:
+            file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=[ti[0] for ti in self.tasks if ti is not None],chroms_to_use=self.chroms_to_use)
+        else:
+            file_to_df[self.index_path]=open_data_file(data_path=self.index_path,tasks=self.index_tasks,chroms_to_use=self.chroms_to_use)
         print("got index_path df") 
         for i in range(self.num_inputs):
             cur_input=self.input_path[i]
@@ -138,10 +146,12 @@ class DataGenerator(Sequence):
             if cur_input in file_to_df:
                 continue
             file_to_df[self.input_path[i]]=open_data_file(data_path=cur_input,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
+        print('got input')
         for i in range(self.num_outputs):
             cur_output=self.output_path[i]
             print(cur_output)
             if cur_output in file_to_df:
+                print('skipped output reading')
                 continue
             file_to_df[cur_output]=open_data_file(data_path=cur_output,tasks=self.tasks[i],chroms_to_use=self.chroms_to_use)
         return file_to_df
@@ -251,7 +261,6 @@ class DataGenerator(Sequence):
         with self.lock:
             ref=pysam.FastaFile(self.ref_fasta)
             self.ref=ref
-            
         #get the coordinates for the current batch
         coords=self.get_coords(idx)
         #get the inputs
@@ -265,7 +274,6 @@ class DataGenerator(Sequence):
             else:
                 #extract values from pandas df 
                 cur_x=self.transform_vals(self.get_pd_vals(coords,cur_input))
-            #print(cur_x.shape)
             X.append(cur_x)
         #get the outputs
         y=[]
@@ -291,7 +299,7 @@ class DataGenerator(Sequence):
         if self.shuffle==True:
             if self.upsample_thresh_list is not None:
                 for ind,val in enumerate(self.batch_sizes):
-                    np.random.shuffle(self.upsample_numerical_indices[ind])
+                    np.random.shuffle(self.upsampled_numerical_indices[ind])
             else:
                 np.random.shuffle(self.indices)
 

@@ -38,11 +38,20 @@ def res_block(conv,num_filter,f_width,act,d_rate,i,bn_true=True):
 
 def build1d_model_residual(input_width,input_dimension,number_of_convolutions,filters,filter_dim,dilation,activations,bn_true=True,max_flag=True):
     input1=Input(shape=(input_width,4), name='sequence')
-    conv=Conv1D(32,1, padding='same',activation='relu',name = 'upsampling')(input1)
+    
+    #first layer
+    conv=BatchNormalization_mod(input1)
+    conv=Activation('relu')(conv)
+    conv=Conv1D(32,1, padding='same',name = 'upsampling')(conv)
+
+    #res blocks
     for i in range(0,number_of_convolutions):
             conv = res_block(conv,filters[i],filter_dim[i],activations,dilation[i],i,bn_true)
-    conv= Conv1D(32, 1,padding='valid', activation='relu',name='down_sampling')(conv)
-    output=Conv1D(1,1,activation='relu',name='dnase')(conv)
+
+    #last layer
+    conv=BatchNormalization_mod(conv)
+    conv=Activation('relu')(conv)
+    output=Conv1D(1,1,padding='same',name='dnase')(conv)
     model = Model(inputs=[input1],outputs=[output])
     return model
 
@@ -50,14 +59,17 @@ def getModelGivenModelOptionsAndWeightInits(args):
     #read in arguments
     seed=args.seed
     init_weights=args.init_weights 
-    sequence_flank=args.sequence_flank
+    sequence_flank=args.tdb_input_flank
+    if type(sequence_flank)==type(list()):
+        sequence_flank=sequence_flank[0]
     np.random.seed(seed)
     input_width=2*sequence_flank
     input_dimension=4
-    number_of_convolutions=16
+    number_of_convolutions=11
+
     filters=[32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32]
-    filter_dim=[11,11,11,11,11,11,11,11,21,21,21,21,41,41,41,41]
-    dilation=[1,1,1,1,4,4,4,4,10,10,10,10,25,25,25,25]
+    filter_dim=[5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+    dilation=[1, 1, 5, 5, 25, 25, 125, 125, 153,160, 625]
     activations='relu'
     bn_true=True
 
@@ -75,3 +87,15 @@ def getModelGivenModelOptionsAndWeightInits(args):
     loss=ambig_mean_squared_error
     model.compile(optimizer=adam,loss=loss)
     return model
+
+if __name__=="__main__":
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--seed',default=1234)
+    parser.add_argument('--init_weights',default=None)
+    parser.add_argument('--tdb_input_flank',default=6500)
+    args=parser.parse_args()
+    model=getModelGivenModelOptionsAndWeightInits(args)
+    print(model.summary())
+    pdb.set_trace()
+    

@@ -10,13 +10,20 @@ import pysam
 from ..util import *
 import tiledb
 import pdb
+from ..s3_sync import * 
 from collections import OrderedDict
-
+import gc 
 def get_genome_size(chrom_sizes_file,chroms):
     '''
     get size of chromosomes to train on 
     '''
-    chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
+    print(chrom_sizes_file) 
+    if chrom_sizes_file.startswith('s3://'):
+        chrom_sizes=read_s3_file_contents(chrom_sizes_file).split('\n')
+        chrom_sizes=pd.DataFrame([i.split('\t') for i in chrom_sizes])
+        chrom_sizes[1]=chrom_sizes[1].astype('int32') 
+    else:
+        chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
     chrom_sizes_subset=chrom_sizes[chrom_sizes[0].isin(chroms)]
     chrom_sizes_subset_dict=dict() 
     genome_size=chrom_sizes_subset[1].sum()
@@ -60,29 +67,48 @@ class TiledbGenerator(Sequence):
                  pseudocount=0,
                  add_revcomp=False,
                  expand_dims=False,
-                 return_coords=False):
+                 return_coords=False,
+                 tdb_config=None,
+                 tdb_ctx=None):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
-        tdb_input_aggregation/ tdb_output_aggregation -- one of 'avg','max',None
+        tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max','sum',None
         '''
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
-        self.ref_fasta=ref_fasta
+        #get local copy of s3 reference sequence
+        if ref_fasta.startswith('s3://'):
+            self.ref_fasta=download_s3_file(ref_fasta)
+            fai=download_s3_file(ref_fasta+'.fai')
+        else: 
+            self.ref_fasta=ref_fasta
         self.batch_size=batch_size
         self.add_revcomp=add_revcomp
         if self.add_revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
             
         self.expand_dims=expand_dims
+        #create tiledb configuration parameters (these have been found optimal for most use cases, but should set in a separate config file in the future)
+        if tdb_config is not None:
+            self.config=tdb_config
+        else:
+            self.config=tiledb.Config()
+        if tdb_ctx is not None:
+            self.ctx=tdb_ctx
+        else:
+            self.ctx=tiledb.Ctx(self.config)
         
         #identify chromosome information
         if chroms is not None:
             self.chroms_to_use=chroms
-        else: 
-            self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
+        else:
+            if chrom_sizes.startswith("s3://"):
+                self.chroms_to_use=[i.split()[0] for i in read_s3_file_contents(chrom_sizes).strip().split('\n')]
+            else:
+                self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
         self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
-        
+        print("got genome size")
         #identify indices to upsample
         self.tdb_indexer=tdb_indexer
 
@@ -101,8 +127,9 @@ class TiledbGenerator(Sequence):
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
+        print("opening tiledb arrays for reading")
         self.data_arrays=self.open_tiledb_arrays_for_reading()        
-
+        print("opened arrays for reading") 
 
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
@@ -123,8 +150,8 @@ class TiledbGenerator(Sequence):
 
         self.pseudocount=pseudocount
         self.return_coords=return_coords
-
-            
+        print('created generator')
+        
     def open_tiledb_arrays_for_reading(self):
         '''
         Opens tiledb arrays for each task/chromosome for reading  
@@ -134,12 +161,17 @@ class TiledbGenerator(Sequence):
         array_dict['inputs']=OrderedDict()
         array_dict['outputs']=OrderedDict() 
 
-        #index tasks 
-        index_tasks=open(self.tdb_indexer).read().strip().split('\n')
+        #index tasks
+        if self.tdb_indexer.startswith("s3://"):
+            index_tasks=read_s3_file_contents(self.tdb_indexer).split('\n')
+        else: 
+            index_tasks=open(self.tdb_indexer).read().strip().split('\n')
         for task in index_tasks:
             array_dict['index'][task]=OrderedDict() 
             for chrom in self.chroms_to_use:
-                array_dict['index'][task][chrom]=task+"."+chrom
+                #array_dict['index'][task][chrom]=task+"."+chrom
+               array_dict['index'][task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
+        print("opened index arrays for reading") 
         #inputs 
         for i in range(len(self.tdb_inputs)):
             tdb_input=self.tdb_inputs[i] 
@@ -150,21 +182,28 @@ class TiledbGenerator(Sequence):
             for task in tdb_input_tasks:
                 tdb_input_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
-                    tdb_input_array[task][chrom]=task+'.'+chrom
+                    #tdb_input_array[task][chrom]=task+'.'+chrom
+                    tdb_input_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
             array_dict['inputs'][i]=tdb_input_array
-            
+        print("opened input arrays for reading") 
         #outputs
         for i in range(len(self.tdb_outputs)): 
             tdb_output=self.tdb_outputs[i]
             if tdb_output=="seq":
-                continue 
-            tdb_output_tasks=open(tdb_output).read().strip().split('\n')
+                continue
+            if tdb_output.startswith("s3://"):
+                tdb_output_tasks=read_s3_file_contents(tdb_output).split('\n')
+            else: 
+                tdb_output_tasks=open(tdb_output).read().strip().split('\n')
             tdb_output_array=OrderedDict()
             for task in tdb_output_tasks:
+                print(task)
                 tdb_output_array[task]=OrderedDict() 
                 for chrom in self.chroms_to_use:
-                    tdb_output_array[task][chrom]=task+'.'+chrom
-            array_dict['outputs'][i]=tdb_output_array 
+                    #tdb_output_array[task][chrom]=task+'.'+chrom
+                    tdb_output_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
+            array_dict['outputs'][i]=tdb_output_array
+        print("opened output arrays for reading") 
         return array_dict
     
     def get_nonupsample_batch_indices(self):
@@ -199,9 +238,9 @@ class TiledbGenerator(Sequence):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
-                    cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
-                    print(cur_vals[0:10])
+                #print(self.data_arrays['index'][task][chrom])
+                #with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=self.ctx) as cur_array:
+                cur_vals=self.data_arrays['index'][task][chrom][:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
                 print("got values for cur task/chrom") 
@@ -251,6 +290,7 @@ class TiledbGenerator(Sequence):
     
 
     def __getitem__(self,idx):
+        gc.unfreeze()
         self.ref=pysam.FastaFile(self.ref_fasta)
         
         #get the coordinates for the current batch
@@ -296,9 +336,11 @@ class TiledbGenerator(Sequence):
         if self.return_coords is True:
             if self.add_revcomp==True:
                 coords=pd.concat((coords,coords),axis=0)
-            coords=[(row[0],row[1]) for index,row in coords.iterrows()]
+            coords=[(row[0],row[1]-self.tdb_output_flank[0],row[1]+self.tdb_output_flank[0]) for index,row in coords.iterrows()]
+            #print("returning batch!")
             return (X,y,coords)
         else:
+            #print("returning batch!")
             return (X,y) 
     
     def get_coords(self,idx):
@@ -359,7 +401,6 @@ class TiledbGenerator(Sequence):
         chroms=coords['chrom']
         start_positions=coords['pos']-flank
         end_positions=coords['pos']+flank
-        
         task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
         tasks=list(task_chrom_to_tdb.keys())
         num_tasks=len(tasks)
@@ -367,7 +408,6 @@ class TiledbGenerator(Sequence):
         #prepopulate the values array with 0
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
         #define a context for querying tiledb
-        ctx=tiledb.Ctx()
         #iterate through entries 
         for val_index in range(num_entries):            
             #iterate through tasks for each entry 
@@ -382,12 +422,8 @@ class TiledbGenerator(Sequence):
                     continue 
                 
                 array_name=task_chrom_to_tdb[task][chrom]
-                with tiledb.DenseArray(array_name, mode='r',ctx=ctx) as cur_array:
-                    try:
-                        cur_vals=cur_array[int(start_position):int(end_position)][attribute]
-                        vals[val_index,:,task_index]=cur_vals
-                    except:
-                        print("skipping: start_position:"+str(start_position)+" : end_position:"+str(end_position))
+                cur_vals=array_name[int(start_position):int(end_position)][attribute]
+                vals[val_index,:,task_index]=cur_vals
         return vals
     
     def transform_vals(self,vals,transformer):
@@ -411,15 +447,20 @@ class TiledbGenerator(Sequence):
             return np.mean(vals,axis=1)
         elif aggregator == 'max':
             return np.max(vals,axis=1)
+        elif aggregator == 'binary_max':
+            #get the max in the interval, but cap it at one or 0
+            raw_max=np.max(vals,axis=1)
+            raw_max[raw_max>1]=1
+            raw_max[raw_max<0]=0
+            return raw_max
+        elif aggregator == 'sum':
+            return np.sum(vals,axis=1) 
         else:
-            raise Exception("aggregate_vals argument must be one of None, average, max; you provided:"+aggregator)
+            raise Exception("aggregate_vals argument must be one of None, average, max, sum; you provided:"+aggregator)
 
     
     def on_epoch_end(self):
-        if self.shuffle==True:
-            #shuffle the indices!
-            numrows=self.upsampled_indices.shape[0]
-            df_indices=list(range(numrows))
-            shuffle(df_indices)#this is an in-place operation
-            df_indices=pd.Series(df_indices)
-
+        if self.shuffle_epoch_end==True:
+            print("WARNING: SHUFFLING ON EPOCH END MAYBE SLOW:"+str(self.upsampled_indices.shape))
+            self.upsampled_indices=self.upsampled_indices.sample(frac=1)
+            self.upsampled_indices=self.upsampled_indices.reset_index(drop=True)

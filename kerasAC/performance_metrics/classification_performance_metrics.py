@@ -14,6 +14,7 @@ from .utils import *
 
 def auroc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     try:
+        true_y_for_task_filtered=[int(round(i)) for i in true_y_for_task_filtered]
         task_auroc = roc_auc_score(y_true=true_y_for_task_filtered,
                                    y_score=predictions_for_task_filtered)
     except Exception as e:
@@ -26,6 +27,7 @@ def auroc_func(predictions_for_task_filtered, true_y_for_task_filtered):
 def auprc_func(predictions_for_task_filtered, true_y_for_task_filtered):
     # sklearn only supports 2 classes (0,1) for the auPRC calculation
     try:
+        true_y_for_task_filtered=[int(round(i)) for i in true_y_for_task_filtered]
         task_auprc=average_precision_score(true_y_for_task_filtered, predictions_for_task_filtered)
     except:
         print("Could not calculate auPRC:")
@@ -37,11 +39,11 @@ def get_accuracy_stats_for_task(predictions_for_task_filtered, true_y_for_task_f
     predictions_for_task_filtered_round = np.array([round(el) for el in predictions_for_task_filtered])
     accuratePredictions = predictions_for_task_filtered_round==true_y_for_task_filtered;
 
-    numPositives_forTask=np.sum(true_y_for_task_filtered==1,axis=0,dtype="float");
-    numNegatives_forTask=np.sum(true_y_for_task_filtered==0,axis=0,dtype="float"); 
+    numPositives_forTask=np.sum(true_y_for_task_filtered>0,axis=0,dtype="float");
+    numNegatives_forTask=np.sum(true_y_for_task_filtered<=0,axis=0,dtype="float"); 
 
-    accuratePredictions_positives = np.sum(accuratePredictions*(true_y_for_task_filtered==1),axis=0);
-    accuratePredictions_negatives = np.sum(accuratePredictions*(true_y_for_task_filtered==0),axis=0);
+    accuratePredictions_positives = np.sum(accuratePredictions*(true_y_for_task_filtered>0),axis=0);
+    accuratePredictions_negatives = np.sum(accuratePredictions*(true_y_for_task_filtered<=0),axis=0);
     unbalancedAccuracy_forTask = (accuratePredictions_positives + accuratePredictions_negatives)/(numPositives_forTask + numNegatives_forTask)
 
     positiveAccuracy_forTask = accuratePredictions_positives/numPositives_forTask
@@ -60,31 +62,23 @@ def recall_at_fdr_function(predictions_for_task_filtered,true_y_for_task_filtere
     for fdr_thresh_index in range(len(fdr_thresh_list)):
         if float(fdr_thresh_list[fdr_thresh_index])>1:
             fdr_thresh_list[fdr_thresh_index]=fdr_thresh_list[fdr_thresh_index]/100
-            
+    
     precision,recall,class_thresholds=precision_recall_curve(true_y_for_task_filtered,predictions_for_task_filtered)
     fdr=1-precision
 
     #remove the last values in recall and fdr, as the scipy precision_recall_curve function sets them to 0 automatically
     recall=np.delete(recall,-1)
     fdr=np.delete(fdr,-1)
-
-    #concatenate recall,fdr, thresholds along axis=1
-    recall=np.expand_dims(recall,axis=1)
-    fdr=np.expand_dims(fdr,axis=1)
-    class_thresholds=np.expand_dims(class_thresholds,axis=1)
-    data=np.concatenate((recall,fdr,class_thresholds),axis=1)
-
-    #sort by threshold
-    data=data[data[:,2].argsort()]
+    df=pd.DataFrame({'recall':recall,'fdr':fdr,'class_thresholds':class_thresholds})
+    df=df.sort_values(by=['fdr','recall','class_thresholds'])
 
     #get the recall, fdr at each thresh
     recall_thresholds=[]
     class_thresholds=[]
     for fdr_thresh in fdr_thresh_list:
         try:
-            data_index=np.max(np.nonzero(data[:,1]<=fdr_thresh))
-            recall_thresholds.append(data[data_index,0])
-            class_thresholds.append(data[data_index,2])
+            recall_thresholds.append(float(df[df.fdr<=fdr_thresh].tail(n=1)['recall']))
+            class_thresholds.append(float(df[df.fdr<=fdr_thresh].tail(n=1)['class_thresholds']))
         except:
             print("No class threshold can give requested fdr <=:"+str(fdr_thresh))
             recall_thresholds.append(np.nan)
@@ -107,7 +101,9 @@ def get_performance_metrics_classification(predictions,true_y):
         true_y_for_task=np.squeeze(true_y[:,c])
         predictions_for_task=np.squeeze(predictions[:,c])
         predictions_for_task_filtered,true_y_for_task_filtered = remove_ambiguous_peaks(predictions_for_task,true_y_for_task)
-
+        print("predictions:"+str(predictions_for_task_filtered))
+        print("labels:"+str(true_y_for_task_filtered))
+        print(c) 
         accuracy_stats_task = get_accuracy_stats_for_task(predictions_for_task_filtered, true_y_for_task_filtered, c)
         auprc_task=auprc_func(predictions_for_task_filtered,true_y_for_task_filtered)
         auroc_task=auroc_func(predictions_for_task_filtered,true_y_for_task_filtered)

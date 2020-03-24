@@ -51,9 +51,9 @@ def parse_args():
     
     output_params=parser.add_argument_group("output_params")
     output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
-    output_params.add_argument('--performance_metrics_classification_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_regression_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
-    output_params.add_argument('--performance_metrics_profile_file',help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_classification_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_regression_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
+    output_params.add_argument('--performance_metrics_profile_file',nargs="+", help='file name to save accuracy metrics; accuracy metrics not computed if file not provided',default=None)
     
     calibration_params=parser.add_argument_group("calibration_params")
     calibration_params.add_argument("--calibrate_classification",action="store_true",default=False)
@@ -142,10 +142,6 @@ def cross_validate(args):
     base_performance_profile_file=args_dict['performance_metrics_profile_file']
 
     base_predictions_and_labels_hdf5=args_dict['predictions_and_labels_hdf5']
-    preds_and_labels_split=base_predictions_and_labels_hdf5.split('/')
-    basename_preds_and_labels_split=preds_and_labels_split[-1]
-    prefix_preds_and_labels_split='/'.join(preds_and_labels_split[0:-1])
-    
     base_init_weights=args_dict['init_weights'] 
 
     all_splits=splits[args.assembly]
@@ -174,30 +170,28 @@ def cross_validate(args):
         if args.save_w1_w0!=None:
             args_dict["w1_w0_file"]=args.save_w1_w0
         if base_predictions_and_labels_hdf5!=None:
-            args_dict['predictions_and_labels_hdf5']=base_predictions_and_labels_hdf5+"."+str(split) 
+            args_dict['predictions_and_labels_hdf5']=base_predictions_and_labels_hdf5+"."+str(split)
+            print(args_dict['predictions_and_labels_hdf5'])
         args_dict['predict_chroms']=test_chroms
         print("Calculating predictions on the test fold in split:"+str(split)) 
         predict(args_dict)
 
         #score the predictions
         print("scoring split:"+str(split))
-
-        score_suffix=basename_preds_and_labels_split+"."+str(split)
-        prefix_preds_and_labels_split='/'.join(preds_and_labels_split[0:-1])
-    
         preds_to_score=[]
         labels_to_score=[]
         for cur_output in range(args.num_outputs):
-            for cur_task in range(args.num_tasks):
-                cur_preds=prefix_preds_and_labels_split+'/'+str(cur_output)+".task"+str(cur_task)+"."+score_suffix+".predictions"
-                cur_labels=prefix_preds_and_labels_split+'/'+str(cur_output)+".task"+str(cur_task)+"."+score_suffix+".labels"
-                preds_to_score.append(cur_preds)
-                labels_to_score.append(cur_labels)
+            cur_preds=base_predictions_and_labels_hdf5+"."+str(split)+".predictions."+str(cur_output)
+            cur_labels=base_predictions_and_labels_hdf5+"."+str(split)+".labels."+str(cur_output)
+            preds_to_score.append(cur_preds)
+            labels_to_score.append(cur_labels)
                 
-        if base_performance_classification_file!=None:
-            args_dict['performance_metrics_classification_file']=base_performance_classification_file+"."+str(split)
-        if base_performance_regression_file!=None:
-            args_dict['performance_metrics_regression_file']=base_performance_regression_file+"."+str(split)
+        if base_performance_classification_file is not None:
+            args_dict['performance_metrics_classification_file']=[perf_file+"."+str(split) for perf_file in base_performance_classification_file]
+        elif base_performance_regression_file is not None:
+            args_dict['performance_metrics_regression_file']=[perf_file +'.'+str(split) for perf_file in base_performance_regression_file]
+        elif base_performance_profile_file is not None:
+            args_dict['performance_metrics_profile_file']=[perf_file +'.'+str(split) for perf_file in base_performance_profile_file]
         print(preds_to_score)
         print(labels_to_score)
         args_dict['predictions_hdf5']=preds_to_score

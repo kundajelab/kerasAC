@@ -38,7 +38,9 @@ class TiledbPredictGenerator(TiledbGenerator):
                  pseudocount=0,
                  expand_dims=False,
                  tiledb_stride=1,
-                 bed_regions=None):
+                 bed_regions=None,
+                 tdb_config=None,
+                 tdb_ctx=None):
         
         TiledbGenerator.__init__(self,          
                                  ref_fasta=ref_fasta,
@@ -66,10 +68,13 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  pseudocount=0,
                                  add_revcomp=False,
                                  expand_dims=expand_dims,
-                                 return_coords=True)
+                                 return_coords=True,
+                                 tdb_config=tdb_config,
+                                 tdb_ctx=tdb_ctx)
         self.tiledb_stride=tiledb_stride
         self.bed_regions=bed_regions
-
+        print("created predict generator")
+        
     def get_upsampled_indices(self):
         #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
         upsampled_chroms=None
@@ -80,11 +85,9 @@ class TiledbPredictGenerator(TiledbGenerator):
             upsampled_indices_chrom=None
             chrom_size=None
             for task in self.data_arrays['index']:
-                with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r') as cur_array:
-                    cur_vals=cur_array[:][self.tdb_partition_attribute_for_upsample]
+                cur_vals=self.data_arrays['index'][task][chrom][:][self.tdb_partition_attribute_for_upsample]
                 if chrom_size is None:
                     chrom_size=cur_vals.shape[0]
-                print("got values for cur task/chrom") 
                 upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
                 print("got upsampled indices")
                 if upsampled_indices_chrom is None:
