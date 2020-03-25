@@ -1,3 +1,4 @@
+#referenced files are in /users/annashch/kerasAC/examples/hdf5_predict_examples
 CUDA_VISIBLE_DEVICES=2 kerasAC_predict_hdf5 --index_data_path DNASE.K562.regressionlabels.allbins.hdf5 \
 		    --input_data_path seq /srv/scratch/annashch/deeplearning/gc_experiments/k562/gc_hg38_110bp.hdf5 \
 		    --output_data_path  DNASE.K562.regressionlabels.allbins.hdf5 \

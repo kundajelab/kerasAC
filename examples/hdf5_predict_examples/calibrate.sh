@@ -1,3 +1,4 @@
+#referenced files are in /users/annashch/kerasAC/examples/hdf5_predict_examples
 kerasAC_calibrate --model DNASE.K562.regressionlabels.withgc.0.hdf5 \
 		  --preacts gc.dnase.k562.predictions.preacts.0 \
 		  --labels gc.dnase.k562.labels.0 \
