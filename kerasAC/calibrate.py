@@ -4,6 +4,10 @@ from __future__ import print_function
 import pandas as pd
 from .custom_losses import *
 from .metrics import *
+from keras.models import load_model
+from keras.models import Model
+from keras.utils.generic_utils import get_custom_objects
+from abstention.calibration import PlattScaling, IsotonicRegression 
 import argparse
 def parse_args():
     parser=argparse.ArgumentParser(description="calibration of model preacts/logits")
@@ -15,9 +19,7 @@ def parse_args():
     parser.add_argument("--calibrate_classification",action="store_true",default=False) 
     return parser.parse_args() 
 
-def load_model(model_hdf5_fname):
-    from keras.models import load_model
-    from keras.utils.generic_utils import get_custom_objects
+def load_model_wrapper(model_hdf5_fname):
     custom_objects={"recall":recall,
                     "sensitivity":recall,
                     "specificity":specificity,
@@ -44,7 +46,7 @@ def get_preacts(model,calibrate_classification=False, calibrate_regression=False
                     outputs=model.layers[-1].output)
 
 
-def calibrate(preacts,labels,model,outf,calibrate_regression=False,calibrate_classification=False,get_model_preact=False):
+def calibrate(preacts,labels,model,outf,calibrate_regression=False,calibrate_classification=False,get_model_preacts=False):
     assert not ((calibrate_classification==False) and (calibrate_regression==False))
     assert not ((calibrate_classification==True) and (calibrate_regression==True))
     if(type(preacts)!=type(pd.DataFrame)):
@@ -58,7 +60,7 @@ def calibrate(preacts,labels,model,outf,calibrate_regression=False,calibrate_cla
     labels=labels.loc[preacts.index]
     print("ordered labels")
     if type(model)==str:
-        model=load_model(model)
+        model=load_model_wrapper(model)
         get_model_preact=True 
     if get_model_preact==True:
         model=get_preacts(model,calibrate_classification=calibrate_classification, calibrate_regression=calibrate_regression)
@@ -68,14 +70,15 @@ def calibrate(preacts,labels,model,outf,calibrate_regression=False,calibrate_cla
     calibrated_predictions=None
     for i in range(preacts.shape[1]):
         #don't calibrate on nan inputs
-        nonambiguous_indices=np.argwhere(~np.isnan(labels[:,i]))
-        if args.calibrate_classification==True:
-            calibration_func = PlattScaling()(valid_preacts=preacts[nonambiguous_indices,i],
-                                                             valid_labels=labels[nonambiguous_indices,i])
-        elif args.calibrate_regression==True:
-            calibration_func=IsotonicRegression()(valid_preacts=preacts[nonambiguous_indices,i].squeeze(),
-                                                  valid_labels=labels[nonambiguous_indices,i].squeeze())
-        calibrated_predictions_task=calibration_func(preacts[:,i])
+        nonambiguous_indices=np.argwhere(~np.isnan(labels[i]))
+        if calibrate_classification==True:
+            calibration_func = PlattScaling()(valid_preacts=preacts[i][nonambiguous_indices],
+                                                             valid_labels=labels[i][nonambiguous_indices])
+        elif calibrate_regression==True:
+            calibration_func=IsotonicRegression()(valid_preacts=preacts[i][nonambiguous_indices].squeeze(),
+                                                  valid_labels=labels[i][nonambiguous_indices].squeeze())
+
+        calibrated_predictions_task=calibration_func(preacts[i].values)
         if calibrated_predictions is None:
             calibrated_predictions=np.expand_dims(calibrated_predictions_task,axis=1)
         else:

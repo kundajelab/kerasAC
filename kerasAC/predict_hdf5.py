@@ -423,18 +423,18 @@ def predict(args):
         out_labels_prefix=get_out_labels_prefix(args)
         out_calibrated_prefix=get_out_calibrated_prefix(args)
         
-        for output_index in args.num_outputs:
+        for output_index in range(args.num_outputs):
             preacts_fname='.'.join([out_predictions_prefix,str(output_index)])
             labels_fname='.'.join([out_labels_prefix,str(output_index)])
             calibrated_fname='.'.join([out_calibrated_prefix,str(output_index)])
             #model has already been transformed to a preact model above
             calibrate(preacts_fname,
                       labels_fname,
-                      calibrated_fname,
                       model,
+                      calibrated_fname,
                       calibrate_regression=args.calibrate_regression,
                       calibrate_classification=args.calibrate_classification,
-                      get_model_preact=False)
+                      get_model_preacts=False)
     #clean up any s3 artifacts:
     run_cleanup()
     

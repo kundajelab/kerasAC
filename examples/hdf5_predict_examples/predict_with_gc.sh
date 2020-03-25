@@ -10,5 +10,6 @@ CUDA_VISIBLE_DEVICES=2 kerasAC_predict_hdf5 --index_data_path DNASE.K562.regress
 		    --threads 10 \
 		    --max_queue_size 100 \
 		    --predictions_and_labels_hdf5 gc.dnase.k562 \
-		    --calibrate_regression
+		    --calibrate_regression \
+		    --expand_dims
 
