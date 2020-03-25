@@ -102,17 +102,44 @@ def parse_args():
     parser.add_argument('--batch_size',type=int,help='batch size to use to make model predictions',default=50)
     return parser.parse_args()
 
+def get_out_predictions_prefix(args):
+    if args.predictions_and_labels_hdf5.startswith('s3://'):
+        #use a local version of the file and upload to s3 when finished
+        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+        out_predictions_prefix=filename.split('/')[-1]+".predictions"
+    else: 
+        out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+    if args.calibrate_classification is True:
+        out_predictions_prefix=out_predictions_prefix+".logits"
+    elif args.calibrate_regression is True:
+        out_predictions_prefix=out_predictions_prefix+".preacts"
+    return out_predictions_prefix 
+
+def get_out_calibrated_prefix(args):
+    if args.predictions_and_labels_hdf5.startswith('s3://'):
+        #use a local version of the file and upload to s3 when finished
+        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+        out_predictions_prefix=filename.split('/')[-1]+".predictions.calibrated"
+    else: 
+        out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions.calibrated"
+    return out_predictions_prefix 
+    
+
+def get_out_labels_prefix(args):
+    if args.predictions_and_labels_hdf5.startswith('s3://'):
+        #use a local version of the file and upload to s3 when finished
+        bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
+        out_labels_prefix=filename.split('/')[-1]+".labels"
+    else: 
+        out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
+    return out_labels_prefix
+
 def write_predictions(args):
     '''
     separate predictions file for each output/task combination 
     '''
     try:
-        if args.predictions_and_labels_hdf5.startswith('s3://'):
-            #use a local version of the file and upload to s3 when finished
-            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
-            out_predictions_prefix=filename.split('/')[-1]+".predictions"
-        else: 
-            out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+        out_predictions_prefix=get_out_predictions_prefix(args)
         first=True
         while True:
             pred_df=pred_queue.get()
@@ -148,13 +175,8 @@ def write_labels(args):
     '''
     separate label file for each output/task combination
     '''
+    out_labels_prefix=get_out_labels_prefix(args)
     try:
-        if args.predictions_and_labels_hdf5.startswith('s3://'):
-            #use a local version of the file and upload to s3 when finished
-            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
-            out_labels_prefix=filename.split('/')[-1]+".labels"
-        else: 
-            out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
         first=True
         while True:
             label_df=label_queue.get()
@@ -397,8 +419,22 @@ def predict(args):
     #perform calibration, if specified
     if perform_calibration is True:
         print("calibrating")
-        calibrate(args)
-
+        out_predictions_prefix=get_out_predictions_prefix(args)
+        out_labels_prefix=get_out_labels_prefix(args)
+        out_calibrated_prefix=get_out_calibrated_prefix(args)
+        
+        for output_index in args.num_outputs:
+            preacts_fname='.'.join([out_predictions_prefix,str(output_index)])
+            labels_fname='.'.join([out_labels_prefix,str(output_index)])
+            calibrated_fname='.'.join([out_calibrated_prefix,str(output_index)])
+            #model has already been transformed to a preact model above
+            calibrate(preacts_fname,
+                      labels_fname,
+                      calibrated_fname,
+                      model,
+                      calibrate_regression=args.calibrate_regression,
+                      calibrate_classification=args.calibrate_classification,
+                      get_model_preact=False)
     #clean up any s3 artifacts:
     run_cleanup()
     

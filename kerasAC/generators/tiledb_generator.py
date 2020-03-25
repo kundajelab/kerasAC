@@ -8,6 +8,7 @@ import math
 from math import ceil, floor
 import pysam
 from ..util import *
+from ..tiledb_config import * 
 import tiledb
 import pdb
 from ..s3_sync import * 
@@ -93,7 +94,7 @@ class TiledbGenerator(Sequence):
         if tdb_config is not None:
             self.config=tdb_config
         else:
-            self.config=tiledb.Config()
+            self.config=get_default_config()
         if tdb_ctx is not None:
             self.ctx=tdb_ctx
         else:
