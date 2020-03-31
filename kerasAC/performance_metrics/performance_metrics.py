@@ -55,6 +55,8 @@ def metrics_from_pickle(cur_pickle,tasks,args):
 def metrics_from_hdf(cur_labels, cur_predictions, tasks,args):
     cur_labels=pd.read_hdf(cur_labels)[tasks]
     cur_predictions=pd.read_hdf(cur_predictions)[tasks]
+    #make sure they are ordered
+    cur_labels=cur_labels.loc[cur_predictions.index]
     metrics_function=get_metrics_function(args)
     return metrics_function(cur_predictions,cur_labels) 
 
