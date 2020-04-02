@@ -1,4 +1,7 @@
 from keras.utils import Sequence
+import os
+import signal
+import psutil
 import pandas as pd
 import numpy as np
 import random
@@ -14,53 +17,67 @@ import pdb
 from ..s3_sync import * 
 from collections import OrderedDict
 import gc 
-def get_genome_size(chrom_sizes_file,chroms):
-    '''
-    get size of chromosomes to train on 
-    '''
-    print(chrom_sizes_file) 
-    if chrom_sizes_file.startswith('s3://'):
-        chrom_sizes=read_s3_file_contents(chrom_sizes_file).split('\n')
-        chrom_sizes=pd.DataFrame([i.split('\t') for i in chrom_sizes])
-        chrom_sizes[1]=chrom_sizes[1].astype('int32') 
-    else:
-        chrom_sizes=pd.read_csv(chrom_sizes_file,header=None,sep='\t')
-    chrom_sizes_subset=chrom_sizes[chrom_sizes[0].isin(chroms)]
-    chrom_sizes_subset_dict=dict() 
-    genome_size=chrom_sizes_subset[1].sum()
-    last_index_to_chrom=dict()
-    last_index=0
-    for index,row in chrom_sizes_subset.iterrows():
-        chrom_name=row[0]
-        chrom_size=row[1]
-        chrom_sizes_subset_dict[chrom_name]=chrom_size
-        first_index=last_index 
-        last_index+=chrom_size
-        last_index_to_chrom[last_index]=[chrom_name,chrom_size,first_index]
-    return chrom_sizes_subset_dict,last_index_to_chrom, genome_size
+import pdb             
 
-            
+
+def get_upsampled_indices_chrom(inputs):
+    region_start=inputs[0]
+    region_end=inputs[1]
+    tdb_array_name=inputs[2]
+    tdb_ambig_attribute=inputs[3]
+    tdb_partition_attribute_for_upsample=inputs[4]
+    task_indices=inputs[5]
+    tdb_partition_thresh_for_upsample=inputs[6]
+    print("starting getting indices to upsample in range:"+str(region_start)+"-"+str(region_end))
+    with tiledb.open(tdb_array_name,'r',ctx=tiledb.Ctx(get_default_config())) as tdb_array:
+        if tdb_ambig_attribute is not None:
+            attr_vals=tdb_array.query(attrs=[tdb_ambig_attribute,tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,task_indices]
+            ambig_attr_vals=np.sum(attr_vals[tdb_ambig_attribute],axis=1)
+        else:
+            attr_vals=tdb_array.query(attrs=[tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,task_indices]        
+        upsample_vals=np.sum(attr_vals[tdb_partition_attribute_for_upsample],axis=1)
+    if tdb_ambig_attribute is not None:
+        cur_upsampled_indices=region_start+np.argwhere((upsample_vals>=tdb_partition_thresh_for_upsample) & ( ambig_attr_vals==0))
+    else: 
+        cur_upsampled_indices=region_start+np.argwhere(upsample_vals>=tdb_partition_thresh_for_upsample)
+    print("finished indices to upsample in range:"+str(region_start)+"-"+str(region_end))
+    return cur_upsampled_indices
+
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(sig)
+
+
 
 class TiledbGenerator(Sequence):
     def __init__(self,
                  ref_fasta,
                  batch_size,
-                 tdb_indexer,
+                 tdb_array,
                  tdb_partition_attribute_for_upsample,
                  tdb_partition_thresh_for_upsample,
-                 tdb_inputs,
                  tdb_input_source_attribute,
                  tdb_input_flank,
                  upsample_ratio,
-                 tdb_outputs,
                  tdb_output_source_attribute,
                  tdb_output_flank,
                  num_inputs,
                  num_outputs,
+                 task_indices=None,
+                 tasks=None,
                  tdb_input_aggregation=None,
                  tdb_input_transformation=None,
                  tdb_output_aggregation=None,
                  tdb_output_transformation=None,
+                 tdb_ambig_attribute=None,
                  chroms=None,
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
@@ -70,26 +87,32 @@ class TiledbGenerator(Sequence):
                  expand_dims=False,
                  return_coords=False,
                  tdb_config=None,
-                 tdb_ctx=None):
+                 tdb_ctx=None,
+                 num_threads=1):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max','sum',None
         '''
+        self.num_threads=num_threads
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
+
         #get local copy of s3 reference sequence
         if ref_fasta.startswith('s3://'):
             self.ref_fasta=download_s3_file(ref_fasta)
             fai=download_s3_file(ref_fasta+'.fai')
         else: 
             self.ref_fasta=ref_fasta
+
         self.batch_size=batch_size
+
         self.add_revcomp=add_revcomp
         if self.add_revcomp==True:
             self.batch_size=int(math.floor(self.batch_size/2))
             
         self.expand_dims=expand_dims
+
         #create tiledb configuration parameters (these have been found optimal for most use cases, but should set in a separate config file in the future)
         if tdb_config is not None:
             self.config=tdb_config
@@ -99,7 +122,12 @@ class TiledbGenerator(Sequence):
             self.ctx=tdb_ctx
         else:
             self.ctx=tiledb.Ctx(self.config)
-        
+            
+        print("opening:"+tdb_array+" for reading...")
+        self.tdb_array_name=tdb_array
+        self.tdb_array=tiledb.open(tdb_array,mode='r',ctx=self.ctx)
+        print("success!")
+
         #identify chromosome information
         if chroms is not None:
             self.chroms_to_use=chroms
@@ -107,15 +135,25 @@ class TiledbGenerator(Sequence):
             if chrom_sizes.startswith("s3://"):
                 self.chroms_to_use=[i.split()[0] for i in read_s3_file_contents(chrom_sizes).strip().split('\n')]
             else:
-                self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]            
-        self.chrom_sizes,self.last_index_to_chrom,self.length=get_genome_size(chrom_sizes,self.chroms_to_use)
-        print("got genome size")
-        #identify indices to upsample
-        self.tdb_indexer=tdb_indexer
+                self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]
+        #find the tdb indices that correspond to the chroms to be used 
+        self.get_chrom_index_ranges(self.chroms_to_use)
+        print("self.weighted_chrom_indices"+str(self.weighted_chrom_indices))
+        print("got indices for used chroms")
+
+        #get indices of tasks to be used in training
+        if tasks is not None:
+            self.task_indices=self.get_task_indices(tasks)
+        elif task_indices is not None:
+            self.task_indices=task_indices
+        else:
+            #already got task indices when calling get_chrom_index_ranges function above
+            pass 
+        print("identified task indices:"+str(self.task_indices))
+        self.tdb_ambig_attribute=tdb_ambig_attribute
 
         #store input params
         self.num_inputs=num_inputs
-        self.tdb_inputs=tdb_inputs
         self.tdb_input_source_attribute=tdb_input_source_attribute
         self.tdb_input_flank=tdb_input_flank
         self.tdb_input_aggregation=[str(i) for i in tdb_input_aggregation]
@@ -123,14 +161,10 @@ class TiledbGenerator(Sequence):
 
         #store output params
         self.num_outputs=num_outputs
-        self.tdb_outputs=tdb_outputs
         self.tdb_output_source_attribute=tdb_output_source_attribute
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
-        print("opening tiledb arrays for reading")
-        self.data_arrays=self.open_tiledb_arrays_for_reading()        
-        print("opened arrays for reading") 
 
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
@@ -153,141 +187,109 @@ class TiledbGenerator(Sequence):
         self.return_coords=return_coords
         print('created generator')
         
-    def open_tiledb_arrays_for_reading(self):
+    def get_chrom_index_ranges(self,chroms_to_use):
         '''
-        Opens tiledb arrays for each task/chromosome for reading  
+        find tdb indices corresponding to the used chromosomes 
         '''
-        array_dict=OrderedDict()
-        array_dict['index']=OrderedDict()
-        array_dict['inputs']=OrderedDict()
-        array_dict['outputs']=OrderedDict() 
-
-        #index tasks
-        if self.tdb_indexer.startswith("s3://"):
-            index_tasks=read_s3_file_contents(self.tdb_indexer).split('\n')
-        else: 
-            index_tasks=open(self.tdb_indexer).read().strip().split('\n')
-        for task in index_tasks:
-            array_dict['index'][task]=OrderedDict() 
-            for chrom in self.chroms_to_use:
-                #array_dict['index'][task][chrom]=task+"."+chrom
-               array_dict['index'][task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
-        print("opened index arrays for reading") 
-        #inputs 
-        for i in range(len(self.tdb_inputs)):
-            tdb_input=self.tdb_inputs[i] 
-            if tdb_input=="seq":
-                continue 
-            tdb_input_tasks=open(tdb_input).read().strip().split('\n')
-            tdb_input_array=OrderedDict() 
-            for task in tdb_input_tasks:
-                tdb_input_array[task]=OrderedDict() 
-                for chrom in self.chroms_to_use:
-                    #tdb_input_array[task][chrom]=task+'.'+chrom
-                    tdb_input_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
-            array_dict['inputs'][i]=tdb_input_array
-        print("opened input arrays for reading") 
-        #outputs
-        for i in range(len(self.tdb_outputs)): 
-            tdb_output=self.tdb_outputs[i]
-            if tdb_output=="seq":
-                continue
-            if tdb_output.startswith("s3://"):
-                tdb_output_tasks=read_s3_file_contents(tdb_output).split('\n')
-            else: 
-                tdb_output_tasks=open(tdb_output).read().strip().split('\n')
-            tdb_output_array=OrderedDict()
-            for task in tdb_output_tasks:
-                print(task)
-                tdb_output_array[task]=OrderedDict() 
-                for chrom in self.chroms_to_use:
-                    #tdb_output_array[task][chrom]=task+'.'+chrom
-                    tdb_output_array[task][chrom]=tiledb.DenseArray(task+"."+chrom,mode='r',ctx=self.ctx)
-            array_dict['outputs'][i]=tdb_output_array
-        print("opened output arrays for reading") 
-        return array_dict
+        num_chroms=self.tdb_array.meta['num_chroms']
+        self.task_indices=[i for i in range(self.tdb_array.meta['num_tasks'])]
+        chrom_indices=[]
+        chrom_sizes=[]
+        chroms=[]
+        num_indices=0
+        for i in range(num_chroms):
+            chrom_name=self.tdb_array.meta['chrom_'+str(i)]
+            if chrom_name in chroms_to_use:
+                chroms.append(chrom_name)
+                start_index=self.tdb_array.meta['offset_'+str(i)]
+                end_index=start_index+self.tdb_array.meta['size_'+str(i)]
+                num_indices+=(end_index-start_index)
+                chrom_indices.append((start_index,end_index))
+                chrom_sizes.append(self.tdb_array.meta['size_'+str(i)])
+        min_chrom_size=min(chrom_sizes)
+        scaled_chrom_sizes=[round(i/min_chrom_size) for i in chrom_sizes]
+        weighted_chrom_sizes=[]
+        for i in range(len(chrom_sizes)):
+            cur_weight=scaled_chrom_sizes[i]
+            cur_range=[chrom_indices[i]]
+            weighted_chrom_sizes=weighted_chrom_sizes+cur_weight*cur_range
+        self.chrom_indices=chrom_indices
+        self.weighted_chrom_indices=weighted_chrom_sizes
+        self.num_indices=num_indices
+        self.chroms_to_use=chroms
+        return
+    
+    def get_task_indices(self,tasks):
+        '''
+        get tdb indices of user-specified tasks 
+        '''
+        num_tasks=self.tdb_array.meta['num_tasks']
+        task_indices=[]
+        for i in range(num_tasks):
+            cur_task=self.tdb_array.meta['task_'+str(i)]
+            if cur_task in tasks:
+                task_indices.append(i)
+        assert(len(task_indices)>0)
+        return task_indices
     
     def get_nonupsample_batch_indices(self):
         '''
         randomly select n positions from the genome 
         '''
-        indices=random.sample(range(self.length),self.non_upsampled_batch_size)
-        #get the chroms and coords for each index
-        chroms=[]
-        chrom_pos=[]
-        for cur_index in indices:
-            for chrom_last_index in self.last_index_to_chrom:
-                if cur_index < chrom_last_index:
-                    #this is the chromosome to use!
-                    #make sure we don't slide off the edge of the chromosome 
-                    cur_chrom,cur_chrom_size,cur_chrom_first_index=self.last_index_to_chrom[chrom_last_index]
-                    cur_chrom_pos=random.randint(self.chrom_edge_flank, cur_chrom_size-self.chrom_edge_flank)
-                    chroms.append(cur_chrom)
-                    chrom_pos.append(cur_chrom_pos)
-                    break 
-        cur_batch= pd.DataFrame({'chrom':chroms,'pos':chrom_pos})
-        assert cur_batch.shape[0]==self.non_upsampled_batch_size
+        #get current chromosome
+        cur_interval=random.sample(self.weighted_chrom_indices,1)[0]
+        #sample random indices from the current chromosome 
+        cur_batch=random.sample(range(cur_interval[0],cur_interval[1]),self.non_upsampled_batch_size)
         return cur_batch
                                                                                                     
-        
+    
+
     def get_upsampled_indices(self):
-        #use pandas dataframes to store index,chrom,position for upsampled and non-upsampled values
-        upsampled_chroms=None
+        from multiprocessing import Pool
+        print("num_threads:"+str(self.num_threads))
+        pool=Pool(processes=self.num_threads,initializer=init_worker)
+        pool_inputs=[] 
+        for region in self.chrom_indices:
+            region_start=region[0]
+            region_end=region[1]
+            pool_inputs.append((region_start,region_end,self.tdb_array_name,self.tdb_ambig_attribute,self.tdb_partition_attribute_for_upsample,self.task_indices,self.tdb_partition_thresh_for_upsample))
         upsampled_indices=None
-        self.chrom_edge_flank=max([max(self.tdb_input_flank),max(self.tdb_output_flank)])
-        for chrom in self.chroms_to_use:
-            upsampled_indices_chrom=None
-            chrom_size=None
-            for task in self.data_arrays['index']:
-                #print(self.data_arrays['index'][task][chrom])
-                #with tiledb.DenseArray(self.data_arrays['index'][task][chrom], mode='r',ctx=self.ctx) as cur_array:
-                cur_vals=self.data_arrays['index'][task][chrom][:][self.tdb_partition_attribute_for_upsample]
-                if chrom_size is None:
-                    chrom_size=cur_vals.shape[0]
-                print("got values for cur task/chrom") 
-                upsampled_indices_task_chrom=np.argwhere(cur_vals>=self.tdb_partition_thresh_for_upsample)
-                print("upsampled_indices_task_chrom:"+str(upsampled_indices_task_chrom.shape))
-                print("got upsampled indices")
-                if upsampled_indices_chrom is None:
-                    upsampled_indices_chrom=upsampled_indices_task_chrom
+        try:
+            for region_upsampled_indices in pool.map(get_upsampled_indices_chrom,pool_inputs):
+                if upsampled_indices is None:
+                    upsampled_indices=np.squeeze(region_upsampled_indices)
                 else:
-                    upsampled_indices_chrom=np.union1d(upsampled_indices_chrom,upsampled_indices_task_chrom)
-                print("performed task union")
-                
-            #make sure we dont' run off the edges of the chromosome!
-            usampled_indices_chrom=upsampled_indices_chrom[upsampled_indices_chrom>self.chrom_edge_flank]
-            upsampled_indices_chrom=upsampled_indices_chrom[upsampled_indices_chrom<(self.chrom_sizes[chrom]-self.chrom_edge_flank)]
-            print("got indices to upsample for chrom:"+str(chrom))            
-            if upsampled_chroms is None:
-                upsampled_chroms=[chrom]*upsampled_indices_chrom.shape[0]
-                upsampled_indices=upsampled_indices_chrom
-            else:
-                upsampled_chroms=upsampled_chroms+[chrom]*upsampled_indices_chrom.shape[0]
-                upsampled_indices=np.concatenate((upsampled_indices,upsampled_indices_chrom),axis=0)
-            print("appended chrom indices to master list") 
-
-        upsampled_indices=pd.DataFrame.from_dict({'chrom':upsampled_chroms,
-                                                  'pos':upsampled_indices.squeeze()})
-
+                    upsampled_indices=np.concatenate((upsampled_indices,np.squeeze(region_upsampled_indices)))
+        except KeyboardInterrupt:
+            kill_child_processes(os.getpid())
+            pool.terminate()
+            raise
+        except Exception as e:
+            print(e)
+            kill_child_processes(os.getpid())
+            raise 
+        pool.close()
+        pool.join()
+        print('closed upsampling pool') 
         print("made upsampled index data frame")
+        self.upsampled_indices=upsampled_indices
         if self.shuffle_epoch_start==True:
             #shuffle rows & reset index
             print("shuffling upsampled dataframes prior to start of training")
-            upsampled_indices=upsampled_indices.sample(frac=1)
-            upsampled_indices=upsampled_indices.reset_index(drop=True)
-        self.upsampled_indices=upsampled_indices    
+            np.random.shuffle(self.upsampled_indices)
         self.upsampled_indices_len=len(self.upsampled_indices)
-        if self.upsampled_indices_len==0:
-            print("WARNING!!! You have requested upsampling, but none of the values in the tiledb self.tdb_partition_attribute_for_upsample exceed the threshold =self.tdb_partition_thresh_for_upsample, so no upsampling will be performed")
-            num_pos_wraps=0
-        else: 
-            num_pos_wraps=math.ceil(self.length/self.upsampled_indices_len)
-        self.upsampled_indices=pd.concat([self.upsampled_indices]*num_pos_wraps, ignore_index=True)[0:self.length]
-        return 
+        print("finished upsampling")
+        return
 
+    
         
     def __len__(self):
-        return int(floor(self.length/self.batch_size))
+        #we are only training on peak regions
+        if (self.upsample_ratio is not None) and (self.upsample_ratio==1):
+            return int(floor(self.upsampled_indices_len/self.upsampled_batch_size))
+        else:
+        #training on peak and non-peak regions 
+            return int(floor(self.num_indices/self.batch_size))
     
 
     def __getitem__(self,idx):
@@ -295,20 +297,25 @@ class TiledbGenerator(Sequence):
         self.ref=pysam.FastaFile(self.ref_fasta)
         
         #get the coordinates for the current batch
-        coords=self.get_coords(idx) #coords is a df with 'chrom' and 'pos' columns.
-
+        tdb_batch_indices=self.get_tdb_indices_for_batch(idx) #coords is a df with 'chrom' and 'pos' columns.
+        coords=None
+        if self.return_coords is True:
+            #get the chromosome coordinates that correspond to indices
+            coords=self.get_coords(tdb_batch_indices)
         #get the inputs 
         X=[]
         for cur_input_index in range(self.num_inputs):
-            cur_input=self.tdb_inputs[cur_input_index]
+            cur_input=self.tdb_input_source_attribute[cur_input_index]
             if cur_input=="seq":                
                 #get the one-hot encoded sequence
+                if coords is None:
+                    coords=self.get_coords(tdb_batch_indices)
                 cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
                 transformed_seq=self.transform_seq(cur_seq,self.tdb_input_transformation[cur_input_index])
                 cur_x=one_hot_encode(transformed_seq)
             else:
                 #extract values from tdb
-                cur_vals=self.get_tdb_vals(coords,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
+                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
                 transformed_vals=self.transform_vals(cur_vals,self.tdb_input_transformation[cur_input_index])
                 aggregate_vals=self.aggregate_vals(transformed_vals,self.input_aggregation[cur_input_index])
                 cur_x=aggregate_vals
@@ -320,15 +327,17 @@ class TiledbGenerator(Sequence):
         #get the outputs 
         y=[]
         for cur_output_index in range(self.num_outputs):
-            cur_output=self.tdb_outputs[cur_output_index]
+            cur_output=self.tdb_output_source_attribute[cur_output_index]
             if cur_output=="seq":
                 #get the one-hot encoded sequence
+                if coords is None:
+                    coords=get_coords(tdb_batch_indices)
                 cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
                 transformed_seq=self.transform_seq(cur_seq,self.tdb_output_transformation[cur_output_index])
                 cur_y=one_hot_encode(transformed_seq)
             else:
                 #extract values from tdb
-                cur_vals=self.get_tdb_vals(coords,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
+                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
                 transformed_vals=self.transform_vals(cur_vals,self.tdb_output_transformation[cur_output_index])
                 aggregate_vals=self.aggregate_vals(transformed_vals,self.tdb_output_aggregation[cur_output_index])
                 cur_y=aggregate_vals
@@ -336,43 +345,64 @@ class TiledbGenerator(Sequence):
             
         if self.return_coords is True:
             if self.add_revcomp==True:
-                coords=pd.concat((coords,coords),axis=0)
-            coords=[(row[0],row[1]-self.tdb_output_flank[0],row[1]+self.tdb_output_flank[0]) for index,row in coords.iterrows()]
-            #print("returning batch!")
+                coords=coords+coords #concatenate coord list 
             return (X,y,coords)
         else:
-            #print("returning batch!")
-            return (X,y) 
+            return (X,y)
+        
+    def get_coords(self,tdb_batch_indices):
+        #return list of (chrom,pos) for each index in batch
+        coords=[]
+        for cur_batch_index in tdb_batch_indices:
+            for chrom_index in range(len(self.chrom_indices)):
+                cur_chrom_start_index=self.chrom_indices[chrom_index][0]
+                cur_chrom_end_index=self.chrom_indices[chrom_index][1]
+                if (cur_batch_index >=cur_chrom_start_index) and (cur_batch_index<cur_chrom_end_index):
+                    coords.append([self.chroms_to_use[chrom_index],cur_batch_index-cur_chrom_start_index])
+                    break
+        return coords
     
-    def get_coords(self,idx):
-        upsampled_batch_start=idx*self.upsampled_batch_size
-        upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+    def get_tdb_indices_for_batch(self,idx):
         upsampled_batch_indices=None
         non_upsampled_batch_indices=None
         if self.upsampled_batch_size > 0:
-            upsampled_batch_indices=self.upsampled_indices.loc[list(range(upsampled_batch_start,upsampled_batch_end))]
+            #might need to wrap to get the upsampled index length
+            upsampled_batch_start=int(idx*self.upsampled_batch_size % self.upsampled_indices_len)
+            upsampled_batch_end=upsampled_batch_start+self.upsampled_batch_size
+            while upsampled_batch_end > self.upsampled_indices_len:
+                if upsampled_batch_indices is None:
+                    upsampled_batch_indices=self.upsampled_indices[upsampled_batch_start:self.upsampled_indices_len]
+                else:
+                    upsampled_batch_indices=np.concatenate((upsampled_batch_indices,self.upsampled_indices[upsampled_batch_start:self.upsampled_indices_len]))
+                upsampled_batch_start=0
+                upsampled_batch_end=upsampled_batch_end-self.upsampled_indices_len
+            if upsampled_batch_indices is None:
+                upsampled_batch_indices=self.upsampled_indices[upsampled_batch_start:upsampled_batch_end]
+            else: 
+                upsampled_batch_indices=np.concatenate((upsampled_batch_indices,self.upsampled_indices[upsampled_batch_start:upsampled_batch_end]))
+            
         if self.non_upsampled_batch_size > 0:
             #select random indices from genome
             non_upsampled_batch_indices=self.get_nonupsample_batch_indices()
         if (upsampled_batch_indices is not None) and (non_upsampled_batch_indices is not None):
-            coords=pd.concat((upsampled_batch_indices,non_upsampled_batch_indices),axis=0)
+            tdb_batch_indices=np.concatenate((upsampled_batch_indices,non_upsampled_batch_indices))
         elif upsampled_batch_indices is not None:
-            coords=upsampled_batch_indices
+            tdb_batch_indices=upsampled_batch_indices
         elif non_upsampled_batch_indices is not None:
-            coords=non_upsampled_batch_indices
+            tdb_batch_indices=non_upsampled_batch_indices
         else:
             raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none")
-        return coords
+        return tdb_batch_indices
     
      
     def get_seq(self,coords,flank):
-        chroms=coords['chrom']
-        start_pos=coords['pos']-flank
-        end_pos=coords['pos']+flank
         seqs=[]
-        for i in range(coords.shape[0]):
+        for coord in coords:
+            chrom=coord[0]
+            start_pos=coord[1]-flank
+            end_pos=coord[1]+flank 
             try:
-                seq=self.ref.fetch(chroms.iloc[i],start_pos.iloc[i],end_pos.iloc[i])
+                seq=self.ref.fetch(chrom,start_pos,end_pos)
                 if len(seq)<2*flank:
                     delta=2*flank-len(seq)
                     seq=seq+"N"*delta
@@ -387,10 +417,11 @@ class TiledbGenerator(Sequence):
             seqs=seqs+seqs_rc
         return seqs
     
-    def get_tdb_vals(self,coords,input_output_index,flank,is_input=False,is_output=False):
+    def get_tdb_vals(self,tdb_batch_indices,input_output_index,flank,is_input=False,is_output=False):
         '''
         extract the values from tileDB 
         '''
+        #determine the attribute from tiledb that will be used 
         assert is_input==True or is_output==True
         if is_input==True:
             input_or_output="inputs"
@@ -399,32 +430,13 @@ class TiledbGenerator(Sequence):
             input_or_output="outputs"
             attribute=self.tdb_output_source_attribute[input_output_index] 
             
-        chroms=coords['chrom']
-        start_positions=coords['pos']-flank
-        end_positions=coords['pos']+flank
-        task_chrom_to_tdb=self.data_arrays[input_or_output][input_output_index]
-        tasks=list(task_chrom_to_tdb.keys())
-        num_tasks=len(tasks)
-        num_entries=coords.shape[0]
-        #prepopulate the values array with 0
+        num_tasks=len(self.task_indices)
+        num_entries=len(tdb_batch_indices)
+        #prepopulate the values array with nans
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
-        #define a context for querying tiledb
-        #iterate through entries 
-        for val_index in range(num_entries):            
-            #iterate through tasks for each entry 
-            for task_index in range(num_tasks):
-                task=tasks[task_index] 
-                chrom=chroms.iloc[val_index]
-                start_position=start_positions.iloc[val_index]
-                if np.isnan(start_position):
-                    continue
-                end_position=end_positions.iloc[val_index]
-                if np.isnan(end_position):
-                    continue 
-                
-                array_name=task_chrom_to_tdb[task][chrom]
-                cur_vals=array_name[int(start_position):int(end_position)][attribute]
-                vals[val_index,:,task_index]=cur_vals
+        #iterate through entries
+        for val_index in range(num_entries):
+            vals[val_index,:,:]=self.tdb_array.query(attrs=[attribute]).multi_index[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank-1,self.task_indices][attribute]
         return vals
     
     def transform_vals(self,vals,transformer):
@@ -464,4 +476,4 @@ class TiledbGenerator(Sequence):
         if self.shuffle_epoch_end==True:
             print("WARNING: SHUFFLING ON EPOCH END MAYBE SLOW:"+str(self.upsampled_indices.shape))
             self.upsampled_indices=self.upsampled_indices.sample(frac=1)
-            self.upsampled_indices=self.upsampled_indices.reset_index(drop=True)
+

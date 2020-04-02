@@ -9,6 +9,7 @@ import h5py
 from .s3_sync import *
 from .generators.basic_generator import *
 from .generators.tiledb_generator import *
+from .custom_callbacks import * 
 from .tiledb_config import *
 from .get_model import *
 from .splits import * 
@@ -27,24 +28,25 @@ def parse_args():
     parser.add_argument("--num_inputs",type=int)
     parser.add_argument("--num_outputs",type=int)
     parser.add_argument("--use_multiprocessing",type=bool,default=True)
+    parser.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     
     tiledbgroup=parser.add_argument_group('tiledb')
-    tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")    
-    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
+
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     
-    tiledbgroup.add_argument("--tdb_inputs",nargs="+")
+    
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
 
-    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")
         
     input_data_path=parser.add_argument_group('input_data_path')
     input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
@@ -86,8 +88,10 @@ def parse_args():
     arch_params.add_argument("--yaml",default=None)
     arch_params.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
     arch_params.add_argument("--architecture_from_file",type=str,default=None)
+    arch_params.add_argument("--model_params",type=str,default=None,help="2-column file with param name in column 1 and param value in column 2")
     arch_params.add_argument("--num_tasks",type=int)
-    arch_params.add_argument("--tasks",nargs="*",default=None)
+    arch_params.add_argument("--tasks",nargs="*",default=None,help="list of tasks to train on, by name")
+    arch_params.add_argument("--task_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
     
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
@@ -99,7 +103,8 @@ def parse_args():
     batch_params.add_argument("--upsample_ratio_list_train",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_thresh_list_eval",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_ratio_list_eval",type=float,nargs="*",default=None)
-
+    batch_params.add_argument("--upsample_threads",type=int,default=1)
+    
     epoch_params=parser.add_argument_group("epoch_params")
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
@@ -120,6 +125,7 @@ def parse_args():
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
     vis_params.add_argument("--tensorboard_logdir",default="logs")
+    vis_params.add_argument("--trackables",nargs="*",default=['loss','val_loss'], help="list of things to track per batch, such as logcount_predictions_loss,loss,profile_predictions_loss,val_logcount_predictions_loss,val_loss,val_profile_predictions_loss")
     return parser.parse_args()
 
 
@@ -147,9 +153,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     
     checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
-    csvlogger = CSVLogger(model_output_path_logs_name, append = True)
+    history=LossHistory(model_output_path_logs_name+".batch",args.trackables)
+    csvlogger = CSVLogger(model_output_path_logs_name, append = False)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
-    cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
+    cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr,history]
     if args.tensorboard==True:
         from keras.callbacks import TensorBoard
         cur_logdir='/'.join([args.tensorboard_logdir,model_output_path_string.split('/')[-1]+'.tb'])
@@ -224,6 +231,12 @@ def initializer_generators_hdf5(args):
     return train_generator, valid_generator 
 
 def initialize_generators_tiledb(args):
+    #open array for reading
+    #print("consolidating:")
+    #import tiledb
+    #tiledb.consolidate(args.tdb_array)
+    #print("done")
+
     if args.upsample_ratio_list_train is not None:
         upsample_ratio_train=args.upsample_ratio_list_train[0]
         print("warning! only a single ratio for upsampling supported for tiledb as of now")
@@ -239,60 +252,62 @@ def initialize_generators_tiledb(args):
     tdb_ctx=tiledb.Ctx(config=tdb_config)
     train_chroms=get_chroms(args,split='train')
     train_generator=TiledbGenerator(chroms=train_chroms,
-                                    chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    tdb_indexer=args.tdb_indexer,
+                                    tdb_array=args.tdb_array,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
-                                    tdb_inputs=args.tdb_inputs,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
-                                    tdb_outputs=args.tdb_outputs,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
+                                    tdb_ambig_attribute=args.tdb_ambig_attribute,
+                                    tasks=args.tasks,
+                                    task_indices=args.task_indices,
                                     upsample_ratio=upsample_ratio_train,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
                                     expand_dims=args.expand_dims,
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
-                                    tdb_ctx=tdb_ctx)
+                                    tdb_ctx=tdb_ctx,
+                                    num_threads=args.upsample_threads)
     
     print("generated training data generator!")
     valid_chroms=get_chroms(args,split='valid')
     valid_generator=TiledbGenerator(chroms=valid_chroms,
-                                    chrom_sizes=args.chrom_sizes,
                                     ref_fasta=args.ref_fasta,
                                     shuffle_epoch_start=args.shuffle_epoch_start,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
-                                    tdb_indexer=args.tdb_indexer,
+                                    tdb_array=args.tdb_array,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
-                                    tdb_inputs=args.tdb_inputs,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
-                                    tdb_outputs=args.tdb_outputs,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
+                                    tdb_ambig_attribute=args.tdb_ambig_attribute,
+                                    tasks=args.tasks,
+                                    task_indices=args.task_indices,
                                     upsample_ratio=upsample_ratio_eval,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
                                     expand_dims=args.expand_dims,
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
-                                    tdb_ctx=tdb_ctx)
+                                    tdb_ctx=tdb_ctx,
+                                    num_threads=args.upsample_threads)
     
     print("generated validation data generator")
     return train_generator, valid_generator
@@ -327,7 +342,7 @@ def get_paths(args):
 def initialize_generators(args):    
     #data is being read in from tiledb for training
     print(args)
-    if args.tdb_indexer is not None:
+    if args.tdb_array is not None:
         return initialize_generators_tiledb(args)
     else:
         return initializer_generators_hdf5(args)

@@ -45,36 +45,27 @@ import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
-    input_data_path=parser.add_argument_group('input_data_path')
-    input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
-    input_data_path.add_argument("--index_tasks",nargs="*",default=None)    
-    input_data_path.add_argument("--input_data_path",nargs="+",default=None,help="seq or path to seqdataloader hdf5")
-    input_data_path.add_argument("--output_data_path",nargs="+",default=None,help="path to seqdataloader hdf5")
-    
-    input_data_path.add_argument('--variant_bed',default=None)
-    input_data_path.add_argument('--ref_fasta')
+    parser.add_argument('--ref_fasta')
 
     tiledbgroup=parser.add_argument_group("tiledb")
-    tiledbgroup.add_argument("--tdb_outputs",nargs="+")
+    tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
-    
-    tiledbgroup.add_argument("--tdb_inputs",nargs="+")
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
 
-    tiledbgroup.add_argument("--tdb_indexer",default=None,help="tiledb paths for each input task")
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
     tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
-    
+    tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")    
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
-
+    tiledbgroup.add_argument("--upsample_threads",type=int,default=1)
+    
     input_filtering_params=parser.add_argument_group("input_filtering_params")    
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
     input_filtering_params.add_argument("--genome",default=None)
@@ -82,6 +73,7 @@ def parse_args():
 
     input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     input_filtering_params.add_argument("--tasks",nargs="*",default=None)
+    input_filtering_params.add_argument("--task_indices",nargs="*",default=None)
     
     output_params=parser.add_argument_group("output_params")
     output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
@@ -226,7 +218,7 @@ def get_batch_wrapper(idx):
     
     #represent coords w/ string, MultiIndex not supported in table append mode
     #set the column names for the MultiIndex
-    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','START','END'])
+    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','CENTER'])
     y=[pd.DataFrame(i,index=coords) for i in y]
     return X,y,coords
 
@@ -244,14 +236,14 @@ def get_tiledb_predict_generator(args):
     test_chroms=get_chroms(args,split='test')
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
-                                          tdb_indexer=args.tdb_indexer,
+                                          tdb_array=args.tdb_array,
                                           tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                           tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                           upsample_ratio=upsample_ratio_predict,
-                                          tdb_inputs=args.tdb_inputs,
+                                          num_threads=args.upsample_threads,
+                                          tdb_ambig_attribute=args.tdb_ambig_attribute,
                                           tdb_input_source_attribute=args.tdb_input_source_attribute,
                                           tdb_input_flank=args.tdb_input_flank,
-                                          tdb_outputs=args.tdb_outputs,
                                           tdb_output_source_attribute=args.tdb_output_source_attribute,
                                           tdb_output_flank=args.tdb_output_flank,
                                           num_inputs=args.num_inputs,
@@ -263,6 +255,8 @@ def get_tiledb_predict_generator(args):
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
                                           chroms=test_chroms,
+                                          tasks=args.tasks,
+                                          task_indices=args.task_indices,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx)
     print("created TiledbPredictGenerator")    
@@ -291,7 +285,6 @@ def predict_on_batch_wrapper(args,model,test_generator):
     pred_queue.put("FINISHED")
     pred_queue.close() 
     return
-
 
 def get_model_layer_functor(model,target_layer_idx):
     from keras import backend as K
