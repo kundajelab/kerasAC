@@ -229,10 +229,10 @@ def initializer_generators_hdf5(args):
 
 def initialize_generators_tiledb(args):
     #open array for reading
-    print("consolidating:")
-    import tiledb
-    tiledb.consolidate(args.tdb_array)
-    print("done")
+    #print("consolidating:")
+    #import tiledb
+    #tiledb.consolidate(args.tdb_array)
+    #print("done")
 
     if args.upsample_ratio_list_train is not None:
         upsample_ratio_train=args.upsample_ratio_list_train[0]
