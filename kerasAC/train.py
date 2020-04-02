@@ -9,7 +9,7 @@ import h5py
 from .s3_sync import *
 from .generators.basic_generator import *
 from .generators.tiledb_generator import *
-
+from .custom_callbacks import * 
 from .tiledb_config import *
 from .get_model import *
 from .splits import * 
@@ -88,6 +88,7 @@ def parse_args():
     arch_params.add_argument("--yaml",default=None)
     arch_params.add_argument("--architecture_spec",type=str,default="basset_architecture_multitask")
     arch_params.add_argument("--architecture_from_file",type=str,default=None)
+    arch_params.add_argument("--model_params",type=str,default=None,help="2-column file with param name in column 1 and param value in column 2")
     arch_params.add_argument("--num_tasks",type=int)
     arch_params.add_argument("--tasks",nargs="*",default=None,help="list of tasks to train on, by name")
     arch_params.add_argument("--task_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
@@ -124,6 +125,7 @@ def parse_args():
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
     vis_params.add_argument("--tensorboard_logdir",default="logs")
+    vis_params.add_argument("--trackables",nargs="*",default=['loss','val_loss'], help="list of things to track per batch, such as logcount_predictions_loss,loss,profile_predictions_loss,val_logcount_predictions_loss,val_loss,val_profile_predictions_loss")
     return parser.parse_args()
 
 
@@ -151,9 +153,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     
     checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
-    csvlogger = CSVLogger(model_output_path_logs_name, append = True)
+    history=LossHistory(model_output_path_logs_name+".batch",args.trackables)
+    csvlogger = CSVLogger(model_output_path_logs_name, append = False)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
-    cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr]
+    cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr,history]
     if args.tensorboard==True:
         from keras.callbacks import TensorBoard
         cur_logdir='/'.join([args.tensorboard_logdir,model_output_path_string.split('/')[-1]+'.tb'])

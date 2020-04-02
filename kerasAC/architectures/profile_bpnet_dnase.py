@@ -20,14 +20,52 @@ from keras.regularizers import l1, l2
 
 from keras.models import Model
 
+def get_model_param_dict(param_file):
+    '''
+    param_file has 2 columns -- param name in column 1, and param value in column 2
+    '''
+    params={}
+    if param_file is None:
+        return  params
+    for line in open(param_file,'r').read().strip().split('\n'):
+        tokens=line.split('\t')
+        params[tokens[0]]=tokens[1]
+    return params 
+
 def getModelGivenModelOptionsAndWeightInits(args):
-    #magic numbers# 
+    #default params (can be overwritten by providing model_params file as input to the training function)
     filters=300
     n_dil_layers=6
     conv1_kernel_size=21
     profile_kernel_size=75
     control_smoothing=[1, 50]
     counts_loss_weight=1
+    profile_loss_weight=1
+    
+    model_params=get_model_param_dict(args.model_params)
+    if 'filters' in model_params:
+        filters=int(model_params['filters'])
+    if 'n_dil_layers' in model_params:
+        n_dil_layers=int(model_params['n_dil_layers'])
+    if 'conv1_kernel_size' in model_params:
+        conv1_kernel_size=int(model_params['conv1_kernel_size'])
+    if 'profile_kernel_size' in model_params:
+        profile_kernel_size=int(model_params['profile_kernel_size'])
+    if 'control_smoothing' in model_params:
+        control_smoothing=[int(i) for i in model_params['control_smoothing'].split(',')]
+    if 'counts_loss_weight' in model_params:
+        counts_loss_weight=float(model_params['counts_loss_weight'])
+    if 'profile_loss_weight' in model_params:
+        profile_loss_weight=float(model_params['profile_loss_weight'])
+
+    print("params:")
+    print("filters:"+str(filters))
+    print("n_dil_layers:"+str(n_dil_layers))
+    print("conv1_kernel_size:"+str(conv1_kernel_size))
+    print("profile_kernel_size:"+str(profile_kernel_size))
+    print("control_smoothing:"+str(control_smoothing))
+    print("counts_loss_weight:"+str(counts_loss_weight))
+    print("profile_loss_weight:"+str(profile_loss_weight))
     
     #read in arguments
     seed=args.seed
@@ -41,11 +79,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print(seq_len)
     print(out_pred_len)
     #define inputs
-    # The three inputs to BPNet
     inp = Input(shape=(seq_len, 4),name='sequence')    
-    #bias_counts_input = Input(shape=(1, ), name="control_logcount")    
-    #bias_profile_input = Input(shape=(out_pred_len, len(control_smoothing)), name="control_profile")
-    # end inputs
 
     # first convolution without dilation
     first_conv = Conv1D(filters,
@@ -142,7 +176,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("got model") 
     model.compile(optimizer=Adam(),
                     loss=[MultichannelMultinomialNLL(1),'mse'],
-                    loss_weights=[1,1])
+                    loss_weights=[profile_loss_weight,counts_loss_weight])
     print("compiled model")
     return model 
 

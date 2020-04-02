@@ -35,7 +35,6 @@ def ambig_log_poisson(y_true,y_pred):
 
 
 #PROFILE MODEL LOSSES #
-
 def get_loss_weights(tdb_path,chrom,label_attribute,ambig_attribute,upsample_attribute,tdb_partition_thresh_for_upsample):
     import tiledb
     from kerasAC.tiledb_config import get_default_config
