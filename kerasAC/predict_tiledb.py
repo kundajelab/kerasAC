@@ -57,7 +57,8 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
-
+    tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=1)
+    
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
     tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
@@ -250,6 +251,7 @@ def get_tiledb_predict_generator(args):
                                           num_outputs=args.num_outputs,
                                           tdb_input_aggregation=args.tdb_input_aggregation,
                                           tdb_input_transformation=args.tdb_input_transformation,
+                                          pseudocount=args.tdb_transformation_pseudocount,
                                           tdb_output_aggregation=args.tdb_output_aggregation,
                                           tdb_output_transformation=args.tdb_output_transformation,                                          
                                           tiledb_stride=args.tiledb_stride,
