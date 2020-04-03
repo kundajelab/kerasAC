@@ -316,9 +316,9 @@ class TiledbGenerator(Sequence):
             else:
                 #extract values from tdb
                 cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
-                transformed_vals=self.transform_vals(cur_vals,self.tdb_input_transformation[cur_input_index])
-                aggregate_vals=self.aggregate_vals(transformed_vals,self.input_aggregation[cur_input_index])
-                cur_x=aggregate_vals
+                aggregate_vals=self.aggregate_vals(cur_vals,self.input_aggregation[cur_input_index])
+                transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
+                cur_x=transformed_vals
                 
             if self.expand_dims==True:
                 cur_x=np.expand_dims(cur_x,axis=1)
@@ -338,9 +338,9 @@ class TiledbGenerator(Sequence):
             else:
                 #extract values from tdb
                 cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
-                transformed_vals=self.transform_vals(cur_vals,self.tdb_output_transformation[cur_output_index])
-                aggregate_vals=self.aggregate_vals(transformed_vals,self.tdb_output_aggregation[cur_output_index])
-                cur_y=aggregate_vals
+                aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
+                transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
+                cur_y=transformed_vals
             y.append(cur_y)
             
         if self.return_coords is True:
