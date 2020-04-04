@@ -66,7 +66,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  chrom_sizes=chrom_sizes,
                                  shuffle_epoch_start=False,
                                  shuffle_epoch_end=False,
-                                 pseudocount=0,
+                                 pseudocount=pseudocount,
                                  add_revcomp=False,
                                  expand_dims=expand_dims,
                                  return_coords=True,

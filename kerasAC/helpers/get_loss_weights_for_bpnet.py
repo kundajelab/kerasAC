@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--tdb_array")
     parser.add_argument("--chroms",nargs="+")
     parser.add_argument("--ambig_attribute",default=None)
+    parser.add_argument("--upsample_attribute")
     parser.add_argument("--label_attribute")
     parser.add_argument("--num_threads",type=int,default=1)
     parser.add_argument("--task",default=None)
@@ -66,24 +67,27 @@ def get_region_counts(inputs):
     label_attribute=inputs[2]
     task_index=inputs[4]
     upsample_thresh=inputs[5]
-    flank=inputs[6]
+    upsample_attribute=inputs[6]
+    flank=inputs[7]
     counts=[]
     print("ambig_attribute:"+str(ambig_attribute))
     print("label_attribute:"+str(label_attribute))
+    print("upsample_attribute:"+str(upsample_attribute))
     with tiledb.open(inputs[1],mode='r',ctx=tiledb.Ctx(get_default_config())) as array:
         if ambig_attribute is not None:
             print("starting query:"+str(start_index)+":"+str(end_index))
-            vals=array.query(attrs=[ambig_attribute,label_attribute])[start_index:end_index-1,task_index]
+            vals=array.query(attrs=[ambig_attribute,label_attribute,upsample_attribute])[start_index:end_index-1,task_index]
         else:
             print("starting query:"+str(start_index)+":"+str(end_index))
-            vals=array.query(attrs=[label_attribute])[start_index:end_index-1,task_index]
+            vals=array.query(attrs=[label_attribute,upsample_attribute])[start_index:end_index-1,task_index]
         print("completed query")
         label_vals=vals[label_attribute]
+        upsample_vals=vals[upsample_attribute]
         if ambig_attribute is not None:
             ambig_vals=vals[ambig_attribute]
-            indices_for_training=np.where(np.logical_and(ambig_vals == 0, label_vals >= upsample_thresh))[0]
+            indices_for_training=np.where(np.logical_and(ambig_vals == 0, upsample_vals >= upsample_thresh))[0]
         else:
-            indices_for_training=np.where(label_vals >= upsample_thresh)[0]
+            indices_for_training=np.where(upsample_vals >= upsample_thresh)[0]
     print("got indices for region")
     for index in indices_for_training:
         if index%1000==0:
@@ -95,7 +99,7 @@ def get_region_counts(inputs):
             continue
     return counts
 
-def get_counts_loss_weight(tdb_path,chroms,ambig_attribute,label_attribute,upsample_thresh,flank,threads=1,task=None,task_index=None):
+def get_counts_loss_weight(tdb_path,chroms,ambig_attribute,label_attribute,upsample_thresh,upsample_attribute,flank,threads=1,task=None,task_index=None):
     array=tiledb.open(tdb_path,mode='r')
     print("opened array:"+str(tdb_path) + " for reading")
     if task is not None:
@@ -103,7 +107,7 @@ def get_counts_loss_weight(tdb_path,chroms,ambig_attribute,label_attribute,upsam
     tdb_indices=get_chrom_index_ranges(array,chroms)
     pool_inputs=[]
     for entry in tdb_indices:
-        pool_inputs.append([entry,tdb_path,label_attribute,ambig_attribute,task_index,upsample_thresh,flank])
+        pool_inputs.append([entry,tdb_path,label_attribute,ambig_attribute,task_index,upsample_thresh,upsample_attribute,flank])
     print("got tdb indices and pool inputs")
     pool=Pool(processes=threads,initializer=init_worker)
     counts=None
@@ -138,6 +142,7 @@ def main():
                                               task_index=args.task_index,
                                               threads=args.num_threads,
                                               upsample_thresh=args.upsample_thresh,
+                                              upsample_attribute=args.upsample_attribute,
                                               flank=args.flank)
     print("counts_loss_weight:"+str(counts_loss_weight))
     
