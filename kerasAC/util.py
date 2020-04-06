@@ -3,6 +3,7 @@ import os.path
 from collections import OrderedDict
 import argparse
 import numpy as np 
+import tiledb
 
 ltrdict = {'a':[1,0,0,0],
            'c':[0,1,0,0],
@@ -82,3 +83,23 @@ def combine_enums(*enums):
 
     
     
+def coords_to_tdb_indices(coords,tdb_instance):
+    '''
+    coords is a tuple (chrom, start, stop)
+    '''
+    num_chroms=tdb_instance.meta['num_chroms']
+    for i in range(num_chroms):
+        if tdb_instance.meta['chrom_'+str(i)]==coords[0]:
+            chrom_offset=tdb_instance.meta['offset_'+str(i)]
+            tdb_index_start=chrom_offset+coords[1]
+            tdb_index_end=chrom_offset+coords[2]
+            return (tdb_index_start,tdb_index_end)
+    raise Exception("chrom name:"+str(coords[0])+" not found in tdb array")
+
+
+def tdb_indices_to_coords(indices,tdb_instance):
+    '''
+    indices is a list of tdb indices     
+    '''
+    
+    pass
