@@ -156,8 +156,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # Branch 2. Counts prediction
     # Step 2.1 - Global average pooling along the "length", the result
     #            size is same as "filters" parameter to the BPNet function
-    #gap_combined_conv = GlobalAveragePooling1D(name='gap')(combined_conv) # acronym - gapcc
-    gap_combined_conv = GlobalAveragePooling1D(name='gap')(profile_out_prebias) # acronym - gapcc
+    gap_combined_conv = GlobalAveragePooling1D(name='gap')(combined_conv) # acronym - gapcc
+    #gap_combined_conv = GlobalAveragePooling1D(name='gap')(profile_out_prebias) # acronym - gapcc
     # Step 2.2 Concatenate the output of GAP with bias counts
     #concat_gapcc_bci = Concatenate([gap_combined_conv, 
     #                                bias_counts_input],

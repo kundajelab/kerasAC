@@ -78,6 +78,11 @@ class TiledbGenerator(Sequence):
                  tdb_output_aggregation=None,
                  tdb_output_transformation=None,
                  tdb_ambig_attribute=None,
+                 tdb_bias_arrays=None,
+                 tdb_bias_source_attribute=None,
+                 tdb_bias_flank=None,
+                 tdb_bias_aggregation=None,
+                 tdb_bias_transformation=None,
                  chroms=None,
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
@@ -126,6 +131,14 @@ class TiledbGenerator(Sequence):
         print("opening:"+tdb_array+" for reading...")
         self.tdb_array_name=tdb_array
         self.tdb_array=tiledb.open(tdb_array,mode='r',ctx=self.ctx)
+        if tdb_bias_arrays is not None:
+            self.bias_arrays=[tiledb.open(tdb_bias_arrays[i],mode='r',ctx=self.ctx) for i in range(len(tdb_bias_arrays))]
+            self.bias_source_attribute=tdb_bias_source_attribute
+            self.bias_flank=tdb_bias_flank
+            self.bias_aggregation=tdb_bias_aggregation
+            self.bias_transformation=tdb_bias_transformation 
+        else:
+            self.bias_arrays=None
         print("success!")
 
         #identify chromosome information
@@ -323,6 +336,17 @@ class TiledbGenerator(Sequence):
             if self.expand_dims==True:
                 cur_x=np.expand_dims(cur_x,axis=1)
             X.append(cur_x)
+
+        #get the biases, if specified
+        if self.bias_arrays is not None:
+            for cur_bias_index in range(len(self.bias_arrays)):
+                cur_bias_vals=self.get_bias_vals(tdb_batch_indices,cur_bias_index,self.bias_flank[cur_bias_index])
+                aggregate_bias=self.aggregate_vals(cur_bias_vals,self.bias_aggregation[cur_bias_index])
+                transformed_bias=self.transform_vals(aggregate_bias,self.bias_transformation[cur_bias_index])
+                cur_bias=transformed_bias
+                if self.expand_dims==True:
+                    cur_bias=np.expand_dims(cur_bias,axis=1)
+                X.append(cur_bias) 
             
         #get the outputs 
         y=[]
@@ -416,6 +440,14 @@ class TiledbGenerator(Sequence):
             seqs_rc=[revcomp(s) for s in seqs]
             seqs=seqs+seqs_rc
         return seqs
+
+    def get_bias_vals(self,tdb_batch_indices,cur_bias_index,flank):
+        num_entries=len(tdb_batch_indices)
+        vals=np.full((num_entries,2*flank,1),np.nan)
+        cur_array=self.bias_arrays[cur_bias_index]
+        for val_index in range(num_entries):
+            vals[val_index,:,:]=cur_array.query(attrs=[self.bias_source_attribute[cur_bias_index]])[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank,:][self.bias_source_attribute[cur_bias_index]]
+        return vals 
     
     def get_tdb_vals(self,tdb_batch_indices,input_output_index,flank,is_input=False,is_output=False):
         '''
