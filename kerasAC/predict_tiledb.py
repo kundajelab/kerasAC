@@ -62,7 +62,13 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
     tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
-    tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")    
+    tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")
+    tiledbgroup.add_argument("--tdb_bias_arrays",nargs="*",default=None)
+    tiledbgroup.add_argument("--tdb_bias_source_attribute",nargs="*")
+    tiledbgroup.add_argument("--tdb_bias_flank",nargs="*",type=int)
+    tiledbgroup.add_argument("--tdb_bias_aggregation",nargs="*")
+    tiledbgroup.add_argument("--tdb_bias_transformation",nargs="*")
+
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
     tiledbgroup.add_argument("--upsample_threads",type=int,default=1)
@@ -243,6 +249,11 @@ def get_tiledb_predict_generator(args):
                                           upsample_ratio=upsample_ratio_predict,
                                           num_threads=args.upsample_threads,
                                           tdb_ambig_attribute=args.tdb_ambig_attribute,
+                                          tdb_bias_arrays=args.tdb_bias_arrays,
+                                          tdb_bias_source_attribute=args.tdb_bias_source_attribute,
+                                          tdb_bias_flank=args.tdb_bias_flank,
+                                          tdb_bias_aggregation=args.tdb_bias_aggregation,
+                                          tdb_bias_transformation=args.tdb_bias_transformation,                                    
                                           tdb_input_source_attribute=args.tdb_input_source_attribute,
                                           tdb_input_flank=args.tdb_input_flank,
                                           tdb_output_source_attribute=args.tdb_output_source_attribute,
