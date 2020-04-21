@@ -101,5 +101,18 @@ def tdb_indices_to_coords(indices,tdb_instance):
     '''
     indices is a list of tdb indices     
     '''
-    
     pass
+
+
+def transform_data_type(inputs,num_inputs):
+    if inputs is None:
+        inputs=[None]*num_inputs
+    elif inputs is []:
+        inputs=[None]*num_inputs
+    else:
+        assert(len(inputs)==num_inputs)
+        for i in range(num_inputs):
+            if str(inputs[i]).lower()=="none":
+                inputs[i]=None
+    return inputs 
+                

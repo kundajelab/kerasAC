@@ -34,12 +34,16 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
 
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_min",nargs="*",default=None)
+    tiledbgroup.add_argument("--tdb_output_max",nargs="*",default=None)        
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=1)
     
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_min",nargs="*",default=None)
+    tiledbgroup.add_argument("--tdb_input_max",nargs="*",default=None)    
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
@@ -269,11 +273,15 @@ def initialize_generators_tiledb(args):
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
+                                    tdb_input_min=args.tdb_input_min,
+                                    tdb_input_max=args.tdb_input_max,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     pseudocount=args.tdb_transformation_pseudocount,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
                                     tdb_output_flank=args.tdb_output_flank,
+                                    tdb_output_min=args.tdb_output_min,
+                                    tdb_output_max=args.tdb_output_max,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,
@@ -305,11 +313,15 @@ def initialize_generators_tiledb(args):
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
+                                    tdb_input_min=args.tdb_input_min,
+                                    tdb_input_max=args.tdb_input_max,
                                     tdb_input_aggregation=args.tdb_input_aggregation,
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     pseudocount=args.tdb_transformation_pseudocount,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
                                     tdb_output_flank=args.tdb_output_flank,
+                                    tdb_output_min=args.tdb_output_min,
+                                    tdb_output_max=args.tdb_output_max,
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,

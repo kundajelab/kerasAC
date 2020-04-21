@@ -71,6 +71,10 @@ class TiledbGenerator(Sequence):
                  tdb_output_flank,
                  num_inputs,
                  num_outputs,
+                 tdb_input_min=None,
+                 tdb_input_max=None,
+                 tdb_output_min=None,
+                 tdb_output_max=None,
                  task_indices=None,
                  tasks=None,
                  tdb_input_aggregation=None,
@@ -179,6 +183,13 @@ class TiledbGenerator(Sequence):
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
 
+
+        #identify min/max values
+        self.tdb_input_min=transform_data_type(tdb_input_min,self.num_inputs)
+        self.tdb_input_max=transform_data_type(tdb_input_max,self.num_inputs)
+        self.tdb_output_min=transform_data_type(tdb_output_min,self.num_outputs)
+        self.tdb_output_max=transform_data_type(tdb_output_max,self.num_outputs)
+                
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
@@ -332,7 +343,6 @@ class TiledbGenerator(Sequence):
                 aggregate_vals=self.aggregate_vals(cur_vals,self.input_aggregation[cur_input_index])
                 transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
                 cur_x=transformed_vals
-                
             if self.expand_dims==True:
                 cur_x=np.expand_dims(cur_x,axis=1)
             X.append(cur_x)
@@ -366,13 +376,38 @@ class TiledbGenerator(Sequence):
                 transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
                 cur_y=transformed_vals
             y.append(cur_y)
-            
         if self.return_coords is True:
             if self.add_revcomp==True:
                 coords=coords+coords #concatenate coord list 
-            return (X,y,coords)
+        
+        filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
+        
+        if self.return_coords is True:
+            return (filtered_X,filtered_y,filtered_coords)
         else:
-            return (X,y)
+            return (filtered_X,filtered_y)
+        
+    def remove_data_out_of_range(self,X,y,coords=None):
+        bad_indices=[]
+        for i in range(self.num_inputs):
+            if self.tdb_input_min[i] is not None:
+                out_of_range=[i[0] for i in np.argwhere(X[:,i]<self.tdb_input_min[i]).tolist() if len(i)>0 ]
+                bad_indices+=out_of_range
+            if self.tdb_input_max[i] is not None:
+                out_of_range=[i[0] for i in np.argwhere(X[:,i]>self.tdb_input_max[i]).tolist() if len(i)>0 ]
+                bad_indices+=out_of_range
+        for i in range(self.num_outputs):
+            if self.tdb_output_min[i] is not None:
+                out_of_range=[i[0] for i in np.argwhere(y[:,i]<self.tdb_output_min[i]).tolist() if len(i)>0]
+                bad_indices+=out_of_range
+            if self.tdb_output_max[i] is not None:
+                out_of_range=[i[0] for i in np.argwhere(y[:,i]<self.tdb_output_max[i]).tolist() if len(i)>0]
+                bad_indices+=out_of_range
+        X=[np.delete(i,bad_indices,0) for i in X]
+        y=[np.delete(i,bad_indices,0) for i in y]
+        if coords is not None:
+            coords=np.delete(coords,bad_indices,0)
+        return X,y,coords
         
     def get_coords(self,tdb_batch_indices):
         #return list of (chrom,pos) for each index in batch
