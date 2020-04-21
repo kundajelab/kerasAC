@@ -389,20 +389,22 @@ class TiledbGenerator(Sequence):
         
     def remove_data_out_of_range(self,X,y,coords=None):
         bad_indices=[]
+        pdb.set_trace() 
         for i in range(self.num_inputs):
             if self.tdb_input_min[i] is not None:
-                out_of_range=[i[0] for i in np.argwhere(X[:,i]<self.tdb_input_min[i]).tolist() if len(i)>0 ]
+                out_of_range=[j[0] for j in np.argwhere(X[i]<self.tdb_input_min[i]).tolist() if len(j)>0 ]
                 bad_indices+=out_of_range
             if self.tdb_input_max[i] is not None:
-                out_of_range=[i[0] for i in np.argwhere(X[:,i]>self.tdb_input_max[i]).tolist() if len(i)>0 ]
+                out_of_range=[j[0] for j in np.argwhere(X[i]>self.tdb_input_max[i]).tolist() if len(j)>0 ]
                 bad_indices+=out_of_range
         for i in range(self.num_outputs):
             if self.tdb_output_min[i] is not None:
-                out_of_range=[i[0] for i in np.argwhere(y[:,i]<self.tdb_output_min[i]).tolist() if len(i)>0]
+                out_of_range=[j[0] for j in np.argwhere(y[i]<self.tdb_output_min[i]).tolist() if len(j)>0]
                 bad_indices+=out_of_range
             if self.tdb_output_max[i] is not None:
-                out_of_range=[i[0] for i in np.argwhere(y[:,i]<self.tdb_output_max[i]).tolist() if len(i)>0]
+                out_of_range=[j[0] for j in np.argwhere(y[i]>self.tdb_output_max[i]).tolist() if len(j)>0]
                 bad_indices+=out_of_range
+        bad_indices=list(set(bad_indices))
         X=[np.delete(i,bad_indices,0) for i in X]
         y=[np.delete(i,bad_indices,0) for i in y]
         if coords is not None:
