@@ -389,7 +389,6 @@ class TiledbGenerator(Sequence):
         
     def remove_data_out_of_range(self,X,y,coords=None):
         bad_indices=[]
-        pdb.set_trace() 
         for i in range(self.num_inputs):
             if self.tdb_input_min[i] is not None:
                 out_of_range=[j[0] for j in np.argwhere(X[i]<self.tdb_input_min[i]).tolist() if len(j)>0 ]
