@@ -114,5 +114,7 @@ def transform_data_type(inputs,num_inputs):
         for i in range(num_inputs):
             if str(inputs[i]).lower()=="none":
                 inputs[i]=None
+            else:
+                inputs[i]=float(inputs[i])
     return inputs 
                 
