@@ -408,6 +408,8 @@ class TiledbGenerator(Sequence):
         y=[np.delete(i,bad_indices,0) for i in y]
         if coords is not None:
             coords=np.delete(coords,bad_indices,0)
+            coords=[tuple(coord) for coord in coords]
+            coords=[(i[0],int(i[1])) for i in coords]
         return X,y,coords
         
     def get_coords(self,tdb_batch_indices):

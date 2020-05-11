@@ -6,16 +6,13 @@ import time
 import psutil
 import signal 
 import os
-
 #multithreading
 #from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Pool,Process, Queue 
-
 import warnings
 import numpy as np
 import pysam
 import pandas as pd
-
 import tensorflow as tf 
 from kerasAC.activations import softMaxAxis1
 from .calibrate import * 
