@@ -31,7 +31,7 @@ echo "outdir:$outdir"
 CUDA_VISIBLE_DEVICES=$gpu kerasAC_predict_tdb \
 		    --batch_size 20 \
 		    --ref_fasta /mnt/data/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
-		    --tdb_array /srv/scratch/annashch/encode_dnase_tiledb/db/dnase \
+		    --tdb_array /oak/stanford/groups/akundaje/projects/atlas/tiledb/tier1/dnase \
 		    --tdb_partition_attribute_for_upsample idr_peak \
 		    --tdb_partition_thresh_for_upsample 2 \
 		    --tdb_input_source_attribute seq \

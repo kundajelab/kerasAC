@@ -1,4 +1,4 @@
-kerasAC_loss_weights_bpnet  --tdb_array /srv/scratch/annashch/encode_dnase_tiledb/db/dnase \
+kerasAC_loss_weights_bpnet  --tdb_array /oak/stanford/groupa/akundaje/projects/atlas/tiledb/tier1/dnase \
 			    --chroms chr1 \
 			    --upsample_attribute overlap_peak \
 			    --label_attribute count_bigwig_unstranded_5p \
