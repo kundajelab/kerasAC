@@ -1,4 +1,5 @@
 The examples here utilize a tiledb dnase database of ENCODE tier 1 cell lines generated as follows: 
+
 ```
 db_ingest --tiledb_metadata tier1.encode.dnase.tasks.tsv \
 	  --array_name /oak/stanford/groups/akundaje/projects/atlas/tiledb/tier1/dnase \
