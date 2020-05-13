@@ -65,7 +65,7 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_bias_flank",nargs="*",type=int)
     tiledbgroup.add_argument("--tdb_bias_aggregation",nargs="*")
     tiledbgroup.add_argument("--tdb_bias_transformation",nargs="*")
-
+    tiledbgroup.add_argument("--tdb_bias_pseudocount",type=float,default=0.001)
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
     tiledbgroup.add_argument("--upsample_threads",type=int,default=1)
@@ -250,7 +250,8 @@ def get_tiledb_predict_generator(args):
                                           tdb_bias_source_attribute=args.tdb_bias_source_attribute,
                                           tdb_bias_flank=args.tdb_bias_flank,
                                           tdb_bias_aggregation=args.tdb_bias_aggregation,
-                                          tdb_bias_transformation=args.tdb_bias_transformation,                                    
+                                          tdb_bias_transformation=args.tdb_bias_transformation,
+                                          bias_pseudocount=args.tdb_bias_pseudocount,
                                           tdb_input_source_attribute=args.tdb_input_source_attribute,
                                           tdb_input_flank=args.tdb_input_flank,
                                           tdb_output_source_attribute=args.tdb_output_source_attribute,

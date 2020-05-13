@@ -4,6 +4,7 @@ import signal
 import psutil
 import pandas as pd
 import numpy as np
+from scipy.special import logit 
 import random
 import threading 
 from random import shuffle 
@@ -16,7 +17,7 @@ import tiledb
 import pdb
 from ..s3_sync import * 
 from collections import OrderedDict
-import gc 
+import gc
 import pdb             
 
 
@@ -92,6 +93,7 @@ class TiledbGenerator(Sequence):
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
                  pseudocount=0,
+                 bias_pseudocount=0.001,
                  add_revcomp=False,
                  expand_dims=False,
                  return_coords=False,
@@ -208,6 +210,7 @@ class TiledbGenerator(Sequence):
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
 
         self.pseudocount=pseudocount
+        self.bias_pseudocount=bias_pseudocount
         self.return_coords=return_coords
         print('created generator')
         
@@ -520,6 +523,11 @@ class TiledbGenerator(Sequence):
             return np.log10(vals+self.pseudocount)
         elif transformer == 'log':
             return np.log(vals+self.pseudocount)
+        elif transformer == 'counts_to_logit':
+            vals=vals/np.expand_dims(vals.sum(axis=1),axis=1) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task 
+            vals+=self.bias_pseudocount
+            vals=logit(vals)
+            return vals 
         else:
             raise Exception("transform_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
     

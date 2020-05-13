@@ -58,6 +58,7 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_bias_flank",nargs="*",type=int)
     tiledbgroup.add_argument("--tdb_bias_aggregation",nargs="*")
     tiledbgroup.add_argument("--tdb_bias_transformation",nargs="*")
+    tiledbgroup.add_argument("--tdb_bias_pseudocount",type=float,default=0.001)
     
     input_data_path=parser.add_argument_group('input_data_path')
     input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
@@ -289,7 +290,8 @@ def initialize_generators_tiledb(args):
                                     tdb_bias_source_attribute=args.tdb_bias_source_attribute,
                                     tdb_bias_flank=args.tdb_bias_flank,
                                     tdb_bias_aggregation=args.tdb_bias_aggregation,
-                                    tdb_bias_transformation=args.tdb_bias_transformation,                                    
+                                    tdb_bias_transformation=args.tdb_bias_transformation,
+                                    bias_pseudocount=args.tdb_bias_pseudocount,
                                     tasks=args.tasks,
                                     task_indices=args.task_indices,
                                     upsample_ratio=upsample_ratio_train,
