@@ -384,7 +384,9 @@ class TiledbGenerator(Sequence):
                 coords=coords+coords #concatenate coord list 
         
         filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
-        
+        if filtered_X[0].size==0:
+            #empty!
+            return self.__getitem__(idx+1)
         if self.return_coords is True:
             return (filtered_X,filtered_y,filtered_coords)
         else:
