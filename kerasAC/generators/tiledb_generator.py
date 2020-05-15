@@ -532,7 +532,7 @@ class TiledbGenerator(Sequence):
                 vals=vals/np.expand_dims(vals.sum(axis=1),axis=1) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
             except ZeroDivisionError:
                 vals=vals/(np.expand_dims(vals.sum(axis=1),axis=1)+self.pseudocount) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
-            vals=logit(vals)
+            vals=logit(vals+self.bias_pseudocount)
             return vals 
         else:
             raise Exception("transform_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
