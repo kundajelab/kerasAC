@@ -45,7 +45,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                  chrom_sizes=None,
                  task_indices=None,
                  tasks=None,
-                 pseudocount=0,
+                 pseudocount=0.001,
                  bias_pseudocount=0.001,
                  expand_dims=False,
                  tiledb_stride=1,

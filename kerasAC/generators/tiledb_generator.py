@@ -92,7 +92,7 @@ class TiledbGenerator(Sequence):
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
-                 pseudocount=0,
+                 pseudocount=0.001,
                  bias_pseudocount=0.001,
                  add_revcomp=False,
                  expand_dims=False,
@@ -195,10 +195,10 @@ class TiledbGenerator(Sequence):
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
-        if upsample_ratio is not None:
+        if (upsample_ratio is not None) and (upsample_ratio > 0):
             assert type(upsample_ratio)==float
         self.upsample_ratio=upsample_ratio
-        if self.upsample_ratio is not None:
+        if (self.upsample_ratio is not None) and (upsample_ratio >0):
             self.get_upsampled_indices()
             self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
         else:
@@ -515,6 +515,8 @@ class TiledbGenerator(Sequence):
     def transform_vals(self,vals,transformer):
         if self.add_revcomp==True:
             vals=np.concatenate((vals,vals),axis=0)
+        if transformer is None:
+            return vals 
         if transformer == 'None':
             return vals
         elif transformer == 'asinh':
@@ -524,14 +526,18 @@ class TiledbGenerator(Sequence):
         elif transformer == 'log':
             return np.log(vals+self.pseudocount)
         elif transformer == 'counts_to_logit':
-            vals=vals/np.expand_dims(vals.sum(axis=1),axis=1) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task 
-            vals+=self.bias_pseudocount
+            try:
+                vals=vals/np.expand_dims(vals.sum(axis=1),axis=1) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
+            except ZeroDivisionError:
+                vals=vals/(np.expand_dims(vals.sum(axis=1),axis=1)+self.pseudocount) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
             vals=logit(vals)
             return vals 
         else:
             raise Exception("transform_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
     
     def aggregate_vals(self,vals,aggregator):
+        if aggregator is None:
+            return vals
         if aggregator == 'None':
             return vals
         elif aggregator == 'average':

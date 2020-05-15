@@ -41,6 +41,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     control_smoothing=[1, 50]
     counts_loss_weight=1
     profile_loss_weight=1
+    kernel_size_post_bias=1
     
     model_params=get_model_param_dict(args.model_params)
     if 'filters' in model_params:
@@ -57,7 +58,9 @@ def getModelGivenModelOptionsAndWeightInits(args):
         counts_loss_weight=float(model_params['counts_loss_weight'])
     if 'profile_loss_weight' in model_params:
         profile_loss_weight=float(model_params['profile_loss_weight'])
-
+    if 'kernel_size_post_bias' in model_params:
+        kernel_size_post_bias=int(model_params['kernel_size_post_bias'])
+        
     print("params:")
     print("filters:"+str(filters))
     print("n_dil_layers:"+str(n_dil_layers))
@@ -148,7 +151,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
     # Step 1.4 - Final 1x1 convolution
     profile_out = Conv1D(filters=num_tasks,
-                         kernel_size=1,
+                         kernel_size=kernel_size_post_bias,
                          name="profile_predictions")(concat_pop_bpi)
     # Branch 2. Counts prediction
     # Step 2.1 - Global average pooling along the "length", the result

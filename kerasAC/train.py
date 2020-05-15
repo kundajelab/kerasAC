@@ -39,7 +39,7 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
-    tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=1)
+    tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=0.001)
     
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
@@ -48,8 +48,8 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
 
-    tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
-    tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default=None,help="tiledb attribute to use for upsampling, i.e. idr_peak")
+    tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=None,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
 
     tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")    
 
