@@ -97,10 +97,30 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  num_threads=num_threads)
         self.tiledb_stride=tiledb_stride
         self.bed_regions=bed_regions
+        self.idx_to_tdb_index=None
         print("created predict generator")
         
-
-
+    def precompute_idx_to_tdb_index(self):
+        self.idx_to_tdb_index={}
+        cur_chrom_index=0
+        next_coord=self.chrom_indices[cur_chrom_index][0] #first tdb coord for chromosome,this is next batch's start coord 
+        cur_chrom_end=self.chrom_indices[cur_chrom_index][1] #final tdb coordinate for this chromsome
+        print("mapping idx to tiledb indices") 
+        for idx in range(0,self.__len__()):
+            self.idx_to_tdb_index[idx]=[]
+            for i in range(self.batch_size): 
+                if next_coord > cur_chrom_end:
+                    try:
+                        cur_chrom_index+=1
+                        next_coord=self.chrom_indices[cur_chrom_index][0]
+                        cur_chrom_end=self.chrom_indices[cur_chrom_index][1]
+                    except:
+                        #we are in the last batch, which may not be full-sized, we cannot increment to the next chromosome. 
+                        continue 
+                self.idx_to_tdb_index[idx].append(next_coord)
+                next_coord+=self.tiledb_stride
+        print("mapping of idx to tiledb indices completed")
+        
     def get_tdb_indices_for_batch(self,idx):
         if len(self.upsampled_indices)>0:
             #use the upsampled indices 
@@ -109,14 +129,16 @@ class TiledbPredictGenerator(TiledbGenerator):
             upsampled_batch_indices=self.upsampled_indices[upsampled_batch_start:upsampled_batch_end]
             return upsampled_batch_indices
         else:
-            #not upsampling, going through the test chromosomes with specified stride value 
-            startpos=idx*self.batch_size*self.tiledb_stride
-            batch_indices=[i for i in range(startpos,startpos+self.batch_size*self.tiledb_stride,self.tiledb_stride)]
+            #not upsampling, going through the test chromosomes with specified stride value
+            #generate mapping of idx values to tdb indices 
+            if self.idx_to_tdb_index is None:
+                self.precompute_idx_to_tdb_index()
+            batch_indices=self.idx_to_tdb_index[idx]
             return batch_indices
     
     def __len__(self):
         if len(self.upsampled_indices) is 0: 
-            return int(ceil(self.length/(self.batch_size*self.tiledb_stride)))
+            return int(ceil(self.num_indices/(self.batch_size*self.tiledb_stride)))
         else:
             return int(ceil(self.upsampled_indices.shape[0] /self.batch_size))
 

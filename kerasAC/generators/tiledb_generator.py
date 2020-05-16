@@ -157,7 +157,7 @@ class TiledbGenerator(Sequence):
                 self.chroms_to_use=[i.split()[0] for i in open(chrom_sizes,'r').read().strip().split('\n')]
         #find the tdb indices that correspond to the chroms to be used 
         self.get_chrom_index_ranges(self.chroms_to_use)
-        print("self.weighted_chrom_indices"+str(self.weighted_chrom_indices))
+        #print("self.weighted_chrom_indices"+str(self.weighted_chrom_indices))
         print("got indices for used chroms")
 
         #get indices of tasks to be used in training
@@ -329,6 +329,7 @@ class TiledbGenerator(Sequence):
         if self.return_coords is True:
             #get the chromosome coordinates that correspond to indices
             coords=self.get_coords(tdb_batch_indices)
+            #print(coords)
         #get the inputs 
         X=[]
         for cur_input_index in range(self.num_inputs):
