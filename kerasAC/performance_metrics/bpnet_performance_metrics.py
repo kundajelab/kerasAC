@@ -9,6 +9,10 @@ from scipy.special import softmax
 from scipy.spatial.distance import jensenshannon
 import matplotlib 
 from matplotlib import pyplot as plt
+from matplotlib import cm
+from matplotlib.colors import Normalize 
+from scipy.interpolate import interpn
+
 plt.rcParams["figure.figsize"]=10,5
 font = {'family' : 'normal',
         'weight' : 'bold',
@@ -27,7 +31,43 @@ def parse_args():
     parser.add_argument("--title") 
     parser.add_argument("--pseudoreps",nargs="+",default=None,help="bigwig replicates for calculating upper bound of performance")
     parser.add_argument("--flank",type=int,default=500)
+    parser.add_argument("--label_min_to_score",type=float,default=None)
+    parser.add_argument("--label_max_to_score",type=float,default=None)
     return parser.parse_args() 
+
+
+def density_scatter(x, y, xlab, ylab, title,figtitle, ax = None, sort = True, bins = 20):
+    """
+    Scatter plot colored by 2d histogram
+    """
+    if ax is None :
+        fig , ax = plt.subplots()
+    data , x_e, y_e = np.histogram2d( x, y, bins = bins, density = True )
+    z = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , np.vstack([x,y]).T , method = "splinef2d", bounds_error = False)
+
+    #To be sure to plot all data
+    z[np.where(np.isnan(z))] = 0.0
+
+    # Sort the points by density, so that the densest points are plotted last
+    if sort :
+        idx = z.argsort()
+        x, y, z = x[idx], y[idx], z[idx]
+
+    ax.scatter( x, y, c=z )
+
+    norm = Normalize(vmin = np.min(z), vmax = np.max(z))
+    cbar = fig.colorbar(cm.ScalarMappable(norm = norm), ax=ax)
+    cbar.ax.set_ylabel('Density')
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title(title)
+    plt.legend(loc='best')
+    plt.xlim(0,11)
+    plt.ylim(0,11)
+    plt.savefig(figtitle,format='png',dpi=300)    
+    return ax
+
+
 
 def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
     prep1_vals=[]
@@ -41,34 +81,20 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
         prep2_vals.append(np.log(np.sum(pseudoreps[1].values(chrom,start,end))+1))
     spearman_cor=spearmanr(prep1_vals,prep2_vals)[0]
     pearson_cor=pearsonr(prep1_vals,prep2_vals)[0]
-    plt.rcParams["figure.figsize"]=8,8
-    plt.figure()
-    plt.scatter(prep1_vals, prep2_vals ,alpha=0.1)
-    plt.xlabel('Log Count Labels Pseudorep1')
-    plt.ylabel('Log Count Labels Pseudorep 2')
-    plt.title("counts:"+str(title)+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
-    plt.legend(loc='best')
-    plt.xlim(0,11)
-    plt.ylim(0,11)
-    plt.savefig(outf+".counts.pseudorep.png",format='png',dpi=300)
+    density_scatter(prep1_vals, prep2_vals ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2',title="counts:"+str(title)+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),figtitle=outf+".counts.pseudorep.png")
     return spearman_cor, pearson_cor
     
-
-
-
 def counts_metrics(labels,preds,outf,title,pseudoreps,flank):            
     spearman_cor=spearmanr(labels[0].values,preds[0].values)[0]
     pearson_cor=pearsonr(labels[0].values,preds[0].values)[0]
     plt.rcParams["figure.figsize"]=8,8
     plt.figure()
-    plt.scatter(labels[0].values, preds[0].values ,alpha=0.1)
-    plt.xlabel('Log Count Labels')
-    plt.ylabel('Log Count Predictions')
-    plt.title("counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
-    plt.legend(loc='best')
-    plt.xlim(0,11)
-    plt.ylim(0,11)
-    plt.savefig(outf+".counts.png",format='png',dpi=300)
+    density_scatter(labels[0].values,
+                    preds[0].values,
+                    xlab='Log Count Labels',
+                    ylab='Log Count Predictions',
+                    title="counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),
+                    figtitle=outf+".counts.png")
     if pseudoreps is not None:
         spearman_cor_ps,pearson_cor_ps=get_pseudorep_counts_cor(pseudoreps,labels.index,title,outf,flank)
     else:
@@ -86,8 +112,12 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     pseudorep_jsd=[] 
     outf=open(outf_prefix+".jsd.txt",'w')
     outf.write('Region\tJSD\tPseudorepJSD\n')
-    for i in range(num_regions): 
-        cur_profile_labels_prob=profile_labels.iloc[i].values/np.nansum(profile_labels.iloc[i].values)
+    for i in range(num_regions):
+        denominator=np.nansum(profile_labels.iloc[i].values)
+        if denominator!=0:
+            cur_profile_labels_prob=profile_labels.iloc[i].values/np.nansum(profile_labels.iloc[i].values)
+        else:
+            cur_profile_labels_prob=profile_labels.iloc[i].values #they are all 0 
         cur_profile_preds_softmax=profile_preds_softmax.iloc[i]
         cur_index=profile_labels.index[i]
         cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
@@ -116,16 +146,12 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     plt.legend(loc='best')
     plt.savefig(outf_prefix+".jsd.png",format='png',dpi=300)
     if prep_jsd is not None:
-        plt.rcParams["figure.figsize"]=8,8
-        plt.figure()
-        plt.scatter(region_jsd, pseudorep_jsd ,alpha=0.1)
-        plt.xlabel('JSD Predicted vs Labels')
-        plt.ylabel('JSD Pseudoreps')
-        plt.title("JSD vs Pseudoreps:"+title)
-        plt.xlim(0,1)
-        plt.ylim(0,1)
-        plt.legend(loc='best')
-        plt.savefig(outf_prefix+".jsd.pseudorep.png",format='png',dpi=300)
+        density_scatter(region_jsd,
+                        pseudorep_jsd,
+                        xlab='JSD Predict vs Labels',
+                        ylab='JSD Pseudoreps',
+                        title='JSD vs Pseudoreps:'+title,
+                        figtitle=outf_prefix+".jsd.pseudorep.png")
 
     
     #get mean and std
@@ -137,7 +163,8 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
 def get_performance_metrics_profile_wrapper(args):
     if type(args)==type({}):
         args=config.args_object_from_args_dict(args)
-    labels_and_preds={} 
+    labels_and_preds={}
+    bad_regions=[]
     for loss_index in range(len(args.losses)):
         cur_loss=args.losses[loss_index]
         cur_loss_suffix=args.loss_suffixes[loss_index]
@@ -149,8 +176,24 @@ def get_performance_metrics_profile_wrapper(args):
             pseudoreps=None
         labels_and_preds[cur_loss]={}
         labels_and_preds[cur_loss]['labels']=cur_labels
-        labels_and_preds[cur_loss]['predictions']=cur_pred 
+        labels_and_preds[cur_loss]['predictions']=cur_pred
+        if cur_loss=="counts":
+            #filter for regions of low or excessively high counts
+            if (args.label_min_to_score is not None) or (args.label_max_to_score is not None):
+                for index,row in cur_labels.iterrows():
+                    cur_count=row[0]
+                    if args.label_min_to_score is not None:
+                        if cur_count < args.label_min_to_score:
+                            bad_regions.append(index)
+                    if args.label_max_to_score is not None:
+                        if cur_count > args.label_max_to_score:
+                            bad_regions.append(index)
     print("loaded labels and predictions")
+    #drop bad regions
+    for loss in labels_and_preds:
+        labels_and_preds[loss]['labels']=labels_and_preds[loss]['labels'].drop(bad_regions)
+        labels_and_preds[loss]['predictions']=labels_and_preds[loss]['predictions'].drop(bad_regions)
+    print("removed regions with too few or too many counts")
     spearman_cor,pearson_cor,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
     mean_jsd, std_jsd, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],labels_and_preds['profile']['predictions'],labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
     outf=open(args.outf+".summary.txt",'w')
