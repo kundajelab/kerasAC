@@ -80,7 +80,10 @@ def parse_args():
     train_val_splits.add_argument("--train_chroms",nargs="*",default=None)
     train_val_splits.add_argument("--validation_chroms",nargs="*",default=None)
     train_val_splits.add_argument("--genome",default=None)
-    train_val_splits.add_argument("--fold",type=int,default=None)    
+    train_val_splits.add_argument("--fold",type=int,default=None)
+    train_val_splits.add_argument("--bed_regions_train",default=None)
+    train_val_splits.add_argument("--bed_regions_validate",default=None)
+    train_val_splits.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     train_val_splits.add_argument("--num_train",type=int,default=700000)
     train_val_splits.add_argument("--num_valid",type=int,default=150000)
 
@@ -301,7 +304,9 @@ def initialize_generators_tiledb(args):
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,
-                                    num_threads=args.upsample_threads)
+                                    num_threads=args.upsample_threads,
+                                    bed_regions=args.bed_regions_train,
+                                    bed_regions_summit_center=args.center_on_summit)
     
     print("generated training data generator!")
     valid_chroms=get_chroms(args,split='valid')
@@ -341,7 +346,9 @@ def initialize_generators_tiledb(args):
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,
-                                    num_threads=args.upsample_threads)
+                                    num_threads=args.upsample_threads,
+                                    bed_regions=args.bed_regions_validate,
+                                    bed_regions_summit_center=args.center_on_summit)
     
     print("generated validation data generator")
     return train_generator, valid_generator

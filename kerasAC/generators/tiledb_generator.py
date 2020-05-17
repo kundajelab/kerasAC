@@ -99,7 +99,9 @@ class TiledbGenerator(Sequence):
                  return_coords=False,
                  tdb_config=None,
                  tdb_ctx=None,
-                 num_threads=1):
+                 num_threads=1,
+                 bed_regions=None,
+                 bed_regions_summit_center=False):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
@@ -185,7 +187,17 @@ class TiledbGenerator(Sequence):
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
 
-
+    
+        #handle the option of training/predicting on pre-specified bed regions
+        if bed_regions is not None:
+            self.bed_regions=pd.read_csv(bed_regions,header=None,sep='\t')
+            self.bed_regions_summit_center=bed_regions_summit_center 
+            print("loaded bed regions")
+            #get mapping of bed region to tdb index
+            self.map_regions_to_tdb_index() 
+        else:
+            self.bed_regions=None 
+            self.coord=None
         #identify min/max values
         self.tdb_input_min=transform_data_type(tdb_input_min,self.num_inputs)
         self.tdb_input_max=transform_data_type(tdb_input_max,self.num_inputs)
@@ -206,14 +218,28 @@ class TiledbGenerator(Sequence):
             self.upsampled_indices_len=0
             self.upsampled_indices=[]
             
-
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
-
         self.pseudocount=pseudocount
         self.bias_pseudocount=bias_pseudocount
         self.return_coords=return_coords
         print('created generator')
         
+    def map_regions_to_tdb_index(self):
+        self.coord=[]
+        self.tdb_indices=[]
+        for index,row in self.bed_regions.iterrows():
+            chrom=row[0]
+            start=row[1]
+            end=row[2]
+            if self.bed_regions_summit_center is True:
+                summit=row[9]
+                pos=start+summit
+            else:
+                pos=int(round((start+end)/2))
+            tdb_index=self.chrom_to_indices[chrom][0]+pos
+            self.coord.append((chrom,pos))
+            self.tdb_indices.append(tdb_index) 
+    
     def get_chrom_index_ranges(self,chroms_to_use):
         '''
         find tdb indices corresponding to the used chromosomes 
@@ -244,6 +270,11 @@ class TiledbGenerator(Sequence):
         self.weighted_chrom_indices=weighted_chrom_sizes
         self.num_indices=num_indices
         self.chroms_to_use=chroms
+        self.chrom_to_indices={}
+        for i in range(len(self.chroms_to_use)):
+            cur_chrom=self.chroms_to_use[i]
+            cur_indices=self.chrom_indices[i]
+            self.chrom_to_indices[cur_chrom]=cur_indices 
         return
     
     def get_task_indices(self,tasks):
@@ -311,8 +342,11 @@ class TiledbGenerator(Sequence):
     
         
     def __len__(self):
+        #we have an explict set of regions
+        if self.bed_regions is not None:
+            return int(floor(self.bed_regions.shape[0]/self.batch_size))
         #we are only training on peak regions
-        if (self.upsample_ratio is not None) and (self.upsample_ratio==1):
+        elif (self.upsample_ratio is not None) and (self.upsample_ratio==1):
             return int(floor(self.upsampled_indices_len/self.upsampled_batch_size))
         else:
         #training on peak and non-peak regions 
@@ -328,7 +362,7 @@ class TiledbGenerator(Sequence):
         coords=None
         if self.return_coords is True:
             #get the chromosome coordinates that correspond to indices
-            coords=self.get_coords(tdb_batch_indices)
+            coords=self.get_coords(tdb_batch_indices,idx)
             #print(coords)
         #get the inputs 
         X=[]
@@ -337,7 +371,7 @@ class TiledbGenerator(Sequence):
             if cur_input=="seq":                
                 #get the one-hot encoded sequence
                 if coords is None:
-                    coords=self.get_coords(tdb_batch_indices)
+                    coords=self.get_coords(tdb_batch_indices,idx)
                 cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
                 transformed_seq=self.transform_seq(cur_seq,self.tdb_input_transformation[cur_input_index])
                 cur_x=one_hot_encode(transformed_seq)
@@ -369,7 +403,7 @@ class TiledbGenerator(Sequence):
             if cur_output=="seq":
                 #get the one-hot encoded sequence
                 if coords is None:
-                    coords=get_coords(tdb_batch_indices)
+                    coords=get_coords(tdb_batch_indices,idx)
                 cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
                 transformed_seq=self.transform_seq(cur_seq,self.tdb_output_transformation[cur_output_index])
                 cur_y=one_hot_encode(transformed_seq)
@@ -418,8 +452,12 @@ class TiledbGenerator(Sequence):
             coords=[(i[0],int(i[1])) for i in coords]
         return X,y,coords
         
-    def get_coords(self,tdb_batch_indices):
+    def get_coords(self,tdb_batch_indices,idx):
         #return list of (chrom,pos) for each index in batch
+        
+        #if we are using bed regions supplied by user, the coords have already been pre-computed 
+        if self.coord is not None:
+            return self.coord[idx*self.batch_size:(idx+1)*self.batch_size]
         coords=[]
         for cur_batch_index in tdb_batch_indices:
             for chrom_index in range(len(self.chrom_indices)):
@@ -431,6 +469,9 @@ class TiledbGenerator(Sequence):
         return coords
     
     def get_tdb_indices_for_batch(self,idx):
+        if self.bed_regions is not None:
+            return self.tdb_indices[idx*self.batch_size:(idx+1)*self.batch_size]
+        
         upsampled_batch_indices=None
         non_upsampled_batch_indices=None
         if self.upsampled_batch_size > 0:

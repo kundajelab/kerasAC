@@ -47,10 +47,15 @@ def parse_args():
     tiledbgroup=parser.add_argument_group("tiledb")
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
+    tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
+    tiledbgroup.add_argument("--tdb_input_max",nargs="*", default=None)    
+
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
@@ -74,7 +79,7 @@ def parse_args():
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
     input_filtering_params.add_argument("--genome",default=None)
     input_filtering_params.add_argument("--fold",type=int,default=None)
-
+    input_filtering_params.add_argument("--bed_regions",default=None) 
     input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
     input_filtering_params.add_argument("--tasks",nargs="*",default=None)
     input_filtering_params.add_argument("--task_indices",nargs="*",default=None)
@@ -237,7 +242,12 @@ def get_tiledb_predict_generator(args):
     import tiledb
     tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
-    test_chroms=get_chroms(args,split='test')
+    #you can only specify one (or neither) or args.fold or args.predict chroms 
+    assert (args.fold is None) or (args.predict_chroms is None)
+    if args.fold is None:
+        predict_chroms=args.predict_chroms
+    else:
+        predict_chroms=get_chroms(args,split='test')
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
                                           tdb_array=args.tdb_array,
@@ -254,8 +264,12 @@ def get_tiledb_predict_generator(args):
                                           bias_pseudocount=args.tdb_bias_pseudocount,
                                           tdb_input_source_attribute=args.tdb_input_source_attribute,
                                           tdb_input_flank=args.tdb_input_flank,
+                                          tdb_input_min=args.tdb_input_min,
+                                          tdb_input_max=args.tdb_input_max,
                                           tdb_output_source_attribute=args.tdb_output_source_attribute,
                                           tdb_output_flank=args.tdb_output_flank,
+                                          tdb_output_min=args.tdb_output_min,
+                                          tdb_output_max=args.tdb_output_max,
                                           num_inputs=args.num_inputs,
                                           num_outputs=args.num_outputs,
                                           tdb_input_aggregation=args.tdb_input_aggregation,
@@ -265,11 +279,13 @@ def get_tiledb_predict_generator(args):
                                           tdb_output_transformation=args.tdb_output_transformation,                                          
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
-                                          chroms=test_chroms,
+                                          chroms=predict_chroms,
                                           tasks=args.tasks,
                                           task_indices=args.task_indices,
                                           tdb_config=tdb_config,
-                                          tdb_ctx=tdb_ctx)
+                                          tdb_ctx=tdb_ctx,
+                                          bed_regions=args.bed_regions,
+                                          bed_regions_summit_center=args.center_on_summit)
     print("created TiledbPredictGenerator")    
     return test_generator 
 

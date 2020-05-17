@@ -49,10 +49,11 @@ class TiledbPredictGenerator(TiledbGenerator):
                  bias_pseudocount=0.001,
                  expand_dims=False,
                  tiledb_stride=1,
-                 bed_regions=None,
                  tdb_config=None,
                  tdb_ctx=None,
-                 num_threads=1):
+                 num_threads=1,
+                 bed_regions=None,
+                 bed_regions_summit_center=False):
         
         TiledbGenerator.__init__(self,          
                                  ref_fasta=ref_fasta,
@@ -94,9 +95,10 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  tdb_ctx=tdb_ctx,
                                  tasks=tasks,
                                  task_indices=task_indices,
-                                 num_threads=num_threads)
+                                 num_threads=num_threads,
+                                 bed_regions=bed_regions,
+                                 bed_regions_summit_center=bed_regions_summit_center)
         self.tiledb_stride=tiledb_stride
-        self.bed_regions=bed_regions
         self.idx_to_tdb_index=None
         print("created predict generator")
         
@@ -120,9 +122,11 @@ class TiledbPredictGenerator(TiledbGenerator):
                 self.idx_to_tdb_index[idx].append(next_coord)
                 next_coord+=self.tiledb_stride
         print("mapping of idx to tiledb indices completed")
-        
+
     def get_tdb_indices_for_batch(self,idx):
-        if len(self.upsampled_indices)>0:
+        if self.bed_regions is not None:
+            return self.tdb_indices[idx*self.batch_size:(idx+1)*self.batch_size]
+        elif len(self.upsampled_indices)>0:
             #use the upsampled indices 
             upsampled_batch_start=idx*self.upsampled_batch_size
             upsampled_batch_end=min([upsampled_batch_start+self.upsampled_batch_size,self.upsampled_indices.shape[0]])
@@ -137,7 +141,10 @@ class TiledbPredictGenerator(TiledbGenerator):
             return batch_indices
     
     def __len__(self):
-        if len(self.upsampled_indices) is 0: 
+        #we have an explict set of regions
+        if self.bed_regions is not None:
+            return int(floor(self.bed_regions.shape[0]/self.batch_size))
+        elif len(self.upsampled_indices) is 0: 
             return int(ceil(self.num_indices/(self.batch_size*self.tiledb_stride)))
         else:
             return int(ceil(self.upsampled_indices.shape[0] /self.batch_size))
