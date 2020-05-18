@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=7 kerasAC_predict --model_hdf5 single.28.starting  --data_bed /srv/scratch/annashch/deeplearning/form_inputs/gecco_inputs_v2/archive/single.test.28.bed --predictions_pickle single.28.starting.vars --batch_size 1000 --sequential --ref /srv/scratch/annashch/deeplearning/form_inputs/code/hg19.genome.fa --accuracy_metrics_file  single.28.starting.acc

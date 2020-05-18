@@ -33,7 +33,7 @@ def parse_args():
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
 
-    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")

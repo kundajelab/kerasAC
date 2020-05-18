@@ -8,14 +8,15 @@ RUN apt-get update
 RUN apt-get install -y libz-dev liblzma-dev gcc libcurl4 libcurl4-openssl-dev samtools
 RUN pip install --upgrade pip
 RUN pip install tiledb>=0.5.2 \
+    		pysam \
 		psutil \
 		tables \
 		numpy>=1.9 \
+		keras>=2.2 \
 		h5py \
 		pandas \
 		deeplift \
 		abstention \
-		psutil \
 		boto3 \
 		pyBigWig
 
