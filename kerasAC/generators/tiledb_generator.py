@@ -421,7 +421,11 @@ class TiledbGenerator(Sequence):
         filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
         if filtered_X[0].size==0:
             #empty!
-            return self.__getitem__(idx+1)
+            try:
+                return self.__getitem__(idx+1)
+            except:
+                #we are at the last index, wrap around 
+                return self.__getitem__(0)
         if self.return_coords is True:
             return (filtered_X,filtered_y,filtered_coords)
         else:

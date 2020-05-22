@@ -122,7 +122,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                 self.idx_to_tdb_index[idx].append(next_coord)
                 next_coord+=self.tiledb_stride
         print("mapping of idx to tiledb indices completed")
-
+        print("MAX idx:"+str(idx))
     def get_tdb_indices_for_batch(self,idx):
         if self.bed_regions is not None:
             return self.tdb_indices[idx*self.batch_size:(idx+1)*self.batch_size]
@@ -143,7 +143,7 @@ class TiledbPredictGenerator(TiledbGenerator):
     def __len__(self):
         #we have an explict set of regions
         if self.bed_regions is not None:
-            return int(floor(self.bed_regions.shape[0]/self.batch_size))
+            return int(ceil(self.bed_regions.shape[0]/self.batch_size))
         elif len(self.upsampled_indices) is 0: 
             return int(ceil(self.num_indices/(self.batch_size*self.tiledb_stride)))
         else:
