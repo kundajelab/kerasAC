@@ -31,7 +31,8 @@ def combine_mult_and_diffref_1d(mult, orig_inp, bg_data):
             hypothetical_contribs = hypothetical_difference_from_reference*mult[l]
             projected_hypothetical_contribs[:,:,i] = np.sum(hypothetical_contribs,axis=-1) 
         to_return.append(np.mean(projected_hypothetical_contribs,axis=0))
-    to_return.append(np.zeros_like(orig_inp[1]))
+    if len(orig_inp)>1: 
+        to_return.append(np.zeros_like(orig_inp[1]))
     return to_return
 
 def combine_mult_and_diffref_2d(mult, orig_inp, bg_data):
@@ -46,7 +47,8 @@ def combine_mult_and_diffref_2d(mult, orig_inp, bg_data):
             hypothetical_contribs = hypothetical_difference_from_reference*mult[l]
             projected_hypothetical_contribs[:,:,:,i] = np.sum(hypothetical_contribs,axis=-1) 
         to_return.append(np.mean(projected_hypothetical_contribs,axis=0))
-    to_return.append(np.zeros_like(orig_inp[1]))
+    if len(orig_inp)>1: 
+        to_return.append(np.zeros_like(orig_inp[1]))
     return to_return
 
 def create_explainer(model,shuffle_func,target_layer,combine_mult_and_diffref,task_index):
