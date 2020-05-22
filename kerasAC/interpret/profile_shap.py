@@ -2,28 +2,32 @@ from deeplift.dinuc_shuffle import dinuc_shuffle
 import shap
 import tensorflow as tf
 import numpy as np
-import pdb 
+
 def create_background(model_inputs, bg_size=10, seed=1234):
     """
     From a pair of single inputs to the model, generates the set of background
     inputs to perform interpretation against.
     Arguments:
-        `model_inputs`: a single one-hot
-            encoded input sequence of shape I x 4;
+        `model_inputs`: a pair of two entries; the first is a single one-hot
+            encoded input sequence of shape I x 4; the second is the set of
+            control profiles for the model, shaped T x O x 2
         `bg_size`: the number of background examples to generate.
     Returns a pair of arrays as a list, where the first array is G x I x 4, and
     the second array is G x T x O x 2; these are the background inputs. The
     background for the input sequences is randomly dinuceotide-shuffles of the
-    original sequence. 
+    original sequence. The background for the control profiles is the same as
+    the originals.
     """
-    #print(len(model_inputs))
-    input_seq = model_inputs[0]
+    input_seq= model_inputs[0]
+    #print("input_seq:"+str(input_seq))
     input_seq_bg = np.empty((bg_size,) + input_seq.shape)
     rng = np.random.RandomState(seed)
     for i in range(bg_size):
         input_seq_shuf = dinuc_shuffle(input_seq, rng=rng)
         input_seq_bg[i] = input_seq_shuf
-    return input_seq_bg
+    #print("returning background:"+str(input_seq_bg.shape))
+    #print("background:"+str(input_seq_bg))
+    return [input_seq_bg]
 
 
 def combine_mult_and_diffref(mult, orig_inp, bg_data):
@@ -58,12 +62,10 @@ def combine_mult_and_diffref(mult, orig_inp, bg_data):
     """
     # Reassign arguments to better names; this specific implementation of
     # DeepSHAP requires the arguments to have the above names
-    input_seq_bg_mults = mult[0]
+    input_seq_bg_mults=mult[0]
     input_seq = orig_inp[0]
-    input_seq_bg= bg_data[0]
-    #print(input_seq_bg_mults.shape)
-    #print(input_seq.shape)
-    #print(input_seq_bg.shape) 
+    input_seq_bg = bg_data[0]
+
     # Allocate array to store hypothetical scores, one set for each background
     # reference (i.e. each difference-from-reference)
     input_seq_hyp_scores_eachdiff = np.empty_like(input_seq_bg)
@@ -88,7 +90,8 @@ def combine_mult_and_diffref(mult, orig_inp, bg_data):
     # Average hypothetical scores across background
     # references/diff-from-references
     input_seq_hyp_scores = np.mean(input_seq_hyp_scores_eachdiff, axis=0)
-    return input_seq_hyp_scores
+    #cont_profs_hyp_scores = np.zeros_like(cont_profs)  # All 0s
+    return [input_seq_hyp_scores]
     
 
 def create_explainer(model, task_index=None):
@@ -109,7 +112,7 @@ def create_explainer(model, task_index=None):
     # the logits weighted by the probabilities after passing through the
     # softmax; this exponentially increases the weight for high-probability
     # positions, and exponentially reduces the weight for low-probability
-    # positions, resulting in a cleaner signal
+    # positions, resulting in a more cleaner signal
 
     # First, center/mean-normalize the logits so the contributions are
     # normalized, as a softmax would do
@@ -118,13 +121,12 @@ def create_explainer(model, task_index=None):
 
     # Stop gradients flowing to softmax, to avoid explaining those
     logits_stopgrad = tf.stop_gradient(logits)
-    probs = tf.nn.softmax(logits_stopgrad, axis=2)
+    probs = tf.nn.softmax(logits_stopgrad, axis=1)
 
     logits_weighted = logits * probs  # Shape: B x T x O x 2
     if task_index:
-        logits_weighted = logits_weighted[:, task_index : task_index + 1]
+        logits_weighted = logits_weighted[:,:, task_index : task_index + 1]
     prof_sum = tf.reduce_sum(logits_weighted, axis=(1, 2))
-    #print("prof sum shape:"+prof_sum.shape)
     explainer = shap.DeepExplainer(
         model=(model.input, prof_sum),
         data=create_background,
@@ -141,7 +143,8 @@ def create_explainer(model, task_index=None):
         Returns a B x I x 4 array containing hypothetical importance scores for
         each of the B input sequences.
         """
-        return explainer.shap_values(input_seqs, progress_message=None)[0]
-    return explain_fn
+        return explainer.shap_values([input_seqs], progress_message=None
+        )[0]
 
+    return explain_fn
 
