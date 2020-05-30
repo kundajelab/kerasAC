@@ -11,7 +11,10 @@ def deepshap_wrapper(inputs):
 
 def create_background(inputs, bg_size=10, seed=1234):
     input_seq=inputs[0]
-    input_seq_bg = [np.empty((bg_size,) + input_seq.shape),np.asarray(bg_size*[inputs[1]])]
+    if len(inputs)==2:
+        input_seq_bg = [np.empty((bg_size,) + input_seq.shape),np.asarray(bg_size*[inputs[1]])]
+    elif len(inputs)==1:
+        input_seq_bg = [np.empty((bg_size,) + input_seq.shape)]
     rng = np.random.RandomState(seed)
     for i in range(bg_size):
         input_seq_shuf = dinuc_shuffle(np.squeeze(input_seq), rng=rng)

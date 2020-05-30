@@ -144,7 +144,7 @@ def create_explainer(model, task_index=None):
         each of the B input sequences.
         """
         return explainer.shap_values([input_seqs], progress_message=None
-        )[0]
+        )
 
     return explain_fn
 
