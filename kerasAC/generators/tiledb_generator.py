@@ -72,6 +72,8 @@ class TiledbGenerator(Sequence):
                  tdb_output_flank,
                  num_inputs,
                  num_outputs,
+                 tdb_input_source_attribute_revcomp=None,
+                 tdb_output_source_attribute_revcomp=None,
                  tdb_input_min=None,
                  tdb_input_max=None,
                  tdb_output_min=None,
@@ -176,6 +178,7 @@ class TiledbGenerator(Sequence):
         #store input params
         self.num_inputs=num_inputs
         self.tdb_input_source_attribute=tdb_input_source_attribute
+        self.tdb_input_source_attribute_revcomp=tdb_input_source_attribute_revcomp
         self.tdb_input_flank=tdb_input_flank
         self.tdb_input_aggregation=[str(i) for i in tdb_input_aggregation]
         self.tdb_input_transformation=[str(i) for i in tdb_input_transformation]
@@ -183,6 +186,7 @@ class TiledbGenerator(Sequence):
         #store output params
         self.num_outputs=num_outputs
         self.tdb_output_source_attribute=tdb_output_source_attribute
+        self.tdb_output_source_attribute_revcomp=tdb_output_source_attribute_revcomp
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
@@ -363,7 +367,6 @@ class TiledbGenerator(Sequence):
         if self.return_coords is True:
             #get the chromosome coordinates that correspond to indices
             coords=self.get_coords(tdb_batch_indices,idx)
-            #print(coords)
         #get the inputs 
         X=[]
         for cur_input_index in range(self.num_inputs):
@@ -373,18 +376,33 @@ class TiledbGenerator(Sequence):
                 if coords is None:
                     coords=self.get_coords(tdb_batch_indices,idx)
                 cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
-                transformed_seq=self.transform_seq(cur_seq,self.tdb_input_transformation[cur_input_index])
-                cur_x=one_hot_encode(transformed_seq)
+                cur_x=one_hot_encode(cur_seq)
             else:
                 #extract values from tdb
-                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input_index,self.tdb_input_flank[cur_input_index],is_input=True)
-                aggregate_vals=self.aggregate_vals(cur_vals,self.input_aggregation[cur_input_index])
+                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input,self.tdb_input_flank[cur_input_index])
+                aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index])
                 transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
                 cur_x=transformed_vals
             if self.expand_dims==True:
                 cur_x=np.expand_dims(cur_x,axis=1)
+            
+            #perform reverse complementation, if specified
+            if self.add_revcomp is True:
+                cur_input=self.tdb_input_source_attribute_revcomp[cur_input_index]
+                if cur_input=='seq':
+                    rev_cur_x=one_hot_encode([revcomp(s) for s in cur_seq])
+                else:
+                    #extract values from tdb
+                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input,self.tdb_input_flank[cur_input_index])
+                    aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index])
+                    transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
+                    rev_cur_x=transformed_vals
+                if self.expand_dims==True:
+                    rev_cur_x=np.expand_dims(cur_x,axis=1)
+                cur_x=np.concatenate((cur_x,rev_cur_x),axis=0)
             X.append(cur_x)
-
+                
+                
         #get the biases, if specified
         if self.bias_arrays is not None:
             for cur_bias_index in range(len(self.bias_arrays)):
@@ -394,8 +412,9 @@ class TiledbGenerator(Sequence):
                 cur_bias=transformed_bias
                 if self.expand_dims==True:
                     cur_bias=np.expand_dims(cur_bias,axis=1)
+                if self.add_revcomp is True:
+                    cur_bias=np.concatenate((cur_bias,cur_bias),axis=0)
                 X.append(cur_bias) 
-            
         #get the outputs 
         y=[]
         for cur_output_index in range(self.num_outputs):
@@ -405,18 +424,31 @@ class TiledbGenerator(Sequence):
                 if coords is None:
                     coords=get_coords(tdb_batch_indices,idx)
                 cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
-                transformed_seq=self.transform_seq(cur_seq,self.tdb_output_transformation[cur_output_index])
                 cur_y=one_hot_encode(transformed_seq)
             else:
                 #extract values from tdb
-                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output_index,self.tdb_output_flank[cur_output_index],is_output=True)
+                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
                 aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
                 transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
                 cur_y=transformed_vals
+            if self.add_revcomp is True:
+                cur_output=self.tdb_output_source_attribute_revcomp[cur_output_index]
+                if cur_output=='seq':
+                    rev_cur_y=one_hot_encode([revcomp(s) for s in cur_seq])
+                else:
+                    #extract values from tdb
+                    rev_cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
+                    aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
+                    transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
+                    rev_cur_y=transformed_vals
+                cur_y=np.concatenate((cur_y,rev_cur_y),axis=0)
             y.append(cur_y)
+            
         if self.return_coords is True:
             if self.add_revcomp==True:
-                coords=coords+coords #concatenate coord list 
+                coords_forward=[i.append('p') for i in coords]
+                coords_reverse=[i.append('r') for i in coords] 
+                coords=coords_forward+coords_reverse #concatenate coord list 
         
         filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
         if filtered_X[0].size==0:
@@ -524,12 +556,6 @@ class TiledbGenerator(Sequence):
             seqs.append(seq) 
         return seqs
 
-    def transform_seq(self,seqs,transformation):
-        if self.add_revcomp is True:
-            seqs_rc=[revcomp(s) for s in seqs]
-            seqs=seqs+seqs_rc
-        return seqs
-
     def get_bias_vals(self,tdb_batch_indices,cur_bias_index,flank):
         num_entries=len(tdb_batch_indices)
         vals=np.full((num_entries,2*flank,1),np.nan)
@@ -538,19 +564,10 @@ class TiledbGenerator(Sequence):
             vals[val_index,:,:]=cur_array.query(attrs=[self.bias_source_attribute[cur_bias_index]])[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank,:][self.bias_source_attribute[cur_bias_index]]
         return vals 
     
-    def get_tdb_vals(self,tdb_batch_indices,input_output_index,flank,is_input=False,is_output=False):
+    def get_tdb_vals(self,tdb_batch_indices,attribute,flank):
         '''
         extract the values from tileDB 
-        '''
-        #determine the attribute from tiledb that will be used 
-        assert is_input==True or is_output==True
-        if is_input==True:
-            input_or_output="inputs"
-            attribute=self.tdb_input_source_attribute[input_output_index]
-        else:
-            input_or_output="outputs"
-            attribute=self.tdb_output_source_attribute[input_output_index] 
-            
+        '''            
         num_tasks=len(self.task_indices)
         num_entries=len(tdb_batch_indices)
         #prepopulate the values array with nans
@@ -561,8 +578,6 @@ class TiledbGenerator(Sequence):
         return vals
     
     def transform_vals(self,vals,transformer):
-        if self.add_revcomp==True:
-            vals=np.concatenate((vals,vals),axis=0)
         if transformer is None:
             return vals 
         if transformer == 'None':

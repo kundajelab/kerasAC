@@ -34,6 +34,7 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
 
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_source_attribute_revcomp",nargs="*",default=None,help="tiledb attribute for use in label generation for negative strands i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
@@ -42,6 +43,7 @@ def parse_args():
     tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=0.001)
     
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_source_attribute_revcomp",nargs="*",default=None,help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_input_max",nargs="*", default=None)    
     tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
@@ -275,6 +277,7 @@ def initialize_generators_tiledb(args):
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                    tdb_input_source_attribute_revcomp=args.tdb_input_source_attribute_revcomp,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_min=args.tdb_input_min,
                                     tdb_input_max=args.tdb_input_max,
@@ -282,6 +285,7 @@ def initialize_generators_tiledb(args):
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     pseudocount=args.tdb_transformation_pseudocount,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                    tdb_output_source_attribute_revcomp=args.tdb_output_source_attribute_revcomp,                                    
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_min=args.tdb_output_min,
                                     tdb_output_max=args.tdb_output_max,
@@ -318,6 +322,7 @@ def initialize_generators_tiledb(args):
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                    tdb_input_source_attribute_revcomp=args.tdb_input_source_attribute_revcomp,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_min=args.tdb_input_min,
                                     tdb_input_max=args.tdb_input_max,
@@ -325,6 +330,7 @@ def initialize_generators_tiledb(args):
                                     tdb_input_transformation=args.tdb_input_transformation,
                                     pseudocount=args.tdb_transformation_pseudocount,
                                     tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                    tdb_output_source_attribute_revcomp=args.tdb_output_source_attribute_revcomp,                                    
                                     tdb_output_flank=args.tdb_output_flank,
                                     tdb_output_min=args.tdb_output_min,
                                     tdb_output_max=args.tdb_output_max,

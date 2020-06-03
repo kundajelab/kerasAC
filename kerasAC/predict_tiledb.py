@@ -46,13 +46,15 @@ def parse_args():
 
     tiledbgroup=parser.add_argument_group("tiledb")
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
-    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default="fc_bigwig",help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default=None,help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_source_attribute_revcomp",nargs="*",default=None,help="tiledb attribute for use in label generation for reverse complement i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
     tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
+    tiledbgroup.add_argument("--tdb_input_source_attribute_revcomp",nargs="*",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_input_max",nargs="*", default=None)    
 
@@ -74,7 +76,7 @@ def parse_args():
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
     tiledbgroup.add_argument("--tiledb_stride",type=int,default=1)
     tiledbgroup.add_argument("--upsample_threads",type=int,default=1)
-    
+    tiledbgroup.add_argument("--revcomp",action="store_true")
     input_filtering_params=parser.add_argument_group("input_filtering_params")    
     input_filtering_params.add_argument('--predict_chroms',nargs="*",default=None)
     input_filtering_params.add_argument("--genome",default=None)
@@ -263,10 +265,12 @@ def get_tiledb_predict_generator(args):
                                           tdb_bias_transformation=args.tdb_bias_transformation,
                                           bias_pseudocount=args.tdb_bias_pseudocount,
                                           tdb_input_source_attribute=args.tdb_input_source_attribute,
+                                          tdb_input_source_attribute_revcomp=args.tdb_input_source_attribute_revcomp,
                                           tdb_input_flank=args.tdb_input_flank,
                                           tdb_input_min=args.tdb_input_min,
                                           tdb_input_max=args.tdb_input_max,
                                           tdb_output_source_attribute=args.tdb_output_source_attribute,
+                                          tdb_output_source_attribute_revcomp=args.tdb_output_source_attribute_revcomp,
                                           tdb_output_flank=args.tdb_output_flank,
                                           tdb_output_min=args.tdb_output_min,
                                           tdb_output_max=args.tdb_output_max,
@@ -285,7 +289,8 @@ def get_tiledb_predict_generator(args):
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
                                           bed_regions=args.bed_regions,
-                                          bed_regions_summit_center=args.center_on_summit)
+                                          bed_regions_summit_center=args.center_on_summit,
+                                          add_revcomp=args.revcomp)
     print("created TiledbPredictGenerator")    
     return test_generator 
 
