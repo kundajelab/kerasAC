@@ -401,8 +401,7 @@ class TiledbGenerator(Sequence):
                     rev_cur_x=np.expand_dims(cur_x,axis=1)
                 cur_x=np.concatenate((cur_x,rev_cur_x),axis=0)
             X.append(cur_x)
-                
-                
+                 
         #get the biases, if specified
         if self.bias_arrays is not None:
             for cur_bias_index in range(len(self.bias_arrays)):
@@ -443,13 +442,13 @@ class TiledbGenerator(Sequence):
                     rev_cur_y=transformed_vals
                 cur_y=np.concatenate((cur_y,rev_cur_y),axis=0)
             y.append(cur_y)
-            
         if self.return_coords is True:
             if self.add_revcomp==True:
-                coords_forward=[i.append('p') for i in coords]
-                coords_reverse=[i.append('r') for i in coords] 
-                coords=coords_forward+coords_reverse #concatenate coord list 
-        
+                coords_updated=[]
+                for i in coords:
+                    coords_updated.append(i+['p'])
+                    coords_updated.append(i+['r'])
+                coords=coords_updated
         filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
         if filtered_X[0].size==0:
             #empty!
@@ -484,6 +483,7 @@ class TiledbGenerator(Sequence):
         y=[np.delete(i,bad_indices,0) for i in y]
         if coords is not None:
             coords=np.delete(coords,bad_indices,0)
+            print(str(coords))
             coords=[tuple(coord) for coord in coords]
             coords=[(i[0],int(i[1])) for i in coords]
         return X,y,coords
