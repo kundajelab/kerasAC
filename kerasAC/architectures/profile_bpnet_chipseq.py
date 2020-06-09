@@ -77,8 +77,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     
     #define inputs
     inp = Input(shape=(seq_len, 4),name='sequence')    
-    bias_counts_input=Input(shape=(1,),name='control_logcount')
-    bias_profile_input=Input(shape=(out_pred_len,1),name='control_profile')
+    bias_counts_input=Input(shape=(2,),name='control_logcount')
+    bias_profile_input=Input(shape=(out_pred_len,2),name='control_profile')
                             
     # first convolution without dilation
     first_conv = Conv1D(filters,
@@ -91,7 +91,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # from all previous layers
     res_layers = [(first_conv, '1stconv')] # on a quest to have meaninful
                                            # layer names
-    layer_names = ['2nd', '3rd', '4th', '5th', '6th', '7th']
+    layer_names = [str(i)+"_dil"  for i in range(n_dil_layers)]
     for i in range(1, n_dil_layers + 1):
         if i == 1:
             res_layers_sum = first_conv
@@ -129,7 +129,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
     # Branch 1. Profile prediction
     # Step 1.1 - 1D convolution with a very large kernel
-    profile_out_prebias = Conv1D(filters=num_tasks,
+    profile_out_prebias = Conv1D(filters=2,
                                  kernel_size=profile_kernel_size,
                                  padding='valid',
                                  name='profile_out_prebias')(combined_conv)
@@ -144,7 +144,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
                                   bias_profile_input])
 
     # Step 1.4 - Final 1x1 convolution
-    profile_out = Conv1D(filters=num_tasks,
+    profile_out = Conv1D(filters=2,
                          kernel_size=1,
                          name="profile_predictions")(concat_pop_bpi)
     # Branch 2. Counts prediction
@@ -156,7 +156,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     concat_gapcc_bci = Concatenate(name="concat_with_bias_cnts",axis=-1)([gap_combined_conv,bias_counts_input])
     
     # Step 2.3 Dense layer to predict final counts
-    count_out = Dense(num_tasks, name="logcount_predictions")(concat_gapcc_bci)
+    count_out = Dense(2, name="logcount_predictions")(concat_gapcc_bci)
     
 
     # instantiate keras Model with inputs and outputs
@@ -178,7 +178,7 @@ if __name__=="__main__":
     parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
     parser.add_argument("--num_tasks",type=int,default=1)
-    parser.add_argument("--model_params")
+    parser.add_argument("--model_params",default=None)
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())

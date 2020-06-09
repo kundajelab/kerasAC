@@ -72,8 +72,6 @@ class TiledbGenerator(Sequence):
                  tdb_output_flank,
                  num_inputs,
                  num_outputs,
-                 tdb_input_source_attribute_revcomp=None,
-                 tdb_output_source_attribute_revcomp=None,
                  tdb_input_min=None,
                  tdb_input_max=None,
                  tdb_output_min=None,
@@ -178,7 +176,6 @@ class TiledbGenerator(Sequence):
         #store input params
         self.num_inputs=num_inputs
         self.tdb_input_source_attribute=tdb_input_source_attribute
-        self.tdb_input_source_attribute_revcomp=tdb_input_source_attribute_revcomp
         self.tdb_input_flank=tdb_input_flank
         self.tdb_input_aggregation=[str(i) for i in tdb_input_aggregation]
         self.tdb_input_transformation=[str(i) for i in tdb_input_transformation]
@@ -186,7 +183,6 @@ class TiledbGenerator(Sequence):
         #store output params
         self.num_outputs=num_outputs
         self.tdb_output_source_attribute=tdb_output_source_attribute
-        self.tdb_output_source_attribute_revcomp=tdb_output_source_attribute_revcomp
         self.tdb_output_flank=tdb_output_flank
         self.tdb_output_aggregation=[str(i) for i in tdb_output_aggregation]
         self.tdb_output_transformation=[str(i) for i in tdb_output_transformation]
@@ -371,36 +367,33 @@ class TiledbGenerator(Sequence):
         #get the inputs 
         X=[]
         for cur_input_index in range(self.num_inputs):
-            cur_input=self.tdb_input_source_attribute[cur_input_index]
-            if cur_input=="seq":                
-                #get the one-hot encoded sequence
-                if coords is None:
-                    coords=self.get_coords(tdb_batch_indices,idx)
-                cur_seq=self.get_seq(coords,self.tdb_input_flank[cur_input_index])
-                cur_x=one_hot_encode(cur_seq)
-            else:
-                #extract values from tdb
-                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input,self.tdb_input_flank[cur_input_index])
-                aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index])
-                transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
-                cur_x=transformed_vals
-            if self.expand_dims==True:
-                cur_x=np.expand_dims(cur_x,axis=1)
+            cur_input=self.tdb_input_source_attribute[cur_input_index].split(',')
+            cur_x=None
+            for cur_input_channel in cur_input: 
+                if cur_input_channel=="seq":                
+                    #get the one-hot encoded sequence
+                    if coords is None:
+                        coords=self.get_coords(tdb_batch_indices,idx)
+                    cur_seq=one_hot_encode(self.get_seq(coords,self.tdb_input_flank[cur_input_index]))
+                    if cur_x is None: 
+                        cur_x=cur_seq
+                    else:
+                        cur_x=np.concatenate((cur_x,cur_seq),axis=-1)
+                else:
+                    #extract values from tdb
+                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input_channel,self.tdb_input_flank[cur_input_index])
+                    aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index])
+                    transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
+                    if cur_x is None: 
+                        cur_x=transformed_vals
+                    else:
+                        cur_x=np.concatenate((cur_x,transformed_vals),axis=-1)
+                if self.expand_dims==True:
+                    cur_x=np.expand_dims(cur_x,axis=1)
             
             #perform reverse complementation, if specified
             if self.add_revcomp is True:
-                cur_input=self.tdb_input_source_attribute_revcomp[cur_input_index]
-                if cur_input=='seq':
-                    rev_cur_x=one_hot_encode([revcomp(s) for s in cur_seq])
-                else:
-                    #extract values from tdb
-                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input,self.tdb_input_flank[cur_input_index])
-                    aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index])
-                    transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index])
-                    rev_cur_x=transformed_vals
-                if self.expand_dims==True:
-                    rev_cur_x=np.expand_dims(cur_x,axis=1)
-                cur_x=np.concatenate((cur_x,rev_cur_x),axis=0)
+                cur_x=np.concatenate((cur_x,np.flip(cur_x)),axis=0)
             X.append(cur_x)
                  
         #get the biases, if specified
@@ -418,31 +411,31 @@ class TiledbGenerator(Sequence):
         #get the outputs 
         y=[]
         for cur_output_index in range(self.num_outputs):
-            cur_output=self.tdb_output_source_attribute[cur_output_index]
-            if cur_output=="seq":
-                #get the one-hot encoded sequence
-                if coords is None:
-                    coords=get_coords(tdb_batch_indices,idx)
-                cur_seq=self.get_seq(coords,self.tdb_output_flank[cur_output_index])
-                cur_y=one_hot_encode(transformed_seq)
-            else:
-                #extract values from tdb
-                cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
-                aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
-                transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
-                cur_y=transformed_vals
-            if self.add_revcomp is True:
-                cur_output=self.tdb_output_source_attribute_revcomp[cur_output_index]
-                if cur_output=='seq':
-                    rev_cur_y=one_hot_encode([revcomp(s) for s in cur_seq])
+            cur_y=None
+            cur_output=self.tdb_output_source_attribute[cur_output_index].split(',')
+            for cur_output_channel in cur_output: 
+                if cur_output_channel=="seq":
+                    #get the one-hot encoded sequence
+                    if coords is None:
+                        coords=get_coords(tdb_batch_indices,idx)
+                    cur_seq=one_hot_encode(self.get_seq(coords,self.tdb_output_flank[cur_output_index]))
+                    if cur_y is None:
+                        cur_y=cur_seq
+                    else:
+                        cur_y=np.concatenate((cur_y,cur_seq),axis=-1)
                 else:
                     #extract values from tdb
-                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
+                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output_channel,self.tdb_output_flank[cur_output_index])
                     aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
                     transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
-                    rev_cur_y=transformed_vals
-                cur_y=np.concatenate((cur_y,rev_cur_y),axis=0)
+                    if cur_y is None:
+                        cur_y=transformed_vals
+                    else:
+                        cur_y=np.concatenate((cur_y,transformed_vals),axis=-1)
+            if self.add_revcomp is True:
+                cur_y=np.concatenate((cur_y,np.flip(cur_y)),axis=0)
             y.append(cur_y)
+            
         if self.return_coords is True:
             coords_updated=[]
             if self.add_revcomp==True:
