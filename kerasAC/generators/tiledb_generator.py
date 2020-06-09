@@ -453,8 +453,10 @@ class TiledbGenerator(Sequence):
             else:
                 for i in coords:
                     coords_updated.append(i+['.'])
-            coords=coords_updated
-        filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
+            coords=coords_updated            
+            filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
+        else:
+            filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y)
         if filtered_X[0].size==0:
             #empty!
             try:
