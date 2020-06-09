@@ -189,6 +189,8 @@ if __name__=="__main__":
     parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
     parser.add_argument("--num_tasks",type=int,default=1)
+    parser.add_argument("--model_params")
+    
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())

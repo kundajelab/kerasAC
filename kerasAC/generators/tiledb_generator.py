@@ -363,6 +363,7 @@ class TiledbGenerator(Sequence):
         
         #get the coordinates for the current batch
         tdb_batch_indices=self.get_tdb_indices_for_batch(idx) #coords is a df with 'chrom' and 'pos' columns.
+        #print("tdb_batch_indices:"+str(tdb_batch_indices))
         coords=None
         if self.return_coords is True:
             #get the chromosome coordinates that correspond to indices
@@ -436,19 +437,23 @@ class TiledbGenerator(Sequence):
                     rev_cur_y=one_hot_encode([revcomp(s) for s in cur_seq])
                 else:
                     #extract values from tdb
-                    rev_cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
+                    cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_output,self.tdb_output_flank[cur_output_index])
                     aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_output_aggregation[cur_output_index])
                     transformed_vals=self.transform_vals(aggregate_vals,self.tdb_output_transformation[cur_output_index])
                     rev_cur_y=transformed_vals
                 cur_y=np.concatenate((cur_y,rev_cur_y),axis=0)
             y.append(cur_y)
         if self.return_coords is True:
+            coords_updated=[]
             if self.add_revcomp==True:
-                coords_updated=[]
                 for i in coords:
                     coords_updated.append(i+['p'])
+                for i in coords:
                     coords_updated.append(i+['r'])
-                coords=coords_updated
+            else:
+                for i in coords:
+                    coords_updated.append(i+['.'])
+            coords=coords_updated
         filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
         if filtered_X[0].size==0:
             #empty!
@@ -458,6 +463,7 @@ class TiledbGenerator(Sequence):
                 #we are at the last index, wrap around 
                 return self.__getitem__(0)
         if self.return_coords is True:
+            #print(str(filtered_coords))
             return (filtered_X,filtered_y,filtered_coords)
         else:
             return (filtered_X,filtered_y)
@@ -484,7 +490,7 @@ class TiledbGenerator(Sequence):
         if coords is not None:
             coords=np.delete(coords,bad_indices,0)
             coords=[tuple(coord) for coord in coords]
-            coords=[(i[0],int(i[1])) for i in coords]
+            coords=[(i[0],int(i[1]),i[2]) for i in coords]
         return X,y,coords
         
     def get_coords(self,tdb_batch_indices,idx):
@@ -573,6 +579,8 @@ class TiledbGenerator(Sequence):
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
         #iterate through entries
         for val_index in range(num_entries):
+            #print("start:"+str(tdb_batch_indices[val_index]-flank))
+            #print("end:"+str(tdb_batch_indices[val_index]+flank-1))
             vals[val_index,:,:]=self.tdb_array.query(attrs=[attribute]).multi_index[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank-1,self.task_indices][attribute]
         return vals
     

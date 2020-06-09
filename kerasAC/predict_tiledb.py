@@ -229,7 +229,7 @@ def get_batch_wrapper(idx):
     
     #represent coords w/ string, MultiIndex not supported in table append mode
     #set the column names for the MultiIndex
-    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','CENTER'])
+    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','CENTER','STRAND'])
     y=[pd.DataFrame(i,index=coords) for i in y]
     return X,y,coords
 
