@@ -164,7 +164,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
                          outputs=[profile_out, count_out])
     print("got model") 
     model.compile(optimizer=Adam(),
-                    loss=[MultichannelMultinomialNLL(1),'mse'],
+                    loss=[MultichannelMultinomialNLL(2),'mse'],
                     loss_weights=[profile_loss_weight,counts_loss_weight])
     print("compiled model")
     return model 

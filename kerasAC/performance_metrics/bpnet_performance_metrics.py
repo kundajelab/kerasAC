@@ -1,4 +1,5 @@
 import pdb
+import h5py
 import pandas as pd
 import numpy as np 
 import argparse
@@ -24,20 +25,19 @@ matplotlib.rc('font', **font)
 
 def parse_args():
     parser=argparse.ArgumentParser(description="performance metrics for profile models")
-    parser.add_argument("--labels",help="each label hdf5 contains labels for a given task in the model")
     parser.add_argument("--predictions",help="each prediction hdf5 contains predictions for a given task from the model")
     parser.add_argument("--losses",nargs="+",help="counts or profile")
-    parser.add_argument("--loss_suffixes",nargs="+")
     parser.add_argument("--outf")
     parser.add_argument("--title") 
-    parser.add_argument("--pseudoreps",nargs="+",default=None,help="bigwig replicates for calculating upper bound of performance")
+    parser.add_argument("--pseudoreps",nargs="+",default=None,help="bigwig replicates for calculating upper bound of performance, pairs of pseudoreps separated by ,")
     parser.add_argument("--flank",type=int,default=500)
     parser.add_argument("--label_min_to_score",type=float,default=None)
     parser.add_argument("--label_max_to_score",type=float,default=None)
+    parser.add_argument("--num_tasks",type=int) 
     return parser.parse_args() 
 
 
-def density_scatter(x, y, xlab, ylab, title,figtitle, ax = None, sort = True, bins = 20):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20):
     """
     Scatter plot colored by 2d histogram
     """
@@ -60,11 +60,8 @@ def density_scatter(x, y, xlab, ylab, title,figtitle, ax = None, sort = True, bi
     cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    plt.title(title)
-    plt.legend(loc='best')
     plt.xlim(0,11)
     plt.ylim(0,11)
-    plt.savefig(figtitle,format='png',dpi=300)    
     return ax
 
 
@@ -84,25 +81,31 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
     density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2',title="counts:"+str(title)+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),figtitle=outf+".counts.pseudorep.png")
     return spearman_cor, pearson_cor
     
-def counts_metrics(labels,preds,outf,title,pseudoreps,flank):            
-    spearman_cor=spearmanr(labels[0].values,preds[0].values)[0]
-    pearson_cor=pearsonr(labels[0].values,preds[0].values)[0]
-    plt.rcParams["figure.figsize"]=8,8
-    plt.figure()
-    density_scatter(labels[0].values,
-                    preds[0].values,
+def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
+    labels=np.squeeze(labels)
+    preds=np.squeeze(preds)
+    plt.rcParams["figure.figsize"]=4,4
+    fig=plt.figure() 
+    spearman_cor=spearmanr(labels,preds)[0]
+    pearson_cor=pearsonr(labels,preds)[0]
+    print("spearman:"+str(spearman_cor))
+    print("pearson:"+str(pearson_cor))
+    density_scatter(labels,
+                    preds,
                     xlab='Log Count Labels',
-                    ylab='Log Count Predictions',
-                    title="counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),
-                    figtitle=outf+".counts.png")
+                    ylab='Log Count Predictions')
+    plt.suptitle(str(task_index)+":"+" counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
+    plt.legend(loc='best')
+    plt.savefig(outf+'.png',format='png',dpi=300)
+    
     if pseudoreps is not None:
-        spearman_cor_ps,pearson_cor_ps=get_pseudorep_counts_cor(pseudoreps,labels.index,title,outf,flank)
+        spearman_cor_ps,pearson_cor_ps=get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank)
     else:
         spearman_cor_ps=None
         pearson_cor_ps=None
     return spearman_cor, pearson_cor, spearman_cor_ps, pearson_cor_ps
 
-def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
     #profile-preds is in logit space
     #get the softmax to put in probability space
     profile_preds_softmax=softmax(profile_preds,axis=1)
@@ -112,19 +115,21 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     pseudorep_jsd=[] 
     outf=open(outf_prefix+".jsd.txt",'w')
     outf.write('Region\tJSD\tPseudorepJSD\n')
-    for i in range(num_regions):
-        denominator=np.nansum(profile_labels.iloc[i].values)
+    for region_index in range(num_regions):
+        coord=coords[region_index]
+        chrom=coord[0]
+        bp=coord[1]
+        denominator=np.nansum(profile_labels[region_index,:])
         if denominator!=0:
-            cur_profile_labels_prob=profile_labels.iloc[i].values/np.nansum(profile_labels.iloc[i].values)
+            cur_profile_labels_prob=profile_labels[region_index,:]/denominator
         else:
-            cur_profile_labels_prob=profile_labels.iloc[i].values #they are all 0 
-        cur_profile_preds_softmax=profile_preds_softmax.iloc[i]
-        cur_index=profile_labels.index[i]
+            cur_profile_labels_prob=profile_labels[region_index,:]
+        cur_profile_preds_softmax=profile_preds_softmax[region_index,:]
         cur_jsd=jensenshannon(cur_profile_labels_prob+0.001,cur_profile_preds_softmax+0.001)
         region_jsd.append(cur_jsd)
         if pseudoreps is not None:
-            prep1_vals=np.nan_to_num(pseudoreps[0].values(cur_index[0],cur_index[1]-flank,cur_index[1]+flank,numpy=True))+0.001
-            prep2_vals=np.nan_to_num(pseudoreps[1].values(cur_index[0],cur_index[1]-flank,cur_index[1]+flank,numpy=True))+0.001
+            prep1_vals=np.nan_to_num(pseudoreps[0].values(chrom,bp-flank,bp+flank,numpy=True))+0.001
+            prep2_vals=np.nan_to_num(pseudoreps[1].values(chrom,bp-flank,bp+flank,numpy=True))+0.001
             #normalize
             if np.nansum(prep1_vals)!=0:
                 prep1_vals=prep1_vals/np.nansum(prep1_vals)
@@ -134,7 +139,7 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
             pseudorep_jsd.append(prep_jsd)
         else:
             prep_jsd=None
-        outf.write(str(cur_index)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\n')
+        outf.write(chrom+'\t'+str(bp)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\n')
     outf.close() 
     #plot jsd histogram
     num_bins=100
@@ -167,13 +172,15 @@ def get_performance_metrics_profile_wrapper(args):
         args=config.args_object_from_args_dict(args)
     labels_and_preds={}
     bad_regions=[]
+    f=h5py.File(args.predictions,'r')
+    coords=f['coords'][:]
+    coords=[[i.decode('utf8')  for i in j] for j in coords]
     for loss_index in range(len(args.losses)):
-        cur_loss=args.losses[loss_index]
-        cur_loss_suffix=args.loss_suffixes[loss_index]
-        cur_pred=pd.read_hdf(args.predictions+"."+cur_loss_suffix,header=None,sep='\t')
-        cur_labels=pd.read_hdf(args.labels+"."+cur_loss_suffix,header=None,sp='\t')
+        cur_loss=args.losses[loss_index]        
+        cur_pred=f['pred_'+str(loss_index)][:]
+        cur_labels=f['lab_'+str(loss_index)][:]
         if args.pseudoreps is not None:
-            pseudoreps=[pyBigWig.open(rep) for rep in args.pseudoreps]
+            pseudoreps=[[pyBigWig.open(rep) for rep in group.split(',')] for group in args.pseudoreps]
         else:
             pseudoreps=None
         labels_and_preds[cur_loss]={}
@@ -181,27 +188,48 @@ def get_performance_metrics_profile_wrapper(args):
         labels_and_preds[cur_loss]['predictions']=cur_pred
         if cur_loss=="counts":
             #filter for regions of low or excessively high counts
-            if (args.label_min_to_score is not None) or (args.label_max_to_score is not None):
-                for index,row in cur_labels.iterrows():
-                    cur_count=row[0]
-                    if args.label_min_to_score is not None:
-                        if cur_count < args.label_min_to_score:
-                            bad_regions.append(index)
-                    if args.label_max_to_score is not None:
-                        if cur_count > args.label_max_to_score:
-                            bad_regions.append(index)
+            if (args.label_min_to_score is not None):
+                bad_regions=bad_regions+list(np.argwhere(cur_labels<args.label_min_to_score)[:,0])
+            if (args.label_max_to_score is not None):
+                bad_regions=bad_regions+list(np.argwhere(cur_labels>args.label_max_to_score)[:,0])
     print("loaded labels and predictions")
+
+
+    
     #drop bad regions
+    bad_regions=list(set(bad_regions))
     for loss in labels_and_preds:
-        labels_and_preds[loss]['labels']=labels_and_preds[loss]['labels'].drop(bad_regions)
-        labels_and_preds[loss]['predictions']=labels_and_preds[loss]['predictions'].drop(bad_regions)
+        labels_and_preds[loss]['labels']=np.delete(labels_and_preds[loss]['labels'],bad_regions,axis=0)
+        labels_and_preds[loss]['predictions']=np.delete(labels_and_preds[loss]['predictions'],bad_regions,axis=0)
     print("removed regions with too few or too many counts")
-    spearman_cor,pearson_cor,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
-    mean_jsd, std_jsd, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],labels_and_preds['profile']['predictions'],labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
-    outf=open(args.outf+".summary.txt",'w')
-    outf.write('Title\tPearson\tSpearman\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\n')
-    outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\n')
-    outf.close() 
+    for task_index in range(args.num_tasks):
+        if pseudoreps is None:
+            cur_pseudoreps=None
+        else:
+            cur_pseudoreps=pseudoreps[task_index]
+        spearman_cor,pearson_cor,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'][:,task_index],
+                                                                               labels_and_preds['counts']['predictions'][:,task_index],
+                                                                               coords,
+                                                                               task_index,
+                                                                               args.outf+'.'+str(task_index),
+                                                                               args.title+'.'+str(task_index),
+                                                                               cur_pseudoreps,
+                                                                               args.flank)
+
+        mean_jsd, std_jsd, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'][:,:,task_index],
+                                                                     labels_and_preds['profile']['predictions'][:,:,task_index],
+                                                                     coords,
+                                                                     task_index,
+                                                                     labels_and_preds['counts']['labels'][:,task_index],
+                                                                     labels_and_preds['counts']['predictions'][:,task_index],
+                                                                     args.outf+'.'+str(task_index),
+                                                                     args.title+"."+str(task_index),
+                                                                     cur_pseudoreps,
+                                                                     args.flank)
+        outf=open(args.outf+"."+str(task_index)+".summary.txt",'w')
+        outf.write('Title\tPearson\tSpearman\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\n')
+        outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\n')
+        outf.close() 
 
 def main():
     args=parse_args()
