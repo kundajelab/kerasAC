@@ -446,7 +446,8 @@ class TiledbGenerator(Sequence):
             else:
                 for i in coords:
                     coords_updated.append(i+['.'])
-            coords=coords_updated            
+            coords= np.string_(coords_updated)
+            coords = coords.astype('S256')            
             filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y,coords)
         else:
             filtered_X,filtered_y,filtered_coords=self.remove_data_out_of_range(X,y)
@@ -484,8 +485,8 @@ class TiledbGenerator(Sequence):
         y=[np.delete(i,bad_indices,0) for i in y]
         if coords is not None:
             coords=np.delete(coords,bad_indices,0)
-            coords=[tuple(coord) for coord in coords]
-            coords=[(i[0],int(i[1]),i[2]) for i in coords]
+            #coords=[tuple(coord) for coord in coords]
+            #coords=[(i[0],int(i[1]),i[2]) for i in coords]
         return X,y,coords
         
     def get_coords(self,tdb_batch_indices,idx):

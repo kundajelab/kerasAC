@@ -129,25 +129,59 @@ def write_predictions(args):
             out_predictions_prefix=filename.split('/')[-1]+".predictions"
         else: 
             out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
+        #create output h5py file
+        outf=h5py.File(out_predictions_prefix,'w')
         first=True
         while True:
-            pred_df=pred_queue.get()
-            if type(pred_df) == str: 
-                if pred_df=="FINISHED":
+            cur_out=queue.get()
+            if type(cur_out)==str:
+                if cur_out=="FINISHED":
+                    outf.close()
                     return
+            coords=cur_out[0]
+            labels=cur_out[1]
+            pred=cur_out[2]
+            num_datasets=len(pred)
             if first is True:
-                mode='w'
-                first=False
-                append=False
-            else:
-                mode='a'
-                append=True
-            for cur_output_index in range(len(pred_df)):
-                #get cur_pred_df for current output
-                cur_pred_df=pred_df[cur_output_index]
-                cur_out_f='.'.join([out_predictions_prefix,str(cur_output_index)])
-                cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
+                #create the predictions & labels datasets
+                for i in range(num_datasets):
+                    cur_pred_shape=pred[i].shape
+                    if len(cur_pred_shape)==1:
+                        maxshape=(None,)
+                    else:
+                        maxshape=(None,)+cur_pred_shape[1::]
+                        
+                    outf.create_dataset('pred_'+str(i),data=pred[i],maxshape=maxshape)
+                    outf.create_dataset('lab_'+str(i),data=labels[i],maxshape=maxshape)
+                #create the coord dataset
+                coord_shape=coords.shape
+                if len(coord_shape)==1:
+                    maxshape=(None,)
+                else:
+                    maxshape=(None,)+coord_shape[1::]
+                outf.create_dataset('coords',data=coords,maxshape=maxshape)
                 
+
+                first=False
+            else:
+                #append to hdf5
+                
+                #append coords
+                curshape=len(outf['coords'])
+                batchshape=coords.shape[0]
+                newshape=curshape+batchshape
+                outf['coords'].resize(newshape,axis=0)
+                outf['coords'][-1*batchshape::]=coords
+                
+                #append predictions
+                for i in range(num_datasets): 
+                    curshape=len(outf['pred_'+str(i)])
+                    batchshape=pred[i].shape[0]
+                    newshape=curshape+batchshape
+                    outf['pred_'+str(i)].resize(newshape,axis=0)
+                    outf['pred_'+str(i)][-1*batchshape::]=pred[i]                
+                    outf['lab_'+str(i)].resize(newshape,axis=0)
+                    outf['lab_'+str(i)][-1*batchshape::]=labels[i]                
     except KeyboardInterrupt:
         #shutdown the pool
         # Kill remaining child processes
@@ -160,47 +194,6 @@ def write_predictions(args):
         kill_child_processes(os.getpid())
         raise e
 
-def write_labels(args):
-    '''
-    separate label file for each output/task combination
-    '''
-    try:
-        if args.predictions_and_labels_hdf5.startswith('s3://'):
-            #use a local version of the file and upload to s3 when finished
-            bucket,filename=s3_string_parse(args.predictions_and_labels_hdf5)
-            out_labels_prefix=filename.split('/')[-1]+".labels"
-        else: 
-            out_labels_prefix=args.predictions_and_labels_hdf5+".labels" 
-        first=True
-        while True:
-            label_df=label_queue.get()
-            if type(label_df)==str:
-                if label_df=="FINISHED":
-                    return
-            if first is True:
-                mode='w'
-                first=False
-                append=False
-            else:
-                mode='a'
-                append=True
-            for cur_output_index in range(len(label_df)):
-                cur_label_df=label_df[cur_output_index]
-                cur_out_f='.'.join([out_labels_prefix,str(cur_output_index)])
-                cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
-                
-    except KeyboardInterrupt:
-        #shutdown the pool
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise 
-    except Exception as e:
-        print(e)
-        #shutdown the pool
-        # Kill remaining child processes
-        kill_child_processes(os.getpid())
-        raise e
-    return
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -224,12 +217,12 @@ def get_batch_wrapper(idx):
         pass
     if type(X) is not list:
         X=[X]
-    
+    return X,y,coords
     #represent coords w/ string, MultiIndex not supported in table append mode
     #set the column names for the MultiIndex
-    coords=pd.MultiIndex.from_tuples(coords,names=['CHR','CENTER','STRAND'])
-    y=[pd.DataFrame(i,index=coords) for i in y]
-    return X,y,coords
+    #coords=pd.MultiIndex.from_tuples(coords,names=['CHR','CENTER','STRAND'])
+    #y=[pd.DataFrame(i,index=coords) for i in y]
+    #return X,y,coords
 
 
 def get_tiledb_predict_generator(args):
@@ -304,14 +297,10 @@ def predict_on_batch_wrapper(args,model,test_generator):
             preds=[i.squeeze(axis=-1) for i in preds]
         except:
             pass 
-        preds_dfs=[pd.DataFrame(cur_pred,index=coords) for cur_pred in preds]
-        label_queue.put(y)
-        pred_queue.put(preds_dfs)
+        queue.put((coords,y,preds))
     print("finished with tiledb predictions!")
-    label_queue.put("FINISHED")
-    label_queue.close() 
-    pred_queue.put("FINISHED")
-    pred_queue.close() 
+    queue.put("FINISHED")
+    queue.close() 
     return
 
 def get_model_layer_functor(model,target_layer_idx):
@@ -327,18 +316,14 @@ def get_layer_outputs(functor,X):
 def predict(args):
     if type(args)==type({}):
         args=args_object_from_args_dict(args) 
-    global pred_queue
-    global label_queue
+    global queue
     
-    pred_queue=Queue()
-    label_queue=Queue()
+    queue=Queue()
     
-    label_writer=Process(target=write_predictions,args=([args]))
-    pred_writer=Process(target=write_labels,args=([args]))
-    label_writer.start()
-    pred_writer.start() 
-
-
+    
+    writer=Process(target=write_predictions,args=([args]))
+    writer.start()
+    
     #get the generator
     test_generator=get_tiledb_predict_generator(args) 
     
@@ -361,37 +346,24 @@ def predict(args):
 
     #drain the queue
     try:
-        while not label_queue.empty():
-            print("draining the label Queue")
-            time.sleep(2)
-    except Exception as e:
-        print(e)
-    try:
-        while not pred_queue.empty():
+        while not queue.empty():
             print("draining the prediction Queue")
             time.sleep(2)
     except Exception as e:
         print(e)
     
-    print("joining label writer") 
-    label_writer.join()
     print("joining prediction writer") 
-    pred_writer.join()
-
+    writer.join()
+    
     #sync files to s3 if needed
     if args.predictions_and_labels_hdf5.startswith('s3://'):
         #use a local version of the file and upload to s3 when finished
         out_predictions_prefix=args.predictions_and_labels_hdf5+".predictions"
-        out_labels_prefix=args.predictions_and_labels_hdf5+".labels"
         #upload outputs for all tasks
         import glob
         to_upload=[]
         for f in glob.glob(out_predictions_prefix+"*"):
             s3_path='/'.join(out_predictions_prefix.split('/')[0:-1]+[f.split('/')[-1]])
-            print(f+'-->'+s3_path)
-            upload_s3_file(s3_path,f)
-        for f in glob.glob(out_labels_prefix+"*"):
-            s3_path='/'.join(out_labels_prefix.split('/')[0:-1]+[f.split('/')[-1]])
             print(f+'-->'+s3_path)
             upload_s3_file(s3_path,f)
         
