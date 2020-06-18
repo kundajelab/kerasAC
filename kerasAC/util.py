@@ -4,7 +4,7 @@ from collections import OrderedDict
 import argparse
 import numpy as np 
 import tiledb
-
+import random 
 ltrdict = {'a':[1,0,0,0],
            'c':[0,1,0,0],
            'g':[0,0,1,0],

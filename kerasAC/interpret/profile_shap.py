@@ -133,7 +133,7 @@ def create_explainer(model, task_index=None):
         combine_mult_and_diffref=combine_mult_and_diffref
     )
 
-    def explain_fn(input_seqs):
+    def explain_fn(input_seqs,control_profile, control_count):
         """
         Given input sequences and control profiles, returns hypothetical scores
         for the input sequences.
@@ -143,8 +143,10 @@ def create_explainer(model, task_index=None):
         Returns a B x I x 4 array containing hypothetical importance scores for
         each of the B input sequences.
         """
-        return explainer.shap_values([input_seqs], progress_message=None
-        )
+        if control_profile is not None: 
+            return explainer.shap_values([input_seqs,control_profile,control_count], progress_message=None)
+        else:
+            return explainer.shap_values([input_seqs], progress_message=None)
 
     return explain_fn
 

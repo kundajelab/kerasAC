@@ -41,6 +41,7 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20):
     """
     Scatter plot colored by 2d histogram
     """
+
     if ax is None :
         fig , ax = plt.subplots()
     data , x_e, y_e = np.histogram2d( x, y, bins = bins, density = True )
@@ -60,8 +61,8 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20):
     cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    plt.xlim(0,11)
-    plt.ylim(0,11)
+    plt.xlim(-7,11)
+    plt.ylim(-7,11)
     return ax
 
 
@@ -78,13 +79,13 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
         prep2_vals.append(np.log(np.sum(np.nan_to_num(pseudoreps[1].values(chrom,start,end)))+1))
     spearman_cor=spearmanr(prep1_vals,prep2_vals)[0]
     pearson_cor=pearsonr(prep1_vals,prep2_vals)[0]
-    density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2',title="counts:"+str(title)+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),figtitle=outf+".counts.pseudorep.png")
+    density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2',title="counts:"+str(title)+" \n spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),figtitle=outf+".counts.pseudorep.png")
     return spearman_cor, pearson_cor
     
 def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
     labels=np.squeeze(labels)
     preds=np.squeeze(preds)
-    plt.rcParams["figure.figsize"]=4,4
+    plt.rcParams["figure.figsize"]=8,8
     fig=plt.figure() 
     spearman_cor=spearmanr(labels,preds)[0]
     pearson_cor=pearsonr(labels,preds)[0]
@@ -201,6 +202,11 @@ def get_performance_metrics_profile_wrapper(args):
     for loss in labels_and_preds:
         labels_and_preds[loss]['labels']=np.delete(labels_and_preds[loss]['labels'],bad_regions,axis=0)
         labels_and_preds[loss]['predictions']=np.delete(labels_and_preds[loss]['predictions'],bad_regions,axis=0)
+        if args.num_tasks==1:
+            labels_and_preds[loss]['labels']=np.expand_dims(labels_and_preds[loss]['labels'],axis=-1)
+            labels_and_preds[loss]['predictions']=np.expand_dims(labels_and_preds[loss]['predictions'],axis=-1)
+            
+            
     print("removed regions with too few or too many counts")
     for task_index in range(args.num_tasks):
         if pseudoreps is None:

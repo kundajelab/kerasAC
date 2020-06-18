@@ -237,7 +237,7 @@ class TiledbGenerator(Sequence):
             else:
                 pos=int(round((start+end)/2))
             tdb_index=self.chrom_to_indices[chrom][0]+pos
-            self.coord.append((chrom,pos))
+            self.coord.append([chrom,pos])
             self.tdb_indices.append(tdb_index) 
     
     def get_chrom_index_ranges(self,chroms_to_use):

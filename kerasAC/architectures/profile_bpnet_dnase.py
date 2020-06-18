@@ -138,8 +138,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     #            difference of 346 is required between input seq len and ouput len
     profile_out_prebias_shape =int_shape(profile_out_prebias)
     cropsize = int(profile_out_prebias_shape[1]/2)-int(out_pred_len/2)
-    profile_out_prebias = Cropping1D(cropsize,
-                                     name='prof_out_crop2match_output')(profile_out_prebias)
+    #profile_out_prebias = Cropping1D(cropsize,
+    #                                 name='prof_out_crop2match_output')(profile_out_prebias)
     # Step 1.3 - concatenate with the control profile 
     #concat_pop_bpi = Concatenate([profile_out_prebias,
     #                              bias_profile_input],
