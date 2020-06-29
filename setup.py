@@ -16,6 +16,7 @@ config = {
                                          'kerasAC_curves=kerasAC.curves:main',
                                          'kerasAC_score=kerasAC.performance_metrics.performance_metrics:main',
                                          'kerasAC_score_bpnet=kerasAC.performance_metrics.bpnet_performance_metrics:main',
+                                         'kerasAC_score_bpnet_legacy=kerasAC.performance_metrics.bpnet_performance_metrics_legacy:main',
                                          'kerasAC_interpret=kerasAC.interpret:main',
                                          'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main',
                                          'kerasAC_cross_validate=kerasAC.cross_validate:main',

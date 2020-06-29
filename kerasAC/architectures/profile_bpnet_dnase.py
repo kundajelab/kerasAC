@@ -34,7 +34,7 @@ def get_model_param_dict(param_file):
 
 def getModelGivenModelOptionsAndWeightInits(args):
     #default params (can be overwritten by providing model_params file as input to the training function)
-    filters=300
+    filters=500
     n_dil_layers=6
     conv1_kernel_size=21
     profile_kernel_size=75
@@ -92,7 +92,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # from all previous layers
     res_layers = [(first_conv, '1stconv')] # on a quest to have meaninful
                                            # layer names
-    layer_names = ['2nd', '3rd', '4th', '5th', '6th', '7th']
+    layer_names = [str(i) for i in range(1,n_dil_layers+1)]
     for i in range(1, n_dil_layers + 1):
         if i == 1:
             res_layers_sum = first_conv
@@ -189,7 +189,7 @@ if __name__=="__main__":
     parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
     parser.add_argument("--num_tasks",type=int,default=1)
-    parser.add_argument("--model_params")
+    parser.add_argument("--model_params",default=None)
     
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
