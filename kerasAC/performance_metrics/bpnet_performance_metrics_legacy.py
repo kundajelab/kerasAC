@@ -2,7 +2,8 @@ import pdb
 import pandas as pd
 import numpy as np 
 import argparse
-import pyBigWig 
+import pyBigWig
+from ..helpers.mnnll import * 
 #from .utils import *
 from scipy.stats import spearmanr, pearsonr
 from scipy import nanmean, nanstd
@@ -87,6 +88,7 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
 def counts_metrics(labels,preds,outf,title,pseudoreps,flank):            
     spearman_cor=spearmanr(labels[0].values,preds[0].values)[0]
     pearson_cor=pearsonr(labels[0].values,preds[0].values)[0]
+    mse=((labels[0].values - preds[0].values)**2).mean(axis=0)
     plt.rcParams["figure.figsize"]=8,8
     plt.figure()
     density_scatter(labels[0].values,
@@ -100,9 +102,18 @@ def counts_metrics(labels,preds,outf,title,pseudoreps,flank):
     else:
         spearman_cor_ps=None
         pearson_cor_ps=None
-    return spearman_cor, pearson_cor, spearman_cor_ps, pearson_cor_ps
+    return spearman_cor, pearson_cor, mse, spearman_cor_ps, pearson_cor_ps
 
 def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+    #get multinomial nll
+    print(profile_labels.shape)
+    print(profile_preds.shape)
+    print(counts_labels.shape)
+    
+    mnnll_vals=profile_multinomial_nll(np.expand_dims(np.expand_dims(profile_labels,axis=1),axis=-1),
+                                       np.expand_dims(np.expand_dims(profile_preds,axis=1),axis=-1),
+                                       np.expand_dims(counts_labels,axis=-1))
+
     #profile-preds is in logit space
     #get the softmax to put in probability space
     profile_preds_softmax=softmax(profile_preds,axis=1)
@@ -111,7 +122,7 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     region_jsd=[]
     pseudorep_jsd=[] 
     outf=open(outf_prefix+".jsd.txt",'w')
-    outf.write('Region\tJSD\tPseudorepJSD\n')
+    outf.write('Region\tJSD\tPseudorepJSD\tNLL\n')
     for i in range(num_regions):
         denominator=np.nansum(profile_labels.iloc[i].values)
         if denominator!=0:
@@ -134,11 +145,22 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
             pseudorep_jsd.append(prep_jsd)
         else:
             prep_jsd=None
-        outf.write(str(cur_index)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\n')
+        outf.write(str(cur_index)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\t'+str(mnnll_vals[i])+'\n')
     outf.close() 
-    #plot jsd histogram
+
     num_bins=100
     plt.rcParams["figure.figsize"]=8,8
+
+    #plot mnnll histogram 
+    plt.figure()
+    n,bins,patches=plt.hist(mnnll_vals,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
+    plt.xlabel('Multinomial Negative LL Profile Labels and Preds in Probability Space')
+    plt.title("MNNLL:"+title)
+    plt.legend(loc='best')
+    plt.savefig(outf_prefix+".mnnll.png",format='png',dpi=300)
+
+
+    #plot jsd histogram    
     plt.figure()
     n,bins,patches=plt.hist(region_jsd,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
     if prep_jsd is not None:
@@ -158,9 +180,9 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     
     #get mean and std
     if len(pseudorep_jsd)>0:
-        return nanmean(region_jsd), nanstd(region_jsd), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd)
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd)
     else:
-        return nanmean(region_jsd), nanstd(region_jsd), None, None
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), None, None
     
 def get_performance_metrics_profile_wrapper(args):
     if type(args)==type({}):
@@ -196,11 +218,11 @@ def get_performance_metrics_profile_wrapper(args):
         labels_and_preds[loss]['labels']=labels_and_preds[loss]['labels'].drop(bad_regions)
         labels_and_preds[loss]['predictions']=labels_and_preds[loss]['predictions'].drop(bad_regions)
     print("removed regions with too few or too many counts")
-    spearman_cor,pearson_cor,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
-    mean_jsd, std_jsd, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],labels_and_preds['profile']['predictions'],labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
+    spearman_cor,pearson_cor, mse, spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
+    mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],labels_and_preds['profile']['predictions'],labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
     outf=open(args.outf+".summary.txt",'w')
-    outf.write('Title\tPearson\tSpearman\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\n')
-    outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\n')
+    outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\n')
+    outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\n')
     outf.close() 
 
 def main():

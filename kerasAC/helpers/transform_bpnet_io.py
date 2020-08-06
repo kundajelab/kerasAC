@@ -51,6 +51,8 @@ def get_model_outputs_to_plot(preds,coords=None):
             'predictions_logits':predictions_profile_logits,
             'predictions_prob':predictions_profile_prob,
             'delta_logits':delta_logits,
-            'delta_prob':delta_prob}
+            'delta_prob':delta_prob,
+            'labels_sum':labels_sum,
+            'predictions_sum':predictions_sum}
 
 

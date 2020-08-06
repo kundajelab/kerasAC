@@ -3,7 +3,8 @@ import h5py
 import pandas as pd
 import numpy as np 
 import argparse
-import pyBigWig 
+import pyBigWig
+from ..helpers.mnnll import * 
 #from .utils import *
 from scipy.stats import spearmanr, pearsonr
 from scipy import nanmean, nanstd
@@ -89,13 +90,15 @@ def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
     fig=plt.figure() 
     spearman_cor=spearmanr(labels,preds)[0]
     pearson_cor=pearsonr(labels,preds)[0]
+    mse=((labels - preds)**2).mean(axis=0)
     print("spearman:"+str(spearman_cor))
     print("pearson:"+str(pearson_cor))
+    print("mse:"+str(mse))
     density_scatter(labels,
                     preds,
                     xlab='Log Count Labels',
                     ylab='Log Count Predictions')
-    plt.suptitle(str(task_index)+":"+" counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
+    plt.suptitle(str(task_index)+":"+" counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3))+", mse="+str(round(mse,3)))
     plt.legend(loc='best')
     plt.savefig(outf+'.png',format='png',dpi=300)
     
@@ -104,9 +107,14 @@ def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
     else:
         spearman_cor_ps=None
         pearson_cor_ps=None
-    return spearman_cor, pearson_cor, spearman_cor_ps, pearson_cor_ps
+    return spearman_cor, pearson_cor, mse, spearman_cor_ps, pearson_cor_ps
 
 def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+    #get multinomial nll
+    mnnll_vals=profile_multinomial_nll(np.expand_dims(np.expand_dims(profile_labels,axis=1),axis=-1),
+                                       np.expand_dims(np.expand_dims(profile_preds,axis=1),axis=-1),
+                                       np.expand_dims(np.expand_dims(counts_labels,axis=1),axis=-1))
+    
     #profile-preds is in logit space
     #get the softmax to put in probability space
     profile_preds_softmax=softmax(profile_preds,axis=1)
@@ -115,7 +123,7 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     region_jsd=[]
     pseudorep_jsd=[] 
     outf=open(outf_prefix+".jsd.txt",'w')
-    outf.write('Region\tJSD\tPseudorepJSD\n')
+    outf.write('Region\tJSD\tPseudorepJSD\tNLL\n')
     for region_index in range(num_regions):
         coord=coords[region_index]
         chrom=coord[0]
@@ -140,11 +148,22 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
             pseudorep_jsd.append(prep_jsd)
         else:
             prep_jsd=None
-        outf.write(chrom+'\t'+str(bp)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\n')
+        outf.write(chrom+'\t'+str(bp)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\t'+str(mnnll_vals[region_index])+'\n')
     outf.close() 
-    #plot jsd histogram
+
+    #generate histogram distributions 
     num_bins=100
     plt.rcParams["figure.figsize"]=8,8
+    
+    #plot mnnll histogram 
+    plt.figure()
+    n,bins,patches=plt.hist(mnnll_vals,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
+    plt.xlabel('Multinomial Negative LL Profile Labels and Preds in Probability Space')
+    plt.title("MNNLL:"+title)
+    plt.legend(loc='best')
+    plt.savefig(outf_prefix+".mnnll.png",format='png',dpi=300)
+    
+    #plot jsd histogram
     plt.figure()
     n,bins,patches=plt.hist(region_jsd,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
     if prep_jsd is not None:
@@ -160,13 +179,13 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
                         ylab='JSD Pseudoreps',
                         title='JSD vs Pseudoreps:'+title,
                         figtitle=outf_prefix+".jsd.pseudorep.png")
-
     
     #get mean and std
     if len(pseudorep_jsd)>0:
-        return nanmean(region_jsd), nanstd(region_jsd), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd)
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd)
     else:
-        return nanmean(region_jsd), nanstd(region_jsd), None, None
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), None, None
+
     
 def get_performance_metrics_profile_wrapper(args):
     if type(args)==type({}):
@@ -195,7 +214,6 @@ def get_performance_metrics_profile_wrapper(args):
                 bad_regions=bad_regions+list(np.argwhere(cur_labels>args.label_max_to_score)[:,0])
     print("loaded labels and predictions")
 
-
     
     #drop bad regions
     bad_regions=list(set(bad_regions))
@@ -213,7 +231,7 @@ def get_performance_metrics_profile_wrapper(args):
             cur_pseudoreps=None
         else:
             cur_pseudoreps=pseudoreps[task_index]
-        spearman_cor,pearson_cor,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'][:,task_index],
+        spearman_cor,pearson_cor,mse,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'][:,task_index],
                                                                                labels_and_preds['counts']['predictions'][:,task_index],
                                                                                coords,
                                                                                task_index,
@@ -222,7 +240,7 @@ def get_performance_metrics_profile_wrapper(args):
                                                                                cur_pseudoreps,
                                                                                args.flank)
 
-        mean_jsd, std_jsd, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'][:,:,task_index],
+        mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'][:,:,task_index],
                                                                      labels_and_preds['profile']['predictions'][:,:,task_index],
                                                                      coords,
                                                                      task_index,
@@ -233,8 +251,8 @@ def get_performance_metrics_profile_wrapper(args):
                                                                      cur_pseudoreps,
                                                                      args.flank)
         outf=open(args.outf+"."+str(task_index)+".summary.txt",'w')
-        outf.write('Title\tPearson\tSpearman\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\n')
-        outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\n')
+        outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\n')
+        outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\n')
         outf.close() 
 
 def main():
