@@ -105,18 +105,18 @@ def counts_metrics(labels,preds,outf,title,pseudoreps,flank):
     return spearman_cor, pearson_cor, mse, spearman_cor_ps, pearson_cor_ps
 
 def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+    #profile-preds is in logit space
+    #get the softmax to put in probability space
+    profile_preds_softmax=softmax(profile_preds,axis=1)
+
     #get multinomial nll
     print(profile_labels.shape)
     print(profile_preds.shape)
     print(counts_labels.shape)
     
     mnnll_vals=profile_multinomial_nll(np.expand_dims(np.expand_dims(profile_labels,axis=1),axis=-1),
-                                       np.expand_dims(np.expand_dims(profile_preds,axis=1),axis=-1),
+                                       np.expand_dims(np.expand_dims(np.log(profile_preds_softmax),axis=1),axis=-1),
                                        np.expand_dims(counts_labels,axis=-1))
-
-    #profile-preds is in logit space
-    #get the softmax to put in probability space
-    profile_preds_softmax=softmax(profile_preds,axis=1)
     #put the counts in probability space to use jsd
     num_regions=profile_labels.shape[0]
     region_jsd=[]
@@ -228,7 +228,6 @@ def get_performance_metrics_profile_wrapper(args):
 def main():
     args=parse_args()
     get_performance_metrics_profile_wrapper(args)
-    
     
 if __name__=="__main__":
     main()
