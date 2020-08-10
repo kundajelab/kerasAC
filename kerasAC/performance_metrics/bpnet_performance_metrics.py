@@ -117,7 +117,7 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     #get multinomial nll
     mnnll_vals=profile_multinomial_nll(np.expand_dims(np.expand_dims(profile_labels,axis=1),axis=-1),
                                        np.expand_dims(np.expand_dims(np.log(profile_preds_softmax),axis=1),axis=-1),
-                                       np.expand_dims(np.expand_dims(counts_labels,axis=1),axis=-1))
+                                       np.expand_dims(np.expand_dims(np.exp(counts_labels),axis=1),axis=-1))
     
     #put the counts in probability space to use jsd
     num_regions=profile_labels.shape[0]
