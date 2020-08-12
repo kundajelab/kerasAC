@@ -42,6 +42,18 @@ def density_scatter(x, y, xlab, ylab, title,figtitle, ax = None, sort = True, bi
     """
     Scatter plot colored by 2d histogram
     """
+    print(x.shape)
+    print(y.shape)
+    
+    bad_x=np.where(np.isnan(x))
+    bad_y=np.where(np.isnan(y))
+    x=x[~np.isin(np.arange(x.size),bad_x)]
+    y=y[~np.isin(np.arange(y.size),bad_x)]
+    x=x[~np.isin(np.arange(x.size),bad_y)]
+    y=y[~np.isin(np.arange(y.size),bad_y)]
+    
+    print(x.shape)
+    print(y.shape) 
     if ax is None :
         fig , ax = plt.subplots()
     data , x_e, y_e = np.histogram2d( x, y, bins = bins, density = True )
