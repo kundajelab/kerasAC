@@ -135,11 +135,11 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
         else:
             cur_profile_labels_prob=profile_labels[region_index,:]
         cur_profile_preds_softmax=profile_preds_softmax[region_index,:]
-        cur_jsd=jensenshannon(cur_profile_labels_prob+0.001,cur_profile_preds_softmax+0.001)
+        cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
         region_jsd.append(cur_jsd)
         if pseudoreps is not None:
-            prep1_vals=np.nan_to_num(pseudoreps[0].values(chrom,bp-flank,bp+flank,numpy=True))+0.001
-            prep2_vals=np.nan_to_num(pseudoreps[1].values(chrom,bp-flank,bp+flank,numpy=True))+0.001
+            prep1_vals=np.nan_to_num(pseudoreps[0].values(chrom,bp-flank,bp+flank,numpy=True))
+            prep2_vals=np.nan_to_num(pseudoreps[1].values(chrom,bp-flank,bp+flank,numpy=True))
             #normalize
             if np.nansum(prep1_vals)!=0:
                 prep1_vals=prep1_vals/np.nansum(prep1_vals)
