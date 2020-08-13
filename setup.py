@@ -21,7 +21,8 @@ config = {
                                          'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main',
                                          'kerasAC_cross_validate=kerasAC.cross_validate:main',
                                          'kerasAC_loss_weights_bpnet=kerasAC.helpers.get_loss_weights_for_bpnet:main',
-                                         'kerasAC_bigwigs_from_io=kerasAC.helpers.generate_bigwigs_from_bpnet_io:main']},
+                                         'kerasAC_bigwigs_from_io=kerasAC.helpers.generate_bigwigs_from_bpnet_io:main',
+                                         'kerasAC_aggregate_summaries=kerasAC.helpers.aggregate_summaries:main']},
     'name': 'kerasAC'
 }
 
