@@ -26,7 +26,7 @@ def main():
     metadata_cols=list(data.columns)
     metadata_cols.remove('File') 
     metric_cols=args.performance_fields 
-    header='\t'.join([str(i) for i in metadata_cols])+'\t'.join([str(i) for i in metric_cols])
+    header='\t'.join([str(i) for i in metadata_cols])+'\t'+'\t'.join([str(i) for i in metric_cols])
     outf.write(header+'\n')
     for index,row in data.iterrows():
         print(str(row['File']))
