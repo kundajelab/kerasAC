@@ -19,6 +19,7 @@ from keras.callbacks import *
 from keras.utils import multi_gpu_model
 import gc
 import multiprocessing
+import pandas as pd
 #multiprocessing.set_start_method('forkserver', force=True)
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -81,9 +82,11 @@ def parse_args():
     train_val_splits.add_argument("--validation_chroms",nargs="*",default=None)
     train_val_splits.add_argument("--genome",default=None)
     train_val_splits.add_argument("--fold",type=int,default=None)
+    train_val_splits.add_argument("--bed_regions",default=None,help="bed file for training/validation; train/splits are generated from the --fold and --genome arguments automatically")
     train_val_splits.add_argument("--bed_regions_train",default=None)
     train_val_splits.add_argument("--bed_regions_validate",default=None)
-    train_val_splits.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
+    train_val_splits.add_argument('--bed_regions_center',choices=['summit','center','random'],help="summit = center on peak summti in column 10 of narrowPeak file; center = center on the base halfway between start (col 2) and end (col 3); random = pick a random base between start and end for centering; this is useful for adding jitter when training")
+    train_val_splits.add_argument("--bed_regions_jitter",type=int,default=1,help="number of positions within a bed region to use as interval centers; i.e. adds jitter for training/validation")
     train_val_splits.add_argument("--num_train",type=int,default=700000)
     train_val_splits.add_argument("--num_valid",type=int,default=150000)
 
@@ -246,11 +249,6 @@ def initializer_generators_hdf5(args):
     return train_generator, valid_generator 
 
 def initialize_generators_tiledb(args):
-    #open array for reading
-    #print("consolidating:")
-    #import tiledb
-    #tiledb.consolidate(args.tdb_array)
-    #print("done")
 
     if args.upsample_ratio_list_train is not None:
         upsample_ratio_train=args.upsample_ratio_list_train[0]
@@ -262,6 +260,26 @@ def initialize_generators_tiledb(args):
         print("warning! only a single ratio for upsampling supported for tiledb as of now")
     else:
         upsample_ratio_eval=None
+
+    #if bed regions are provided, generate splits
+    if args.bed_regions is not None:
+        assert args.bed_regions_train is None
+        assert args.bed_regions_validate is None
+        assert args.genome is not None
+        assert args.fold is not None
+        bed_regions=pd.read_csv(args.bed_regions,header=None,sep='\t')
+        bed_regions_train=get_bed_regions_for_fold_split(bed_regions,args.genome,args.fold,'train')
+        bed_regions_validate=get_bed_regions_for_fold_split(bed_regions,args.genome,args.fold,'valid')
+    elif (args.bed_regions_train is not None) or (args.bed_regions_validate is not None):
+        #make sure that both training and validation bed files are provided 
+        assert args.bed_regions_validate is not None
+        assert args.bed_regions_train is not None        
+        bed_regions_train=args.bed_regions_train
+        bed_regions_validate=args.bed_regions_validate
+    else:
+        bed_regions_train=args.bed_regions_train #should be None
+        bed_regions_validate=args.bed_regions_validate #should be None
+        
     import tiledb
     tdb_config=get_default_config() 
     tdb_ctx=tiledb.Ctx(config=tdb_config)
@@ -304,8 +322,9 @@ def initialize_generators_tiledb(args):
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,
                                     num_threads=args.upsample_threads,
-                                    bed_regions=args.bed_regions_train,
-                                    bed_regions_summit_center=args.center_on_summit)
+                                    bed_regions=bed_regions_train,
+                                    bed_regions_center=args.bed_regions_center,
+                                    bed_regions_jitter=args.bed_regions_jitter)
     
     print("generated training data generator!")
     valid_chroms=get_chroms(args,split='valid')
@@ -346,8 +365,9 @@ def initialize_generators_tiledb(args):
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,
                                     num_threads=args.upsample_threads,
-                                    bed_regions=args.bed_regions_validate,
-                                    bed_regions_summit_center=args.center_on_summit)
+                                    bed_regions=bed_regions_validate,
+                                    bed_regions_center=args.bed_regions_center,
+                                    bed_regions_jitter=args.bed_regions_jitter)
     
     print("generated validation data generator")
     return train_generator, valid_generator

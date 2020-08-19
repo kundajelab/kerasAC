@@ -101,7 +101,8 @@ class TiledbGenerator(Sequence):
                  tdb_ctx=None,
                  num_threads=1,
                  bed_regions=None,
-                 bed_regions_summit_center=False):
+                 bed_regions_center=None,
+                 bed_regions_jitter=1):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
@@ -190,8 +191,13 @@ class TiledbGenerator(Sequence):
     
         #handle the option of training/predicting on pre-specified bed regions
         if bed_regions is not None:
-            self.bed_regions=pd.read_csv(bed_regions,header=None,sep='\t')
-            self.bed_regions_summit_center=bed_regions_summit_center 
+            if type(bed_regions)==str: 
+                self.bed_regions=pd.read_csv(bed_regions,header=None,sep='\t')
+            else:
+                self.bed_regions=bed_regions
+            self.bed_regions_center=bed_regions_center
+            if self.bed_regions_center=="random":
+                self.bed_regions_jitter=bed_regions_jitter
             print("loaded bed regions")
             #get mapping of bed region to tdb index
             self.map_regions_to_tdb_index() 
@@ -231,15 +237,26 @@ class TiledbGenerator(Sequence):
             chrom=row[0]
             start=row[1]
             end=row[2]
-            if self.bed_regions_summit_center is True:
+            if self.bed_regions_center =="summit":
                 summit=row[9]
                 pos=start+summit
-            else:
+                tdb_index=self.chrom_to_indices[chrom][0]+pos
+                self.coord.append([chrom,pos])
+                self.tdb_indices.append(tdb_index) 
+            elif self.bed_regions_center == "center":
                 pos=int(round((start+end)/2))
-            tdb_index=self.chrom_to_indices[chrom][0]+pos
-            self.coord.append([chrom,pos])
-            self.tdb_indices.append(tdb_index) 
-    
+                tdb_index=self.chrom_to_indices[chrom][0]+pos
+                self.coord.append([chrom,pos])
+                self.tdb_indices.append(tdb_index)                 
+            else:
+                assert self.bed_regions_center =="random"
+                #select n=bed_regions_jitter bases from each peak to center the training/validation interval
+                for jitter_index in range(self.bed_regions_jitter): 
+                    pos=random.randint(start,end) 
+                    tdb_index=self.chrom_to_indices[chrom][0]+pos
+                    self.coord.append([chrom,pos])
+                    self.tdb_indices.append(tdb_index)                 
+                    
     def get_chrom_index_ranges(self,chroms_to_use):
         '''
         find tdb indices corresponding to the used chromosomes 

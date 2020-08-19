@@ -128,3 +128,12 @@ def get_chroms(args,split):
     else:
         raise Exception("invalid split specified, must be one of train,valid,test; you gave:"+str(split))
     
+
+def get_bed_regions_for_fold_split(bed_regions,genome,fold,split):
+    chroms_to_keep=splits[genome][int(fold)][split]
+    bed_regions_to_keep=bed_regions[bed_regions[0].isin(chroms_to_keep)]
+    print("got split:"+str(split)+" for fold:"+str(fold) +" for bed regions:"+str(bed_regions_to_keep.shape))
+    return bed_regions_to_keep
+
+    
+    
