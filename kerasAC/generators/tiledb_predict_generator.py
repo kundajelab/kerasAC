@@ -53,7 +53,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                  tdb_ctx=None,
                  num_threads=1,
                  bed_regions=None,
-                 bed_regions_summit_center=False,
+                 bed_regions_center=None,
                  add_revcomp=False):
         
         TiledbGenerator.__init__(self,          
@@ -98,7 +98,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  task_indices=task_indices,
                                  num_threads=num_threads,
                                  bed_regions=bed_regions,
-                                 bed_regions_summit_center=bed_regions_summit_center)
+                                 bed_regions_center=bed_regions_center)
         self.tiledb_stride=tiledb_stride
         self.idx_to_tdb_index=None
         print("created predict generator")

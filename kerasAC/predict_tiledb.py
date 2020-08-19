@@ -80,7 +80,7 @@ def parse_args():
     input_filtering_params.add_argument("--genome",default=None)
     input_filtering_params.add_argument("--fold",type=int,default=None)
     input_filtering_params.add_argument("--bed_regions",default=None) 
-    input_filtering_params.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file or hammock) and expanded args.flank to the left and right")
+    input_filtering_params.add_argument('--bed_regions_center', choices=['random','center','summit'],default=None)
     input_filtering_params.add_argument("--tasks",nargs="*",default=None)
     input_filtering_params.add_argument("--task_indices",nargs="*",default=None)
     
@@ -278,7 +278,7 @@ def get_tiledb_predict_generator(args):
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
                                           bed_regions=args.bed_regions,
-                                          bed_regions_summit_center=args.center_on_summit,
+                                          bed_regions_center=args.bed_regions_center,
                                           add_revcomp=args.revcomp)
     print("created TiledbPredictGenerator")    
     return test_generator 
