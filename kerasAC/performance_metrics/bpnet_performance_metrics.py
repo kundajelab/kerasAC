@@ -34,7 +34,10 @@ def parse_args():
     parser.add_argument("--flank",type=int,default=500)
     parser.add_argument("--label_min_to_score",type=float,default=None)
     parser.add_argument("--label_max_to_score",type=float,default=None)
-    parser.add_argument("--num_tasks",type=int) 
+    parser.add_argument("--num_tasks",type=int)
+    parser.add_argument("--smooth_observed_profile",action="store_true",default=False)
+    parser.add_argument("--smooth_predicted_profile",action="store_true",default=False)
+    parser.add_argument("--smooth_preps",action="store_true",default=False)
     return parser.parse_args() 
 
 
@@ -112,9 +115,16 @@ def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
         pearson_cor_ps=None
     return spearman_cor, pearson_cor, mse, spearman_cor_ps, pearson_cor_ps
 
-def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank,smooth_observed_profile, smooth_predicted_profile,smooth_preps):
     #profile-preds is in logit space
     #get the softmax to put in probability space
+
+    #perform smoothing of labels/predictions, if specified 
+    if smooth_observed_profile==True:
+        profile_labels=scipy.ndimage.gaussian_filter1d(profile_labels, 7,axis=1, truncate=(80 / 14))
+    if smooth_predicted_profile==True:
+        profile_preds=scipy.ndimage.gaussian_filter1d(profile_preds, 7, axis=1, truncate=(80/14))
+        
     profile_preds_softmax=softmax(profile_preds,axis=1)
     
     #get multinomial nll
@@ -138,11 +148,16 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
         else:
             cur_profile_labels_prob=profile_labels[region_index,:]
         cur_profile_preds_softmax=profile_preds_softmax[region_index,:]
+        
         cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
         region_jsd.append(cur_jsd)
         if pseudoreps is not None:
             prep1_vals=np.nan_to_num(pseudoreps[0].values(chrom,bp-flank,bp+flank,numpy=True))
             prep2_vals=np.nan_to_num(pseudoreps[1].values(chrom,bp-flank,bp+flank,numpy=True))
+            if smooth_preps==True:
+                prep1_vals=scipy.ndimage.gaussian_filter1d(prep1_vals, 7, truncate=(80 / 14))
+                prep2_vals=scipy.ndimage.gaussian_filter1d(prep2_vals, 7, truncate=(80 / 14))
+                
             #normalize
             if np.nansum(prep1_vals)!=0:
                 prep1_vals=prep1_vals/np.nansum(prep1_vals)
@@ -236,24 +251,27 @@ def get_performance_metrics_profile_wrapper(args):
         else:
             cur_pseudoreps=pseudoreps[task_index]
         spearman_cor,pearson_cor,mse,spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'][:,task_index],
-                                                                               labels_and_preds['counts']['predictions'][:,task_index],
-                                                                               coords,
-                                                                               task_index,
-                                                                               args.outf+'.'+str(task_index),
-                                                                               args.title+'.'+str(task_index),
-                                                                               cur_pseudoreps,
-                                                                               args.flank)
+                                                                                   labels_and_preds['counts']['predictions'][:,task_index],
+                                                                                   coords,
+                                                                                   task_index,
+                                                                                   args.outf+'.'+str(task_index),
+                                                                                   args.title+'.'+str(task_index),
+                                                                                   cur_pseudoreps,
+                                                                                   args.flank)
 
         mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'][:,:,task_index],
-                                                                     labels_and_preds['profile']['predictions'][:,:,task_index],
-                                                                     coords,
-                                                                     task_index,
-                                                                     labels_and_preds['counts']['labels'][:,task_index],
-                                                                     labels_and_preds['counts']['predictions'][:,task_index],
-                                                                     args.outf+'.'+str(task_index),
-                                                                     args.title+"."+str(task_index),
-                                                                     cur_pseudoreps,
-                                                                     args.flank)
+                                                                                        labels_and_preds['profile']['predictions'][:,:,task_index],
+                                                                                        coords,
+                                                                                        task_index,
+                                                                                        labels_and_preds['counts']['labels'][:,task_index],
+                                                                                        labels_and_preds['counts']['predictions'][:,task_index],
+                                                                                        args.outf+'.'+str(task_index),
+                                                                                        args.title+"."+str(task_index),
+                                                                                        cur_pseudoreps,
+                                                                                        args.flank,
+                                                                                        args.smooth_observed_profile,
+                                                                                        args.smooth_predicted_profile,
+                                                                                        args.smooth_preps)
         outf=open(args.outf+"."+str(task_index)+".summary.txt",'w')
         outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\n')
         outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\n')

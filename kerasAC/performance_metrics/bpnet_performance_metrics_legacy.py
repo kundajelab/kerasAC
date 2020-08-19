@@ -35,6 +35,9 @@ def parse_args():
     parser.add_argument("--flank",type=int,default=500)
     parser.add_argument("--label_min_to_score",type=float,default=None)
     parser.add_argument("--label_max_to_score",type=float,default=None)
+    parser.add_argument("--smooth_observed_profile",action="store_true",default=False)
+    parser.add_argument("--smooth_predicted_profile",action="store_true",default=False)
+    parser.add_argument("--smooth_preps",action="store_true",default=False)
     return parser.parse_args() 
 
 
@@ -116,9 +119,21 @@ def counts_metrics(labels,preds,outf,title,pseudoreps,flank):
         pearson_cor_ps=None
     return spearman_cor, pearson_cor, mse, spearman_cor_ps, pearson_cor_ps
 
-def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank):
+def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf_prefix,title,pseudoreps,flank,smooth_observed_profile, smooth_predicted_profile,smooth_preps):
     #profile-preds is in logit space
     #get the softmax to put in probability space
+    coords=profile_labels.index.tolist()
+    chroms=[i[0] for i in coords]
+    summits=[i[1] for i in coords]
+    profile_labels=profile_labels.values
+    profile_preds=profile_preds.values
+
+    #perform smoothing of labels/predictions, if specified 
+    if smooth_observed_profile==True:
+        profile_labels=scipy.ndimage.gaussian_filter1d(profile_labels, 7,axis=1, truncate=(80 / 14))
+    if smooth_predicted_profile==True:
+        profile_preds=scipy.ndimage.gaussian_filter1d(profile_preds, 7, axis=1, truncate=(80/14))
+    
     profile_preds_softmax=softmax(profile_preds,axis=1)
 
     #get multinomial nll
@@ -136,18 +151,21 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     outf=open(outf_prefix+".jsd.txt",'w')
     outf.write('Region\tJSD\tPseudorepJSD\tNLL\n')
     for i in range(num_regions):
-        denominator=np.nansum(profile_labels.iloc[i].values)
+        denominator=np.nansum(profile_labels[i,:])
         if denominator!=0:
-            cur_profile_labels_prob=profile_labels.iloc[i].values/np.nansum(profile_labels.iloc[i].values)
+            cur_profile_labels_prob=profile_labels[i,:]/denominator
         else:
-            cur_profile_labels_prob=profile_labels.iloc[i].values #they are all 0 
-        cur_profile_preds_softmax=profile_preds_softmax.iloc[i]
-        cur_index=profile_labels.index[i]
+            cur_profile_labels_prob=profile_labels[i,:]
+        cur_profile_preds_softmax=profile_preds_softmax[i,:]
         cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
         region_jsd.append(cur_jsd)
+        
         if pseudoreps is not None:
-            prep1_vals=np.nan_to_num(pseudoreps[0].values(cur_index[0],cur_index[1]-flank,cur_index[1]+flank,numpy=True))
-            prep2_vals=np.nan_to_num(pseudoreps[1].values(cur_index[0],cur_index[1]-flank,cur_index[1]+flank,numpy=True))
+            prep1_vals=np.nan_to_num(pseudoreps[0].values(chroms[i],summits[i]-flank,summits[i]+flank,numpy=True))
+            prep2_vals=np.nan_to_num(pseudoreps[1].values(chroms[i],summits[i]-flank,summits[i]+flank,numpy=True))
+            if smooth_preps==True:
+                prep1_vals=scipy.ndimage.gaussian_filter1d(prep1_vals, 7, truncate=(80 / 14))
+                prep2_vals=scipy.ndimage.gaussian_filter1d(prep2_vals, 7, truncate=(80 / 14))
             #normalize
             if np.nansum(prep1_vals)!=0:
                 prep1_vals=prep1_vals/np.nansum(prep1_vals)
@@ -157,7 +175,7 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
             pseudorep_jsd.append(prep_jsd)
         else:
             prep_jsd=None
-        outf.write(str(cur_index)+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\t'+str(mnnll_vals[i])+'\n')
+        outf.write(str(chroms[i])+'\t'+str(summits[i])+'\t'+str(cur_jsd)+'\t'+str(prep_jsd)+'\t'+str(mnnll_vals[i])+'\n')
     outf.close() 
 
     num_bins=100
@@ -230,8 +248,18 @@ def get_performance_metrics_profile_wrapper(args):
         labels_and_preds[loss]['labels']=labels_and_preds[loss]['labels'].drop(bad_regions)
         labels_and_preds[loss]['predictions']=labels_and_preds[loss]['predictions'].drop(bad_regions)
     print("removed regions with too few or too many counts")
-    spearman_cor,pearson_cor, mse, spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
-    mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],labels_and_preds['profile']['predictions'],labels_and_preds['counts']['labels'],labels_and_preds['counts']['predictions'],args.outf,args.title,pseudoreps,args.flank)
+    spearman_cor,pearson_cor, mse, spearman_cor_ps,pearson_cor_ps=counts_metrics(labels_and_preds['counts']['labels'],
+                                                                                 labels_and_preds['counts']['predictions'],
+                                                                                 args.outf,args.title,pseudoreps,args.flank)
+    
+    mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],
+                                                                                    labels_and_preds['profile']['predictions'],
+                                                                                    labels_and_preds['counts']['labels'],
+                                                                                    labels_and_preds['counts']['predictions'],
+                                                                                    args.outf,args.title,pseudoreps,args.flank,
+                                                                                    args.smooth_observed_profile,
+                                                                                    args.smooth_predicted_profile,
+                                                                                    args.smooth_preps)
     outf=open(args.outf+".summary.txt",'w')
     outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\n')
     outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\n')
