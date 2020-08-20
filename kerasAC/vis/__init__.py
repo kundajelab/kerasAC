@@ -298,7 +298,7 @@ def plot_seq_importance(grads, x, xlim=None, ylim=None, figsize=(25, 3),title=""
     if ylim is None:
         ylim= (np.amin(vals_to_plot),np.amax(vals_to_plot))
     axes=plot_bases_on_ax(vals_to_plot,axes,show_ticks=True)
-    plt.xticks(list(range(xlim[0], xlim[1], 5)))
+    plt.xticks(list(range(xlim[0], xlim[1], 50,)))
     axes.set_xlim(xlim)
     axes.set_ylim(ylim)
     axes.set_title(title)

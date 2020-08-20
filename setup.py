@@ -18,6 +18,7 @@ config = {
                                          'kerasAC_score_bpnet=kerasAC.performance_metrics.bpnet_performance_metrics:main',
                                          'kerasAC_score_bpnet_legacy=kerasAC.performance_metrics.bpnet_performance_metrics_legacy:main',
                                          'kerasAC_interpret=kerasAC.interpret:main',
+                                         'kerasAC_bpnet_shap_wrapper=kerasAC.interpret.bpnet_shap_wrapper:main',
                                          'kerasAC_plot_interpretation=kerasAC.plot_interpretation:main',
                                          'kerasAC_cross_validate=kerasAC.cross_validate:main',
                                          'kerasAC_loss_weights_bpnet=kerasAC.helpers.get_loss_weights_for_bpnet:main',
