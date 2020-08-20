@@ -92,7 +92,7 @@ def get_interpretations(gen, model, count_explainer, prof_explainer):
     for i in range(length_gen): 
         print(str(i)+'/'+str(length_gen))
         X,y,coords=gen[i]
-        coords=[[i.decode('utf8')  for i in j] for j in coords]
+        coords=[[entry.decode('utf8')  for entry in coord] for coord in coords]
         preds=model.predict(X)
 
         pred_prob=get_probability_track_from_bpnet(preds[0])
@@ -104,17 +104,17 @@ def get_interpretations(gen, model, count_explainer, prof_explainer):
         profile_explanations=prof_explainer(X[0],None,None)
         count_explanations=np.squeeze(count_explainer.shap_values(X)[0])
         #store outputs in dictionary 
-        for i in range(len(coords)): 
-            cur_coord=coords[i][0:2]
+        for coord_index in range(len(coords)): 
+            cur_coord=coords[coord_index][0:2]
             cur_coord[1]=int(cur_coord[1])
             cur_coord=tuple(cur_coord)
-            label_prof_dict[cur_coord]=label_prob[i]
-            label_count_dict[cur_coord]=label_sum[i]
-            pred_prof_dict[cur_coord]=pred_prob[i]
-            pred_count_dict[cur_coord]=pred_sum[i]
-            profile_shap_dict[cur_coord]=profile_explanations[i,:]
-            count_shap_dict[cur_coord]=count_explanations[i,:]
-            seq_dict[cur_coord]=X[0][i]    
+            label_prof_dict[cur_coord]=label_prob[coord_index]
+            label_count_dict[cur_coord]=label_sum[coord_index]
+            pred_prof_dict[cur_coord]=pred_prob[coord_index]
+            pred_count_dict[cur_coord]=pred_sum[coord_index]
+            profile_shap_dict[cur_coord]=profile_explanations[coord_index,:]
+            count_shap_dict[cur_coord]=count_explanations[coord_index,:]
+            seq_dict[cur_coord]=X[0][coord_index]    
     return label_prof_dict, label_count_dict,pred_prof_dict,pred_count_dict, profile_shap_dict, count_shap_dict, seq_dict
 
 def main():
