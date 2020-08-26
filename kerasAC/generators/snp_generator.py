@@ -79,7 +79,7 @@ class SNPGenerator(Sequence):
         if self.expand_dims==True:
             seqs=np.expand_dims(seqs,axis=1) 
         if self.compute_gc==False:
-            return [rsid,seqs]
+            return [rsids,seqs]
         else:
             gc=np.expand_dims(np.asarray(gc),axis=1)
             return [rsids,[seqs,gc]]
