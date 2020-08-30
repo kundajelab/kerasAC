@@ -73,6 +73,7 @@ class DataGenerator(Sequence):
         self.batch_size=batch_size
         self.ref_fasta=ref_fasta
         self.chroms_to_use=chroms_to_use
+
         
         #decide if reverse complement should be used
         self.add_revcomp=add_revcomp
@@ -99,6 +100,8 @@ class DataGenerator(Sequence):
         self.output_path=output_path
         self.num_inputs=num_inputs
         self.num_outputs=num_outputs
+
+        
         self.file_to_pd=self.get_file_to_pd()        
         self.indices=self.file_to_pd[self.index_path]
         self.num_indices=self.indices.shape[0]

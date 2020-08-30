@@ -1,9 +1,7 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import pdb
-from multiprocessing.pool import Pool 
+import tensorflow
+from tensorflow.compat.v1.keras.backend import get_session
+tensorflow.compat.v1.disable_v2_behavior()
+from multiprocessing.pool import Pool
 
 #numpy & i/o
 import warnings
@@ -15,7 +13,7 @@ import pandas as pd
 #import dependencies from kerasAC 
 from ..metrics import *
 from ..generators.snp_generator import *
-from ..generators.basic_generator import * 
+from ..generators.one_hot_from_bed_generator import * 
 from ..custom_losses import *
 from ..config import args_object_from_args_dict
 from ..get_model import * 
@@ -60,8 +58,8 @@ def parse_args():
     input_group.add_argument('--input_bed_file',required=True,help='bed file with peaks')
     input_group.add_argument('--ref_fasta')
     input_group.add_argument('--flank',default=500,type=int)
-    input_group.add_argument('--center_on_summit',default=False,action='store_true',help="if this is set to true, the peak will be centered at the summit (must be last entry in bed file) and expanded args.flank to the left and right")
-    input_group.add_argument("--center_on_bed_interval",default=False,action='store_true',help="if set to true, the region will be centered on the bed peak's center.")
+    input_group.add_argument('--center_choice',choices=['summit','center'])
+    input_group.add_argument('--summit_col',type=int,default=9,help="column index where summit is stored in input bed file")
     input_group.add_argument("--compute_gc",action="store_true",default=False)
     
     snp_group=parser.add_argument_group('snp')
@@ -86,13 +84,13 @@ def parse_args():
 def get_generators(args):     
     if args.generator_type=="basic":    
         #create generator to score batches of deepLIFT data
-        return [DataGenerator(args.input_bed_file,
-                                     args.ref_fasta,
-                                     batch_size=args.batch_size,
-                                     center_on_summit=args.center_on_summit,
-                                     center_on_bed_interval=args.center_on_bed_interval,
-                                     flank=args.flank,
-                                     expand_dims=args.expand_dims)],''
+        return [OneHotFromBedGenerator(bed_path=args.input_bed_file,
+                                       flank_size=args.flank,
+                                       ref_fasta=args.ref_fasta,
+                                       center_choice=args.center_choice,
+                                       summit_col_name=args.summit_col,
+                                       batch_size=args.batch_size,
+                                       expand_dims=args.expand_dims)],''
     elif args.generator_type=="snp":
         ref_generator=SNPGenerator(args.input_bed_file,
                                    args.chrom_col,
@@ -144,9 +142,9 @@ def update_scores(batch_scores,bed_entries_batch,batch_inputs,scores,bed_entries
             scores[1]=np.append(scores[1],ism_vals_input_scaled,axis=0)
     else:
         if scores is None:
-            scores=batch_scores[args.input_index_to_interpret]
+            scores=batch_scores
         else:
-            scores=np.append(scores[args.input_index_to_interpret],batch_scores,axis=0)
+            scores=np.append(scores,batch_scores,axis=0)
     print(scores.shape)
     return bed_entries,scores,inputs_onehot    
 
@@ -198,6 +196,7 @@ def interpret(generator,model,args):
     print("iterating...")
     for bed_entries_batch,X in generator:
         batch_scores=interp_methods[args.interp_method]([X]+static_inputs)
+        print("batch_scores:"+str(batch_scores.shape))
         bed_entries,scores,inputs_onehot=update_scores(batch_scores,bed_entries_batch,X[0],scores,bed_entries,inputs_onehot,args)
     return bed_entries,scores,inputs_onehot
 
