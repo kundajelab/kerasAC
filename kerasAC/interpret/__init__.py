@@ -90,7 +90,7 @@ def get_generators(args):
                                        center_choice=args.center_choice,
                                        summit_col_name=args.summit_col,
                                        batch_size=args.batch_size,
-                                       expand_dims=args.expand_dims)],''
+                                       expand_dims=args.expand_dims)],['interp']
     elif args.generator_type=="snp":
         ref_generator=SNPGenerator(args.input_bed_file,
                                    args.chrom_col,
