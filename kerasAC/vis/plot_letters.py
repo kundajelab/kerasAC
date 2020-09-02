@@ -10,7 +10,6 @@ from shapely.wkt import loads as load_wkt
 from shapely import affinity
 
 import numpy as np
-from simdna.simulations import loaded_motifs
 from pkg_resources import resource_filename
 
 ##########################################################################
