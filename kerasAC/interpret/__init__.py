@@ -30,7 +30,7 @@ interp_methods={'ism':ism_wrapper,
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model yaml & weights files & a dataset, get model predictions and accuracy metrics')
 
-    parser.add_argument("--output_npz_file",default=None,help="name of output file to store the interpretation scores. The npz file will have fields \"bed_entries\" and \"scores\"")
+    parser.add_argument("--output_npz_file",default=None,help="name of output file to store the interpretation scores. The npz file will have fields \"bed_entries\" and \"interp_scores\"")
     parser.add_argument("--generator_type", choices=['basic','snp'],help="snp uses snp_generator to interpret ref and alt alleles; basic uses basic_generator to interpret a sequence; tiledb reads from tiledb")
     parser.add_argument("--interp_method",choices=['ism','input_grad','deeplift','deepshap'])
     
