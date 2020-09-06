@@ -1,7 +1,7 @@
 from .splits import *
 from .config import args_object_from_args_dict
 from .train import *
-from .predict import *
+from .predict_hdf5 import *
 from .interpret import *
 from .performance_metrics.performance_metrics import * 
 import argparse
@@ -163,6 +163,7 @@ def cross_validate(args):
             args_dict['init_wights']=base_init_weights+"."+str(split)
         #set the training arguments specific to this fold 
         args_dict['model_hdf5']=base_model_file+"."+str(split)
+        args_dict['tdb_array']=None
         print("Training model on split"+str(split)) 
         train(args_dict)
         

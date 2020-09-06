@@ -6,7 +6,7 @@ import warnings
 import pandas as pd
 from .classification_performance_metrics import *
 from .regression_performance_metrics import *
-from .profile_performance_metrics import *
+from .bpnet_performance_metrics import *
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide a model prediction pickle to compute performance metrics.')
