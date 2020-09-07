@@ -76,7 +76,7 @@ def parse_args():
     arch_params.add_argument("--architecture_from_file",type=str,default=None)
     arch_params.add_argument("--num_tasks",type=int)
     arch_params.add_argument("--tasks",nargs="*",default=None)
-
+    arch_params.add_argument("--task_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
         
     parallelization_params=parser.add_argument_group("parallelization")
     parallelization_params.add_argument("--threads",type=int,default=1)
@@ -119,8 +119,8 @@ def parse_args():
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=True)
-    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=True)
+    epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=False)
+    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=False)
 
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
