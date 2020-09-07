@@ -169,7 +169,11 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
 
     
     checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True)
-    earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
+    try:
+        earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
+    except:
+        #compatibility with keras <  2.2. 
+        earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1)
     history=LossHistory(model_output_path_logs_name+".batch",args.trackables)
     csvlogger = CSVLogger(model_output_path_logs_name, append = False)
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)

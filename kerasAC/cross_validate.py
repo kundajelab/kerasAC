@@ -9,6 +9,7 @@ import pdb
 
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
+    parser.add_argument("--model_prefix",help="output model file that is generated at the end of training (in hdf5 format)")
     parser.add_argument("--assembly",default="hg19")
     parser.add_argument("--splits",nargs="+",default=None,type=int)
     parser.add_argument("--seed",type=int,default=1234)
@@ -60,7 +61,6 @@ def parse_args():
     calibration_params.add_argument("--calibrate_regression",action="store_true",default=False)        
     
     model_params=parser.add_argument_group("model_params")
-    model_params.add_argument('--model_hdf5',help='hdf5 file that stores the model')
     model_params.add_argument('--weights',help='weights file for the model')
     model_params.add_argument('--yaml',help='yaml file for the model')
     model_params.add_argument('--json',help='json file for the model')
@@ -81,6 +81,7 @@ def parse_args():
     parallelization_params=parser.add_argument_group("parallelization")
     parallelization_params.add_argument("--threads",type=int,default=1)
     parallelization_params.add_argument("--max_queue_size",type=int,default=100)
+    parallelization_params.add_argument("--num_gpus",type=int,default=1)
 
     snp_params=parser.add_argument_group("snp_params")
     snp_params.add_argument("--vcf_file",default=None)
@@ -124,7 +125,7 @@ def parse_args():
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
     vis_params.add_argument("--tensorboard_logdir",default="logs")
-
+    vis_params.add_argument("--trackables",nargs="*",default=['loss','val_loss'], help="list of things to track per batch, such as logcount_predictions_loss,loss,profile_predictions_loss,val_logcount_predictions_loss,val_loss,val_profile_predictions_loss")
     return parser.parse_args()
 
 def cross_validate(args):
@@ -136,7 +137,7 @@ def cross_validate(args):
         raise Exception("Unsupported genome assembly:"+args.assembly+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
     args_dict=vars(args)
     print(args_dict) 
-    base_model_file=args_dict['model_hdf5']
+    base_model_file=args_dict['model_prefix']
     base_performance_classification_file=args_dict['performance_metrics_classification_file']
     base_performance_regression_file=args_dict['performance_metrics_regression_file']
     base_performance_profile_file=args_dict['performance_metrics_profile_file']
@@ -162,8 +163,9 @@ def cross_validate(args):
         if base_init_weights is not None:
             args_dict['init_wights']=base_init_weights+"."+str(split)
         #set the training arguments specific to this fold 
-        args_dict['model_hdf5']=base_model_file+"."+str(split)
+        args_dict['model_prefix']=base_model_file+"."+str(split)
         args_dict['tdb_array']=None
+        args_dict['load_model_hdf5']=None
         print("Training model on split"+str(split)) 
         train(args_dict)
         
