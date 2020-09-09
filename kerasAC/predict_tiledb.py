@@ -120,7 +120,8 @@ def parse_args():
 
 def write_predictions(args):
     '''
-    separate predictions file for each output/task combination 
+    keys lab_i, pred_i indicate the labels and predictions matrices for loss i. 
+    The tasks are encoded in the final axis. i.e. profile labels matrix would be (N,L,T), where N = number of samples, L= length of profile, T = number of tasks.
     '''
     try:
         if args.predictions_and_labels_hdf5.startswith('s3://'):

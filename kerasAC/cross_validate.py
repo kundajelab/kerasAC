@@ -1,6 +1,4 @@
 import tensorflow as tf
-from tensorflow.compat.v1.keras.backend import get_session
-tf.compat.v1.disable_v2_behavior()
 from .splits import *
 from .config import args_object_from_args_dict
 from .train import *
