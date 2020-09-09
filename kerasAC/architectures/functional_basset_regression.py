@@ -23,11 +23,12 @@ def getModelGivenModelOptionsAndWeightInits(args):
     from keras.layers import Input, Add
     from keras.models import Model
 
-    K.set_image_data_format('channels_last')
-    print(K.image_data_format())
+    #K.set_image_data_format('channels_last')
+    #print(K.image_data_format())
 
     seq = Input(shape=(1,1000,4))
     if (init_weights!=None):
+        print("HERE")
         #load the weight initializations
         data=np.load(init_weights);
         x = Conv2D(filters=300,kernel_size=(1,19),weights=[data['0.Conv/weights:0'],np.zeros(300,)],padding="same")(seq)
@@ -91,3 +92,17 @@ def getModelGivenModelOptionsAndWeightInits(args):
     model = Model(inputs = [seq], outputs = outputs)
     model.compile(optimizer=adam,loss=loss)
     return model
+
+if __name__=="__main__":
+    import argparse
+    parser=argparse.ArgumentParser(description="functional bassett regression arch")
+    parser.add_argument("--seed",type=int,default=1234)
+    parser.add_argument("--init_weights",default=None)
+    parser.add_argument("--w0",default=None)
+    parser.add_argument("--w1",default=None)
+    parser.add_argument("--num_tasks",type=int,default=1)
+    args=parser.parse_args()
+    model=getModelGivenModelOptionsAndWeightInits(args)
+    print(model.summary())
+    pdb.set_trace() 
+    

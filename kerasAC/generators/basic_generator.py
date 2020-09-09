@@ -32,6 +32,7 @@ def open_data_file(data_path=None,tasks=None,chroms_to_use=None):
             end_col=data.columns[2]
             data=pd.read_csv(data_path,header=0,sep='\t',usecols=[chrom_col,start_col,end_col]+tasks)
     print("loaded labels")
+    print("chroms_to_use:"+str(chroms_to_use))
     print(data.head())
     try:
         data=data.set_index(['CHR','START','END'])
@@ -238,8 +239,11 @@ class DataGenerator(Sequence):
         return seqs
         
     def get_pd_vals(self,coords,io_index):
-        return self.file_to_pd[io_index].loc[coords].values
-    
+        try:
+            return self.file_to_pd[io_index].loc[coords].values
+        except:
+            raise Exception("could not fetch coords:"+str(coords))
+        
     def transform_seq(self,seqs):
         if self.add_revcomp==True:
             #add in the reverse-complemented sequences for training.

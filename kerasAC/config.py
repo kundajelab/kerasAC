@@ -8,10 +8,7 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['data_path']=None
     vars(args_object)['tiledb_tasks_file']=None
     vars(args_object)['chrom_sizes']=None
-    vars(args_object)['label_source_attribute']="fc_bigwig"
     vars(args_object)['label_aggregation']=None
-    vars(args_object)['partition_attribute_for_upsample']='idr_peak'
-    vars(args_object)['partition_thresh_for_upsample']=1
     vars(args_object)['nonzero_bin_path']=None
     vars(args_object)['universal_negative_path']=None 
     vars(args_object)['multigpu']=False
@@ -47,8 +44,8 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['json']=None
     vars(args_object)['expand_dims']=False
     vars(args_object)['tasks']=None
-    vars(args_object)['shuffle_epoch_start']=True
-    vars(args_object)['shuffle_epoch_end']=True
+    vars(args_object)['shuffle_epoch_start']=False
+    vars(args_object)['shuffle_epoch_end']=False
     vars(args_object)['revcomp']=False
     
     #prediction
@@ -60,7 +57,6 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['sequential']=False
     vars(args_object)['background_freqs']=None
     vars(args_object)['variant_bed']=None
-    vars(args_object)['flank']=500
     vars(args_object)['mask']=10
     vars(args_object)['center_on_summit']=False
     vars(args_object)['calibrate_classification']=False
@@ -70,14 +66,12 @@ def args_object_from_args_dict(args_dict):
     vars(args_object)['label_thresh']=None
 
     #cross-validation
-    vars(args_object)['assembly']='hg19'
     vars(args_object)['splits']=None
 
     #interpret
     vars(args_object)['method']='deeplift'
     vars(args_object)['deeplift_ref']='shuffled_ref' 
     vars(args_object)['background_freqs']=None
-    vars(args_object)['chromsizes']="/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes"
     vars(args_object)['precision_thresh']=0.90
     for key in args_dict:
         vars(args_object)[key]=args_dict[key]

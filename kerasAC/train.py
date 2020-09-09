@@ -1,4 +1,5 @@
 from __future__ import division, print_function, absolute_import
+import tensorflow as tf
 import importlib
 import imp
 import os
@@ -28,8 +29,7 @@ def parse_args():
     parser.add_argument("--seed",type=int,default=1234)    
     parser.add_argument("--num_inputs",type=int)
     parser.add_argument("--num_outputs",type=int)
-    parser.add_argument("--use_multiprocessing",type=bool,default=True)
-    parser.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
+    parser.add_argument("--use_multiprocessing",action='store_true',default=False)
     
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
@@ -126,8 +126,8 @@ def parse_args():
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=True)
-    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=False)
+    epoch_params.add_argument("--shuffle_epoch_start",action='store_true',default=False)
+    epoch_params.add_argument("--shuffle_epoch_end",action='store_true', default=False)
     
     #add functionality to train on individuals' allele frequencies
     snp_params=parser.add_argument_group("snp_params")
@@ -214,7 +214,10 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     
 def initializer_generators_hdf5(args):
     #get upsampling parameters
-    train_chroms=get_chroms(args,split='train')
+    if args.train_chroms is not None:
+        train_chroms=args.train_chroms
+    else: 
+        train_chroms=get_chroms(args,split='train')
     index_train_path, index_valid_path, input_train_path, input_valid_path, output_train_path, output_valid_path=get_paths(args)
     train_generator=DataGenerator(index_path=index_train_path,
                                   input_path=input_train_path,
@@ -230,11 +233,14 @@ def initializer_generators_hdf5(args):
                                   expand_dims=args.expand_dims,
                                   upsample_thresh_list=args.upsample_thresh_list_train,
                                   upsample_ratio_list=args.upsample_ratio_list_train,
-                                  tasks=args.tasks)
-
-    
+                                  tasks=args.tasks,
+                                  shuffle=args.shuffle_epoch_end)    
     print("generated training data generator!")
-    valid_chroms=get_chroms(args,split='valid')
+
+    if args.validation_chroms is not None:
+        valid_chroms=args.validation_chroms
+    else: 
+        valid_chroms=get_chroms(args,split='valid')
     valid_generator=DataGenerator(index_path=index_train_path,
                                   input_path=input_train_path,
                                   output_path=output_train_path,
@@ -248,7 +254,8 @@ def initializer_generators_hdf5(args):
                                   upsample_ratio_list=args.upsample_ratio_list_eval,
                                   chroms_to_use=valid_chroms,
                                   expand_dims=args.expand_dims,
-                                  tasks=args.tasks)
+                                  tasks=args.tasks,
+                                  shuffle=args.shuffle_epoch_end)
     print("generated validation data generator!")
     return train_generator, valid_generator 
 
@@ -432,7 +439,7 @@ def train(args):
     run_cleanup()
     
 def main():
-    gc.freeze()
+    #gc.freeze()
     args=parse_args()
     train(args)
     print("Exiting!")

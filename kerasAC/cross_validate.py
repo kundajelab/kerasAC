@@ -1,3 +1,6 @@
+import tensorflow as tf
+from tensorflow.compat.v1.keras.backend import get_session
+tf.compat.v1.disable_v2_behavior()
 from .splits import *
 from .config import args_object_from_args_dict
 from .train import *
@@ -10,11 +13,11 @@ import pdb
 def parse_args():
     parser=argparse.ArgumentParser(description='Provide model files  & a dataset, get model predictions')
     parser.add_argument("--model_prefix",help="output model file that is generated at the end of training (in hdf5 format)")
-    parser.add_argument("--assembly",default="hg19")
+    parser.add_argument("--assembly")
     parser.add_argument("--splits",nargs="+",default=None,type=int)
     parser.add_argument("--seed",type=int,default=1234)
-    parser.add_argument("--use_multiprocessing",type=bool,default=True)
-    parser.add_argument("--multi_gpu",type=bool,default=False)
+    parser.add_argument("--use_multiprocessing",action='store_true',default=False)
+    parser.add_argument("--multi_gpu",action='store_true',default=False)
     input_data_path=parser.add_argument_group("input_data_path")
     input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
     input_data_path.add_argument("--index_train_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the training split")
@@ -119,8 +122,8 @@ def parse_args():
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    epoch_params.add_argument("--shuffle_epoch_start",type=bool, default=False)
-    epoch_params.add_argument("--shuffle_epoch_end",type=bool, default=False)
+    epoch_params.add_argument("--shuffle_epoch_start",action='store_true',default=False)
+    epoch_params.add_argument("--shuffle_epoch_end",action='store_true',default=False)
 
     vis_params=parser.add_argument_group("visualization")            
     vis_params.add_argument("--tensorboard",action="store_true")
@@ -134,7 +137,7 @@ def cross_validate(args):
 
     #run training on each of the splits
     if args.assembly not in splits:
-        raise Exception("Unsupported genome assembly:"+args.assembly+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
+        raise Exception("You did not provide the args.assembly flag, or you provided an unsupported genome assembly:"+str(args.assembly)+". Supported assemblies include:"+str(splits.keys())+"; add splits for this assembly to splits.py file")
     args_dict=vars(args)
     print(args_dict) 
     base_model_file=args_dict['model_prefix']
