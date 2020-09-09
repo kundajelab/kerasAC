@@ -129,7 +129,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
 
     # Branch 1. Profile prediction
     # Step 1.1 - 1D convolution with a very large kernel
-    profile_out_prebias = Conv1D(filters=2,
+    profile_out_prebias = Conv1D(filters=num_tasks,
                                  kernel_size=profile_kernel_size,
                                  padding='valid',
                                  name='profile_out_prebias')(combined_conv)
@@ -144,7 +144,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
                                   bias_profile_input])
 
     # Step 1.4 - Final 1x1 convolution
-    profile_out = Conv1D(filters=2,
+    profile_out = Conv1D(filters=num_tasks,
                          kernel_size=1,
                          name="profile_predictions")(concat_pop_bpi)
     # Branch 2. Counts prediction
@@ -156,7 +156,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     concat_gapcc_bci = Concatenate(name="concat_with_bias_cnts",axis=-1)([gap_combined_conv,bias_counts_input])
     
     # Step 2.3 Dense layer to predict final counts
-    count_out = Dense(2, name="logcount_predictions")(concat_gapcc_bci)
+    count_out = Dense(num_tasks, name="logcount_predictions")(concat_gapcc_bci)
     
 
     # instantiate keras Model with inputs and outputs
@@ -164,7 +164,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
                          outputs=[profile_out, count_out])
     print("got model") 
     model.compile(optimizer=Adam(),
-                    loss=[MultichannelMultinomialNLL(2),'mse'],
+                    loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
                     loss_weights=[profile_loss_weight,counts_loss_weight])
     print("compiled model")
     return model 
@@ -177,7 +177,7 @@ if __name__=="__main__":
     parser.add_argument("--init_weights",default=None)
     parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
-    parser.add_argument("--num_tasks",type=int,default=1)
+    parser.add_argument("--num_tasks",type=int,default=2)
     parser.add_argument("--model_params",default=None)
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)

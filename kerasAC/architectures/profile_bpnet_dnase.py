@@ -138,18 +138,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     #            difference of 346 is required between input seq len and ouput len
     profile_out_prebias_shape =int_shape(profile_out_prebias)
     cropsize = int(profile_out_prebias_shape[1]/2)-int(out_pred_len/2)
-    #profile_out_prebias = Cropping1D(cropsize,
-    #                                 name='prof_out_crop2match_output')(profile_out_prebias)
-    # Step 1.3 - concatenate with the control profile 
-    #concat_pop_bpi = Concatenate([profile_out_prebias,
-    #                              bias_profile_input],
-    #                             name="concat_with_bias_prof",
-    #                             axis=-1)
 
     # Step 1.4 - Final 1x1 convolution
-    #profile_out = Conv1D(filters=num_tasks,
-    #                     kernel_size=1,
-    #                     name="profile_predictions")(concat_pop_bpi)
     profile_out = Conv1D(filters=num_tasks,
                          kernel_size=1,
                          name="profile_predictions")(profile_out_prebias)
@@ -157,25 +147,17 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # Step 2.1 - Global average pooling along the "length", the result
     #            size is same as "filters" parameter to the BPNet function
     gap_combined_conv = GlobalAveragePooling1D(name='gap')(combined_conv) # acronym - gapcc
-    #gap_combined_conv = GlobalAveragePooling1D(name='gap')(profile_out_prebias) # acronym - gapcc
-    # Step 2.2 Concatenate the output of GAP with bias counts
-    #concat_gapcc_bci = Concatenate([gap_combined_conv, 
-    #                                bias_counts_input],
-    #                               name="concat_with_bias_cnts",
-    #                               axis=-1)
-    
+
     # Step 2.3 Dense layer to predict final counts
     #count_out = Dense(num_tasks, name="logcount_predictions")(concat_gapcc_bci)
     count_out = Dense(num_tasks, name="logcount_predictions")(gap_combined_conv)
 
     # instantiate keras Model with inputs and outputs
-    #model = Model(inputs=[inp, bias_counts_input, bias_profile_input],
-    #                     outputs=[profile_out, count_out])
     model=Model(inputs=[inp],outputs=[profile_out,
                                      count_out])
     print("got model") 
     model.compile(optimizer=Adam(),
-                    loss=[MultichannelMultinomialNLL(1),'mse'],
+                    loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
                     loss_weights=[profile_loss_weight,counts_loss_weight])
     print("compiled model")
     return model 
