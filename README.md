@@ -1,6 +1,9 @@
 # kerasAC
 keras accessibility models for genomic data 
 
+### See full workflow example here: https://github.com/kundajelab/cardiogenesis
+
+
 ## dependencies ## 
 * pysam
 * tiledb>=0.5.2
