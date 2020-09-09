@@ -126,6 +126,36 @@ The format for lab_i will be (N, L, T):
 * T = number of tasks (i.e. 2 for chipseq for the 2 strands; 1 for DNASE) 
 
 
+Example prediction script for H3K27ac dataset: 
+```
+CUDA_VISIBLE_DEVICES=$gpu kerasAC_predict_tdb \
+		    --batch_size 20 \
+		    --ref_fasta /mnt/data/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
+		    --tdb_array /srv/scratch/annashch/encode_dnase_tiledb/db/histone \
+		    --tdb_partition_attribute_for_upsample overlap_peak \
+		    --tdb_partition_thresh_for_upsample 2 \
+		    --tdb_input_source_attribute seq control_count_bigwig_plus_5p,control_count_bigwig_minus_5p control_count_bigwig_plus_5p,control_count_bigwig_minus_5p \
+		    --tdb_input_aggregation None None sum \
+		    --tdb_input_transformation None None log \
+		    --tdb_input_flank 3000 500 500 \
+		    --tdb_output_source_attribute count_bigwig_plus_5p,count_bigwig_minus_5p count_bigwig_plus_5p,count_bigwig_minus_5p \
+		    --tdb_output_flank 500 500 \
+		    --tdb_output_aggregation None sum \
+		    --tdb_output_transformation None log \
+     		    --num_inputs 3 \
+		    --num_outputs 2 \
+		    --tdb_ambig_attribute ambig_peak \
+		    --chrom_sizes ~/hg38.chrom.sizes \
+		    --fold $fold \
+		    --genome hg38 \
+		    --upsample_ratio_list_predict 1 \
+		    --predictions_and_labels_hdf5 $outdir/$model_name.$fold \
+		    --load_model_hdf5 $outdir/$model_name.$fold.hdf5 \
+		    --tasks K562 \
+		    --upsample_threads 1 \
+		    --tdb_transformation_pseudocount 0.001
+```
+
 ### keras_cross_validate ####
 
 #### kerasAC_calibrate ####
@@ -136,11 +166,48 @@ Calibrates model's predictions using isotonic regression (for a regression model
 #### kerasAC_score ####
 
 #### kerasAC_score_bpnet ####
+```
+outdir=$1
+model_name=$2
+
+for fold in 0 #`seq 0 4`
+do
+    kerasAC_score_bpnet \
+	--predictions $outdir/$model_name.$fold.predictions \
+	--outf $outdir/$model_name.$fold.scores \
+	--title "K562 H3K27ac, counts loss x 25, seed 1234" \
+	--label_min_to_score 3 \
+	--label_max_to_score 11.5 \
+	--num_tasks 2 \
+	--losses profile counts
+done
+```
 
 #### kerasAC_curves ####
 
 ### Interpretation ###
+```
+CUDA_VISIBLE_DEVICES=3 kerasAC_bpnet_shap_wrapper \
+		    --model_hdf5 /srv/scratch/annashch/cardiogenesis/bias_corrected_bpnet/bias_corrected_model.$fold.hdf5 \
+		    --ref_fasta /mnt/data/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
+		    --bed_regions peaks.bed \
+		    --bed_regions_center summit \
+		    --tdb_array /srv/scratch/annashch/cardiogenesis/tiledb/db \
+		    --chrom_sizes hg38.chrom.sizes \
+		    --tasks cf_new \
+		    --batch_size 200 \
+		    --tdb_output_source_attribute count_bigwig_unstranded_5p count_bigwig_unstranded_5p \
+		    --tdb_output_flank 500 500 \
+		    --tdb_output_aggregation None sum \
+		    --tdb_output_transformation None log \
+		    --tdb_input_source_attribute seq \
+		    --tdb_input_flank 673 \
+		    --tdb_input_aggregation None \
+		    --tdb_input_transformation None \
+		    --out_pickle CF_NEW.fold$fold.deepSHAP \
+		    --num_threads 10
 
+```
 #### kerasAC_interpret ####
 
 #### kerasAC_plot_interpret ####
