@@ -439,7 +439,7 @@ def train(args):
     run_cleanup()
     
 def main():
-    #gc.freeze()
+    gc.freeze()
     args=parse_args()
     train(args)
     print("Exiting!")

@@ -1,4 +1,8 @@
 from keras.utils import Sequence
+import os
+import signal
+import psutil
+import gc 
 import pandas as pd
 import numpy as np
 import random
@@ -8,6 +12,16 @@ from ..util import *
 import threading
 import pickle
 import pdb
+
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(sig)
+
 
 def get_weights(data):
     w1=[float(data.shape[0])/sum(data.iloc[:,i]==1) for i in range(data.shape[1])]
@@ -67,7 +81,6 @@ class DataGenerator(Sequence):
                  upsample_ratio_list=None,
                  shuffle=True,
                  return_coords=False):
-        self.lock = threading.Lock()
         self.return_coords=return_coords
         self.expand_dims=expand_dims
         self.shuffle=shuffle
@@ -127,6 +140,7 @@ class DataGenerator(Sequence):
             self.indices=self.indices.index.tolist() 
             if self.shuffle == True:
                 np.random.shuffle(self.indices)
+        self.lock=threading.Lock() 
         print("generator initialized")
         
     def get_file_to_pd(self):
@@ -265,40 +279,51 @@ class DataGenerator(Sequence):
         return vals
         
     def __getitem__(self,idx):
-        with self.lock:
-            ref=pysam.FastaFile(self.ref_fasta)
-            self.ref=ref
-        #get the coordinates for the current batch
-        coords=self.get_coords(idx)
-        #get the inputs
-        X=[]
-        for cur_input_index in range(self.num_inputs):
-            cur_input=self.input_path[cur_input_index]
-            if cur_input=="seq":
-                cur_x=one_hot_encode(self.transform_seq(self.get_seq(coords)))
-                if self.expand_dims==True:
-                    cur_x=np.expand_dims(cur_x,axis=1)
-            else:
-                #extract values from pandas df 
-                cur_x=self.transform_vals(self.get_pd_vals(coords,cur_input))
-            X.append(cur_x)
-        #get the outputs
-        y=[]
-        for cur_output_index in range(self.num_outputs):
-            cur_output=self.output_path[cur_output_index] 
-            if cur_output=="seq":
-                cur_y=one_hot_encode(self.transform_seq(self.get_seq(coords)))
-                if self.expand_dims==True:
-                    cur_y=np.expand_dims(cur_y,axis=1)
-            else:
-                cur_y=self.transform_vals(self.get_pd_vals(coords,cur_output))
-            y.append(cur_y)
-        #return the batch as an X,y tuple
-        if self.return_coords is False: 
-            return (X,y)
-        else:
-            return (X,y,coords)
         
+        try:
+            gc.unfreeze()
+            self.lock.acquire() 
+            #print("STARTING")
+            self.ref=pysam.FastaFile(self.ref_fasta)
+            #get the coordinates for the current batch
+            coords=self.get_coords(idx)
+            #print("GOT COORDS") 
+            #get the inputs
+            X=[]
+            for cur_input_index in range(self.num_inputs):
+                cur_input=self.input_path[cur_input_index]
+                if cur_input=="seq":
+                    cur_x=one_hot_encode(self.transform_seq(self.get_seq(coords)))
+                    if self.expand_dims==True:
+                        cur_x=np.expand_dims(cur_x,axis=1)
+                else:
+                    #extract values from pandas df 
+                    cur_x=self.transform_vals(self.get_pd_vals(coords,cur_input))
+                X.append(cur_x)
+            #get the outputs
+            y=[]
+            for cur_output_index in range(self.num_outputs):
+                cur_output=self.output_path[cur_output_index] 
+                if cur_output=="seq":
+                    cur_y=one_hot_encode(self.transform_seq(self.get_seq(coords)))
+                    if self.expand_dims==True:
+                        cur_y=np.expand_dims(cur_y,axis=1)
+                else:
+                    cur_y=self.transform_vals(self.get_pd_vals(coords,cur_output))
+                y.append(cur_y)
+            self.lock.release() 
+            #return the batch as an X,y tuple
+            #print("SUCCESS") 
+            if self.return_coords is False: 
+                return (X,y)
+            else:
+                return (X,y,coords)
+        except Exception as e:
+            print(str(e)+" from id:"+str(idx))
+            kill_child_processes(os.getpid())
+            raise 
+
+
 
 
     def on_epoch_end(self):
