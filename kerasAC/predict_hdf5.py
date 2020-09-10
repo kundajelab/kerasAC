@@ -153,17 +153,14 @@ def write_predictions(args):
             else:
                 mode='a'
                 append=True
-            if args.tasks is not None:
-                task_names={}
-                for i in range(len(args.tasks)):
-                    task_names[i]=args.tasks[i]
-                pred_df=pred_df.rename(columns=task_names)
             for cur_output_index in range(len(pred_df)):
                 #get cur_pred_df for current output
+                cur_pred_df=pred_df[cur_output_index]
                 if args.tasks is not None:
-                    cur_pred_df=pred_df[task_names[cur_output_index]]
-                else:
-                    cur_pred_df=pred_df[cur_output_index]
+                    task_names={}
+                    for i in range(len(args.tasks)):
+                        task_names[i]=args.tasks[i]
+                    cur_pred_df=cur_pred_df.rename(columns=task_names)
                 cur_out_f='.'.join([out_predictions_prefix,str(cur_output_index)])
                 cur_pred_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 
@@ -198,16 +195,14 @@ def write_labels(args):
             else:
                 mode='a'
                 append=True
-            if args.tasks is not None:
-                task_names={}
-                for i in range(len(args.tasks)):
-                    task_names[i]=args.tasks[i]
-                label_df=label_df.rename(columns=task_names)
             for cur_output_index in range(len(label_df)):
-                if args.task_names is not None:
-                    cur_label_df=label_df[task_names[cur_output_index]]
-                else:
-                    cur_label_df=label_df[cur_output_index]
+                cur_label_df=label_df[cur_output_index]
+                if args.tasks is not None:
+                    task_names={}
+                    for i in range(len(args.tasks)):
+                        task_names[i]=args.tasks[i]
+                    cur_label_df=cur_label_df.rename(columns=task_names)
+
                 cur_out_f='.'.join([out_labels_prefix,str(cur_output_index)])
                 cur_label_df.to_hdf(cur_out_f,key="data",mode=mode,append=append,format="table",min_itemsize={'CHR':30})
                 
