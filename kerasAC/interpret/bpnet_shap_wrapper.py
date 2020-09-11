@@ -9,7 +9,7 @@ from kerasAC.tiledb_config import *
 from kerasAC.interpret.deepshap import * 
 from kerasAC.interpret.profile_shap import * 
 from kerasAC.helpers.transform_bpnet_io import *
-#load the model! 
+#load the model!
 from keras.models import load_model
 from keras.utils.generic_utils import get_custom_objects
 from kerasAC.metrics import * 
@@ -18,12 +18,14 @@ from kerasAC.custom_losses import *
 def parse_args():
     parser=argparse.ArgumentParser(description="wrapper to make it easier to deepSHAP bpnet models")
     parser.add_argument("--ref_fasta")
+    parser.add_argument("--chipseq",action='store_true',default=False) 
     parser.add_argument("--model_hdf5")
     parser.add_argument("--bed_regions")
     parser.add_argument("--bed_regions_center",choices=['summit','center'])
     parser.add_argument("--tdb_array")
     parser.add_argument("--chrom_sizes")
-    parser.add_argument("--tasks",nargs="+")
+    parser.add_argument("--datasets",nargs="+")
+    parser.add_argument("--task_index",type=int)
     parser.add_argument("--batch_size",type=int)
     parser.add_argument("--tdb_output_source_attribute",nargs="+",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     parser.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
@@ -33,6 +35,8 @@ def parse_args():
     parser.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
     parser.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     parser.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
+    parser.add_argument("--num_inputs",type=int)
+    parser.add_argument("--num_outputs",type=int) 
     parser.add_argument("--out_pickle")
     parser.add_argument("--num_threads",type=int)
     return parser.parse_args() 
@@ -70,17 +74,17 @@ def get_generator(args):
                                tdb_output_flank=args.tdb_output_flank,
                                tdb_output_aggregation=args.tdb_output_aggregation,
                                tdb_output_transformation=args.tdb_output_transformation,
-                               num_inputs=1,
-                               num_outputs=2,
+                               num_inputs=args.num_inputs,
+                               num_outputs=args.num_outputs,
                                upsample_ratio=None,
-                               tasks=args.tasks,
+                               tasks=args.datasets,
                                tdb_ambig_attribute=None,
                                tdb_config=get_default_config(),
                                tdb_ctx=tiledb.Ctx(config=get_default_config()),
                                num_threads=args.num_threads)
     return gen
 
-def get_interpretations(gen, model, count_explainer, prof_explainer):
+def get_interpretations(gen, model, count_explainer, prof_explainer,task_index,chipseq):
     label_prof_dict={} 
     label_count_dict={} 
     pred_prof_dict={} 
@@ -95,13 +99,18 @@ def get_interpretations(gen, model, count_explainer, prof_explainer):
         coords=[[entry.decode('utf8')  for entry in coord] for coord in coords]
         preds=model.predict(X)
 
-        pred_prob=get_probability_track_from_bpnet(preds[0])
-        label_prob=get_probability_label_track(y[0].squeeze())
+        pred_prob=get_probability_track_from_bpnet(preds[0][:,:,task_index])
+        label_prob=get_probability_label_track(y[0][:,:,task_index])
         
-        label_sum=y[1].squeeze() 
-        pred_sum=preds[1].squeeze()         
-        
-        profile_explanations=prof_explainer(X[0],None,None)
+        label_sum=y[1][:,task_index]
+        pred_sum=preds[1][:,task_index]
+        #chipseq will have control profile, control counts; ATAC/histone will not
+        seq_input=X[0]
+        if chipseq is True:
+            control_profile=X[1]
+        else:
+            control_profile=None
+        profile_explanations=prof_explainer(seq_input, control_profile)
         count_explanations=np.squeeze(count_explainer.shap_values(X)[0])
         #store outputs in dictionary 
         for coord_index in range(len(coords)): 
@@ -126,11 +135,16 @@ def main():
     print("loaded model")
 
     model_wrapper_for_counts=(model.input, model.layers[-1].output)
+    if args.chipseq is True:
+        create_background=create_background_chip
+    else:
+        create_background=create_background_atac
+        
     count_explainer=shap.DeepExplainer(model_wrapper_for_counts,data=create_background,combine_mult_and_diffref=combine_mult_and_diffref_1d)
     print("got count explainer") 
-    prof_explainer = create_explainer(model)
+    prof_explainer = create_explainer(model,ischip=args.chipseq,task_index=args.task_index)
     print("got profile explainer")
-    label_prof_dict, label_count_dict,pred_prof_dict,pred_count_dict, profile_shap_dict, count_shap_dict, seq_dict=get_interpretations(gen,model, count_explainer,prof_explainer)
+    label_prof_dict, label_count_dict,pred_prof_dict,pred_count_dict, profile_shap_dict, count_shap_dict, seq_dict=get_interpretations(gen,model, count_explainer,prof_explainer,args.task_index,args.chipseq)
     print("finished with interpretations")
     #save the dictionaries to disk! 
     
