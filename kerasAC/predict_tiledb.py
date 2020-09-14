@@ -81,8 +81,8 @@ def parse_args():
     input_filtering_params.add_argument("--fold",type=int,default=None)
     input_filtering_params.add_argument("--bed_regions",default=None) 
     input_filtering_params.add_argument('--bed_regions_center', choices=['random','center','summit'],default=None)
-    input_filtering_params.add_argument("--tasks",nargs="*",default=None)
-    input_filtering_params.add_argument("--task_indices",nargs="*",default=None)
+    input_filtering_params.add_argument("--datasets",nargs="*",default=None)
+    input_filtering_params.add_argument("--dataset_indices",nargs="*",default=None)
     
     output_params=parser.add_argument_group("output_params")
     output_params.add_argument('--predictions_and_labels_hdf5',help='name of hdf5 to save predictions',default=None)
@@ -274,8 +274,8 @@ def get_tiledb_predict_generator(args):
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
                                           chroms=predict_chroms,
-                                          tasks=args.tasks,
-                                          task_indices=args.task_indices,
+                                          tasks=args.datasets,
+                                          task_indices=args.dataset_indices,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
                                           bed_regions=args.bed_regions,

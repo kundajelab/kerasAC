@@ -108,8 +108,8 @@ def parse_args():
     arch_params.add_argument("--architecture_from_file",type=str,default=None)
     arch_params.add_argument("--model_params",type=str,default=None,help="2-column file with param name in column 1 and param value in column 2")
     arch_params.add_argument("--num_tasks",type=int)
-    arch_params.add_argument("--tasks",nargs="*",default=None,help="list of tasks to train on, by name")
-    arch_params.add_argument("--task_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
+    arch_params.add_argument("--datasets",nargs="*",default=None,help="list of tasks to train on, by name")
+    arch_params.add_argument("--dataset_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
     
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
@@ -233,7 +233,7 @@ def initializer_generators_hdf5(args):
                                   expand_dims=args.expand_dims,
                                   upsample_thresh_list=args.upsample_thresh_list_train,
                                   upsample_ratio_list=args.upsample_ratio_list_train,
-                                  tasks=args.tasks,
+                                  tasks=args.datasets,
                                   shuffle=args.shuffle_epoch_end)    
     print("generated training data generator!")
 
@@ -254,7 +254,7 @@ def initializer_generators_hdf5(args):
                                   upsample_ratio_list=args.upsample_ratio_list_eval,
                                   chroms_to_use=valid_chroms,
                                   expand_dims=args.expand_dims,
-                                  tasks=args.tasks,
+                                  tasks=args.datasets,
                                   shuffle=args.shuffle_epoch_end)
     print("generated validation data generator!")
     return train_generator, valid_generator 
@@ -323,8 +323,8 @@ def initialize_generators_tiledb(args):
                                     tdb_bias_aggregation=args.tdb_bias_aggregation,
                                     tdb_bias_transformation=args.tdb_bias_transformation,
                                     bias_pseudocount=args.tdb_bias_pseudocount,
-                                    tasks=args.tasks,
-                                    task_indices=args.task_indices,
+                                    tasks=args.datasets,
+                                    task_indices=args.dataset_indices,
                                     upsample_ratio=upsample_ratio_train,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
@@ -366,8 +366,8 @@ def initialize_generators_tiledb(args):
                                     tdb_bias_flank=args.tdb_bias_flank,
                                     tdb_bias_aggregation=args.tdb_bias_aggregation,
                                     tdb_bias_transformation=args.tdb_bias_transformation,                                    
-                                    tasks=args.tasks,
-                                    task_indices=args.task_indices,
+                                    tasks=args.datasets,
+                                    task_indices=args.dataset_indices,
                                     upsample_ratio=upsample_ratio_eval,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
