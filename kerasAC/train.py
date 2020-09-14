@@ -54,12 +54,6 @@ def parse_args():
 
     tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")    
 
-    tiledbgroup.add_argument("--tdb_bias_arrays",nargs="*",default=None)
-    tiledbgroup.add_argument("--tdb_bias_source_attribute",nargs="*")
-    tiledbgroup.add_argument("--tdb_bias_flank",nargs="*",type=int)
-    tiledbgroup.add_argument("--tdb_bias_aggregation",nargs="*")
-    tiledbgroup.add_argument("--tdb_bias_transformation",nargs="*")
-    tiledbgroup.add_argument("--tdb_bias_pseudocount",type=float,default=0.001)
     
     input_data_path=parser.add_argument_group('input_data_path')
     input_data_path.add_argument("--index_data_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels")
@@ -317,12 +311,6 @@ def initialize_generators_tiledb(args):
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,
-                                    tdb_bias_arrays=args.tdb_bias_arrays,
-                                    tdb_bias_source_attribute=args.tdb_bias_source_attribute,
-                                    tdb_bias_flank=args.tdb_bias_flank,
-                                    tdb_bias_aggregation=args.tdb_bias_aggregation,
-                                    tdb_bias_transformation=args.tdb_bias_transformation,
-                                    bias_pseudocount=args.tdb_bias_pseudocount,
                                     tasks=args.datasets,
                                     task_indices=args.dataset_indices,
                                     upsample_ratio=upsample_ratio_train,
@@ -361,11 +349,6 @@ def initialize_generators_tiledb(args):
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,
-                                    tdb_bias_arrays=args.tdb_bias_arrays,
-                                    tdb_bias_source_attribute=args.tdb_bias_source_attribute,
-                                    tdb_bias_flank=args.tdb_bias_flank,
-                                    tdb_bias_aggregation=args.tdb_bias_aggregation,
-                                    tdb_bias_transformation=args.tdb_bias_transformation,                                    
                                     tasks=args.datasets,
                                     task_indices=args.dataset_indices,
                                     upsample_ratio=upsample_ratio_eval,

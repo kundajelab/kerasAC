@@ -27,15 +27,15 @@ def get_upsampled_indices_chrom(inputs):
     tdb_array_name=inputs[2]
     tdb_ambig_attribute=inputs[3]
     tdb_partition_attribute_for_upsample=inputs[4]
-    task_indices=inputs[5]
+    dataset_indices=inputs[5]
     tdb_partition_thresh_for_upsample=inputs[6]
     print("starting getting indices to upsample in range:"+str(region_start)+"-"+str(region_end))
     with tiledb.open(tdb_array_name,'r',ctx=tiledb.Ctx(get_default_config())) as tdb_array:
         if tdb_ambig_attribute is not None:
-            attr_vals=tdb_array.query(attrs=[tdb_ambig_attribute,tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,task_indices]
+            attr_vals=tdb_array.query(attrs=[tdb_ambig_attribute,tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,dataset_indices]
             ambig_attr_vals=np.sum(attr_vals[tdb_ambig_attribute],axis=1)
         else:
-            attr_vals=tdb_array.query(attrs=[tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,task_indices]        
+            attr_vals=tdb_array.query(attrs=[tdb_partition_attribute_for_upsample]).multi_index[region_start:region_end-1,dataset_indices]        
         upsample_vals=np.sum(attr_vals[tdb_partition_attribute_for_upsample],axis=1)
     if tdb_ambig_attribute is not None:
         cur_upsampled_indices=region_start+np.argwhere((upsample_vals>=tdb_partition_thresh_for_upsample) & ( ambig_attr_vals==0))
@@ -76,24 +76,18 @@ class TiledbGenerator(Sequence):
                  tdb_input_max=None,
                  tdb_output_min=None,
                  tdb_output_max=None,
-                 task_indices=None,
-                 tasks=None,
+                 dataset_indices=None,
+                 datasets=None,
                  tdb_input_aggregation=None,
                  tdb_input_transformation=None,
                  tdb_output_aggregation=None,
                  tdb_output_transformation=None,
                  tdb_ambig_attribute=None,
-                 tdb_bias_arrays=None,
-                 tdb_bias_source_attribute=None,
-                 tdb_bias_flank=None,
-                 tdb_bias_aggregation=None,
-                 tdb_bias_transformation=None,
                  chroms=None,
                  chrom_sizes=None,
                  shuffle_epoch_start=True,
                  shuffle_epoch_end=True,
                  pseudocount=0.001,
-                 bias_pseudocount=0.001,
                  add_revcomp=False,
                  expand_dims=False,
                  return_coords=False,
@@ -140,14 +134,7 @@ class TiledbGenerator(Sequence):
         print("opening:"+tdb_array+" for reading...")
         self.tdb_array_name=tdb_array
         self.tdb_array=tiledb.open(tdb_array,mode='r',ctx=self.ctx)
-        if tdb_bias_arrays is not None:
-            self.bias_arrays=[tiledb.open(tdb_bias_arrays[i],mode='r',ctx=self.ctx) for i in range(len(tdb_bias_arrays))]
-            self.bias_source_attribute=tdb_bias_source_attribute
-            self.bias_flank=tdb_bias_flank
-            self.bias_aggregation=tdb_bias_aggregation
-            self.bias_transformation=tdb_bias_transformation 
-        else:
-            self.bias_arrays=None
+        
         print("success!")
 
         #identify chromosome information
@@ -165,13 +152,13 @@ class TiledbGenerator(Sequence):
 
         #get indices of tasks to be used in training
         if tasks is not None:
-            self.task_indices=self.get_task_indices(tasks)
-        elif task_indices is not None:
-            self.task_indices=task_indices
+            self.dataset_indices=self.get_dataset_indices(tasks)
+        elif dataset_indices is not None:
+            self.dataset_indices=dataset_indices
         else:
             #already got task indices when calling get_chrom_index_ranges function above
             pass 
-        print("identified task indices:"+str(self.task_indices))
+        print("identified task indices:"+str(self.dataset_indices))
         self.tdb_ambig_attribute=tdb_ambig_attribute
 
         #store input params
@@ -226,7 +213,6 @@ class TiledbGenerator(Sequence):
             
         self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
         self.pseudocount=pseudocount
-        self.bias_pseudocount=bias_pseudocount
         self.return_coords=return_coords
         print('created generator')
         
@@ -262,7 +248,7 @@ class TiledbGenerator(Sequence):
         find tdb indices corresponding to the used chromosomes 
         '''
         num_chroms=self.tdb_array.meta['num_chroms']
-        self.task_indices=[i for i in range(self.tdb_array.meta['num_tasks'])]
+        self.dataset_indices=[i for i in range(self.tdb_array.meta['num_tasks'])]
         chrom_indices=[]
         chrom_sizes=[]
         chroms=[]
@@ -294,18 +280,18 @@ class TiledbGenerator(Sequence):
             self.chrom_to_indices[cur_chrom]=cur_indices 
         return
     
-    def get_task_indices(self,tasks):
+    def get_dataset_indices(self,tasks):
         '''
         get tdb indices of user-specified tasks 
         '''
         num_tasks=self.tdb_array.meta['num_tasks']
-        task_indices=[]
+        dataset_indices=[]
         for i in range(num_tasks):
             cur_task=self.tdb_array.meta['task_'+str(i)]
             if cur_task in tasks:
-                task_indices.append(i)
-        assert(len(task_indices)>0)
-        return task_indices
+                dataset_indices.append(i)
+        assert(len(dataset_indices)>0)
+        return dataset_indices
     
     def get_nonupsample_batch_indices(self):
         '''
@@ -327,7 +313,7 @@ class TiledbGenerator(Sequence):
         for region in self.chrom_indices:
             region_start=region[0]
             region_end=region[1]
-            pool_inputs.append((region_start,region_end,self.tdb_array_name,self.tdb_ambig_attribute,self.tdb_partition_attribute_for_upsample,self.task_indices,self.tdb_partition_thresh_for_upsample))
+            pool_inputs.append((region_start,region_end,self.tdb_array_name,self.tdb_ambig_attribute,self.tdb_partition_attribute_for_upsample,self.dataset_indices,self.tdb_partition_thresh_for_upsample))
         upsampled_indices=None
         try:
             for region_upsampled_indices in pool.map(get_upsampled_indices_chrom,pool_inputs):
@@ -413,18 +399,6 @@ class TiledbGenerator(Sequence):
                 cur_x=np.concatenate((cur_x,np.flip(cur_x)),axis=0)
             X.append(cur_x)
                  
-        #get the biases, if specified
-        if self.bias_arrays is not None:
-            for cur_bias_index in range(len(self.bias_arrays)):
-                cur_bias_vals=self.get_bias_vals(tdb_batch_indices,cur_bias_index,self.bias_flank[cur_bias_index])
-                aggregate_bias=self.aggregate_vals(cur_bias_vals,self.bias_aggregation[cur_bias_index])
-                transformed_bias=self.transform_vals(aggregate_bias,self.bias_transformation[cur_bias_index])
-                cur_bias=transformed_bias
-                if self.expand_dims==True:
-                    cur_bias=np.expand_dims(cur_bias,axis=1)
-                if self.add_revcomp is True:
-                    cur_bias=np.concatenate((cur_bias,cur_bias),axis=0)
-                X.append(cur_bias) 
         #get the outputs 
         y=[]
         for cur_output_index in range(self.num_outputs):
@@ -574,19 +548,12 @@ class TiledbGenerator(Sequence):
             seqs.append(seq) 
         return seqs
 
-    def get_bias_vals(self,tdb_batch_indices,cur_bias_index,flank):
-        num_entries=len(tdb_batch_indices)
-        vals=np.full((num_entries,2*flank,1),np.nan)
-        cur_array=self.bias_arrays[cur_bias_index]
-        for val_index in range(num_entries):
-            vals[val_index,:,:]=cur_array.query(attrs=[self.bias_source_attribute[cur_bias_index]])[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank,:][self.bias_source_attribute[cur_bias_index]]
-        return vals 
     
     def get_tdb_vals(self,tdb_batch_indices,attribute,flank):
         '''
         extract the values from tileDB 
         '''            
-        num_tasks=len(self.task_indices)
+        num_tasks=len(self.dataset_indices)
         num_entries=len(tdb_batch_indices)
         #prepopulate the values array with nans
         vals=np.full((num_entries,2*flank,num_tasks),np.nan)
@@ -594,7 +561,7 @@ class TiledbGenerator(Sequence):
         for val_index in range(num_entries):
             #print("start:"+str(tdb_batch_indices[val_index]-flank))
             #print("end:"+str(tdb_batch_indices[val_index]+flank-1))
-            vals[val_index,:,:]=self.tdb_array.query(attrs=[attribute]).multi_index[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank-1,self.task_indices][attribute]
+            vals[val_index,:,:]=self.tdb_array.query(attrs=[attribute]).multi_index[tdb_batch_indices[val_index]-flank:tdb_batch_indices[val_index]+flank-1,self.dataset_indices][attribute]
         return vals
     
     def transform_vals(self,vals,transformer):
@@ -613,7 +580,7 @@ class TiledbGenerator(Sequence):
                 vals=vals/np.expand_dims(vals.sum(axis=1),axis=1) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
             except ZeroDivisionError:
                 vals=vals/(np.expand_dims(vals.sum(axis=1),axis=1)+self.pseudocount) #transform to probability space, axis 0 = batch, axis 1 = genome pos, axis 2 = task
-            vals=logit(vals+self.bias_pseudocount)
+            vals=logit(vals+self.pseudocount)
             return vals 
         else:
             raise Exception("transform_vals argument must be one of None, asinh, log10, log; you provided:"+transformer) 
