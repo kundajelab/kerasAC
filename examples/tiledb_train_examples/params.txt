@@ -1,2 +1,0 @@
-counts_loss_weight	250
-profile_loss_weight	1

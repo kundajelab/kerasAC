@@ -1,4 +1,5 @@
 import sys, os
+import math 
 import os.path
 from collections import OrderedDict
 import argparse
@@ -111,10 +112,51 @@ def transform_data_type(inputs,num_inputs):
         inputs=[None]*num_inputs
     else:
         assert(len(inputs)==num_inputs)
+        transformed=[]
         for i in range(num_inputs):
-            if str(inputs[i]).lower()=="none":
-                inputs[i]=None
-            else:
-                inputs[i]=float(inputs[i])
-    return inputs 
-                
+            transformed.append([]) 
+            cur_inputs=inputs[i].split(',')
+            for j in cur_inputs: 
+                if str(j).lower()=="none":
+                    transformed[i].append(None)
+                else:
+                    transformed[i].append(float(j))
+    return transformed
+
+
+def transform_data_type_min(inputs,num_inputs):
+    if inputs is None:
+        transformed=[-math.inf]*num_inputs
+    elif inputs is []:
+        transformed=[-math.inf]*num_inputs
+    else:
+        assert(len(inputs)==num_inputs)
+        transformed=[]
+        for i in range(num_inputs):
+            transformed.append([]) 
+            cur_inputs=inputs[i].split(',')
+            for j in cur_inputs: 
+                if str(j).lower()=="none":
+                    transformed[i].append(-math.inf)
+                else:
+                    transformed[i].append(float(j))
+    return transformed
+
+def transform_data_type_max(inputs,num_inputs):
+    if inputs is None:
+        transformed=[math.inf]*num_inputs
+    elif inputs is []:
+        transformed=[math.inf]*num_inputs
+    else:
+        assert(len(inputs)==num_inputs)
+        transformed=[]
+        for i in range(num_inputs):
+            transformed.append([]) 
+            cur_inputs=inputs[i].split(',')
+            for j in cur_inputs: 
+                if str(j).lower()=="none":
+                    transformed[i].append(math.inf)
+                else:
+                    transformed[i].append(float(j))
+    return transformed
+

@@ -1,0 +1,8 @@
+overlap_peak	bed_summit_from_last_col
+ambig_peak	bed_no_summit
+idr_peaks	bed_summit_from_last_col
+count_bigwig_unstranded_5p	bigwig
+count_bigwig_plus_5p	bigwig
+count_bigwig_minus_5p	bigwig
+control_count_bigwig_plus_5p	bigwig
+control_count_bigwig_minus_5p	bigwig

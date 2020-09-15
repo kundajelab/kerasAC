@@ -1,3 +1,4 @@
+import pdb 
 import argparse
 import pickle
 import tensorflow
@@ -24,20 +25,21 @@ def parse_args():
     parser.add_argument("--bed_regions_center",choices=['summit','center'])
     parser.add_argument("--tdb_array")
     parser.add_argument("--chrom_sizes")
-    parser.add_argument("--datasets",nargs="+")
-    parser.add_argument("--task_index",type=int)
+    parser.add_argument("--tdb_output_datasets",nargs="+")
+    parser.add_argument("--tdb_input_datasets",nargs="+")
     parser.add_argument("--batch_size",type=int)
     parser.add_argument("--tdb_output_source_attribute",nargs="+",help="tiledb attribute for use in label generation i.e. fc_bigwig")
-    parser.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    parser.add_argument("--tdb_output_flank",nargs="+",help="flank around bin center to use in generating outputs")
     parser.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     parser.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     parser.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
-    parser.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    parser.add_argument("--tdb_input_flank",nargs="+",help="length of sequence around bin center to use for input")
     parser.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     parser.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
     parser.add_argument("--num_inputs",type=int)
     parser.add_argument("--num_outputs",type=int) 
     parser.add_argument("--out_pickle")
+    parser.add_argument("--task_index",type=int)
     parser.add_argument("--num_threads",type=int)
     return parser.parse_args() 
 
@@ -64,6 +66,9 @@ def get_generator(args):
                                bed_regions=args.bed_regions,
                                tdb_partition_thresh_for_upsample=None,
                                tdb_partition_attribute_for_upsample=None,
+                               tdb_partition_datasets_for_upsample=None,
+                               tdb_output_datasets=args.tdb_output_datasets,
+                               tdb_input_datasets=args.tdb_input_datasets,
                                tdb_array=args.tdb_array,
                                chrom_sizes=args.chrom_sizes,
                                tdb_input_flank=args.tdb_input_flank,
@@ -77,7 +82,6 @@ def get_generator(args):
                                num_inputs=args.num_inputs,
                                num_outputs=args.num_outputs,
                                upsample_ratio=None,
-                               tasks=args.datasets,
                                tdb_ambig_attribute=None,
                                tdb_config=get_default_config(),
                                tdb_ctx=tiledb.Ctx(config=get_default_config()),
@@ -108,10 +112,22 @@ def get_interpretations(gen, model, count_explainer, prof_explainer,task_index,c
         seq_input=X[0]
         if chipseq is True:
             control_profile=X[1]
+            control_counts=X[2]
+            count_explanations=count_explainer.shap_values([seq_input,control_counts])[0]
         else:
             control_profile=None
+            count_explanations=count_explainer.shap_values(X)[0]
         profile_explanations=prof_explainer(seq_input, control_profile)
-        count_explanations=np.squeeze(count_explainer.shap_values(X)[0])
+        #print(str(len(profile_explanations)))
+        #print(str(profile_explanations[0].shape))
+        #print(str(profile_explanations[1].shape))
+        #print(str(len(count_explanations)))
+        #print(str(count_explanations[0].shape))
+        #print(str(count_explanations[1].shape))
+
+        #get explanations relative to input sequence, the bias track is in index 1
+        profile_explanations=profile_explanations[0]
+        count_explanations=count_explanations[0]        
         #store outputs in dictionary 
         for coord_index in range(len(coords)): 
             cur_coord=coords[coord_index][0:2]
@@ -132,15 +148,14 @@ def main():
     print("created generator")
     #load the model
     model=load_model_wrapper(args)
-    print("loaded model")
-
-    model_wrapper_for_counts=(model.input, model.layers[-1].output)
+    print("loaded model")    
     if args.chipseq is True:
-        create_background=create_background_chip
+        create_background_counts=create_background_counts_chip
+        model_wrapper_for_counts=([model.input[0],model.input[2]],model.outputs[1][:,args.task_index:args.task_index+1])
     else:
-        create_background=create_background_atac
-        
-    count_explainer=shap.DeepExplainer(model_wrapper_for_counts,data=create_background,combine_mult_and_diffref=combine_mult_and_diffref_1d)
+        create_background_counts=create_background_atac 
+        model_wrapper_for_counts=(model.input, model.outputs[1][:,task_index:task_index+1])    
+    count_explainer=shap.DeepExplainer(model_wrapper_for_counts,data=create_background_counts,combine_mult_and_diffref=combine_mult_and_diffref_1d)
     print("got count explainer") 
     prof_explainer = create_explainer(model,ischip=args.chipseq,task_index=args.task_index)
     print("got profile explainer")

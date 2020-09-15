@@ -3,6 +3,14 @@ import shap
 import tensorflow as tf
 import numpy as np
 
+def create_background_counts_chip(model_inputs,bg_size=10,seed=1234):
+    input_seq=model_inputs[0]
+    cont_counts = model_inputs[1]
+    rng = np.random.RandomState(seed)
+    input_seq_bg = dinuc_shuffle(input_seq, bg_size, rng=rng)
+    cont_counts_bg = np.tile(cont_counts, (bg_size, 1))
+    return [input_seq_bg, cont_counts_bg]
+
 def create_background_chip(model_inputs, bg_size=10, seed=1234):
     """
     From a pair of single inputs to the model, generates the set of background

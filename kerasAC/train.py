@@ -34,23 +34,26 @@ def parse_args():
     tiledbgroup=parser.add_argument_group('tiledb')
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
 
+    tiledbgroup.add_argument("--tdb_output_datasets",nargs="+",default=None,help="dataset column from db_ingest; comma separated across channels; space separated across outputs")
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",help="tiledb attribute for use in label generation i.e. fc_bigwig")
     tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
-    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",help="method for output aggregation; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",help="method for output transformation; one of None, 'log','log10','asinh'")
     tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=0.001)
-    
+
+    tiledbgroup.add_argument("--tdb_input_datasets",nargs="+",default=None,help="dataset column from db_ingest; comma separated across channels; space separated across inputs")
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_input_max",nargs="*", default=None)    
-    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",help="method for input transformation; one of None, 'log','log10','asinh'")
 
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default=None,help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=None,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--tdb_partition_datasets_for_upsample",nargs="+")
 
     tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")    
 
@@ -60,7 +63,7 @@ def parse_args():
     input_data_path.add_argument("--index_train_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the training split")
     input_data_path.add_argument("--index_valid_path",default=None,help="seqdataloader output hdf5, or tsv file containing binned labels for the validation split")
     input_data_path.add_argument("--index_tasks",nargs="*",default=None)
-    
+    input_data_path.add_argument("--hdf5_tasks",nargs="+") 
     input_data_path.add_argument("--input_data_path",nargs="+",default=None,help="seq or path to seqdataloader hdf5")
     input_data_path.add_argument("--input_train_path",nargs="+",default=None,help="seq or seqdataloader hdf5")
     input_data_path.add_argument("--input_valid_path",nargs="+",default=None,help="seq or seqdataloader hdf5")
@@ -109,7 +112,7 @@ def parse_args():
     batch_params.add_argument("--batch_size",type=int,default=1000)
     batch_params.add_argument("--revcomp",action="store_true")
     batch_params.add_argument("--squeeze_input_for_gru",action="store_true")
-    batch_params.add_argument("--expand_dims",default=False,action="store_true")
+    batch_params.add_argument("--expand_dims",default=False,action="store_true",help="this is deprecated for tiledb, only supported for legacy compatibility with hdf5; ignored for tiledb")
     batch_params.add_argument("--upsample_thresh_list_train",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_ratio_list_train",type=float,nargs="*",default=None)
     batch_params.add_argument("--upsample_thresh_list_eval",type=float,nargs="*",default=None)
@@ -224,10 +227,10 @@ def initializer_generators_hdf5(args):
                                   add_revcomp=args.revcomp,
                                   chroms_to_use=train_chroms,
                                   get_w1_w0=args.weighted,
-                                  expand_dims=args.expand_dims,
                                   upsample_thresh_list=args.upsample_thresh_list_train,
                                   upsample_ratio_list=args.upsample_ratio_list_train,
-                                  tasks=args.datasets,
+                                  tasks=args.hdf5_tasks,
+                                  expand_dims=args.expand_dims,
                                   shuffle=args.shuffle_epoch_end)    
     print("generated training data generator!")
 
@@ -248,7 +251,7 @@ def initializer_generators_hdf5(args):
                                   upsample_ratio_list=args.upsample_ratio_list_eval,
                                   chroms_to_use=valid_chroms,
                                   expand_dims=args.expand_dims,
-                                  tasks=args.datasets,
+                                  tasks=args.hdf5_tasks,
                                   shuffle=args.shuffle_epoch_end)
     print("generated validation data generator!")
     return train_generator, valid_generator 
@@ -297,6 +300,7 @@ def initialize_generators_tiledb(args):
                                     tdb_array=args.tdb_array,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                    tdb_partition_datasets_for_upsample=args.tdb_partition_datasets_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_min=args.tdb_input_min,
@@ -311,12 +315,11 @@ def initialize_generators_tiledb(args):
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,
-                                    tasks=args.datasets,
-                                    task_indices=args.dataset_indices,
+                                    tdb_input_datasets=args.tdb_input_datasets,
+                                    tdb_output_datasets=args.tdb_output_datasets,
                                     upsample_ratio=upsample_ratio_train,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
-                                    expand_dims=args.expand_dims,
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,
@@ -335,6 +338,7 @@ def initialize_generators_tiledb(args):
                                     tdb_array=args.tdb_array,
                                     tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                     tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                    tdb_partition_datasets_for_upsample=args.tdb_partition_datasets_for_upsample,
                                     tdb_input_source_attribute=args.tdb_input_source_attribute,
                                     tdb_input_flank=args.tdb_input_flank,
                                     tdb_input_min=args.tdb_input_min,
@@ -349,12 +353,11 @@ def initialize_generators_tiledb(args):
                                     tdb_output_aggregation=args.tdb_output_aggregation,
                                     tdb_output_transformation=args.tdb_output_transformation,
                                     tdb_ambig_attribute=args.tdb_ambig_attribute,
-                                    tasks=args.datasets,
-                                    task_indices=args.dataset_indices,
+                                    tdb_input_datasets=args.tdb_input_datasets,
+                                    tdb_output_datasets=args.tdb_output_datasets,
                                     upsample_ratio=upsample_ratio_eval,
                                     num_inputs=args.num_inputs,
                                     num_outputs=args.num_outputs,
-                                    expand_dims=args.expand_dims,
                                     add_revcomp=args.revcomp,
                                     tdb_config=tdb_config,
                                     tdb_ctx=tdb_ctx,

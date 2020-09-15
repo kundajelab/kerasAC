@@ -46,23 +46,28 @@ def parse_args():
 
     tiledbgroup=parser.add_argument_group("tiledb")
     tiledbgroup.add_argument("--tdb_array",help="name of tdb array to use")
+    
     tiledbgroup.add_argument("--tdb_output_source_attribute",nargs="+",default=None,help="tiledb attribute for use in label generation i.e. fc_bigwig")
+    tiledbgroup.add_argument("--tdb_output_datasets",nargs="+",default=None,help="dataset column from db_ingest; comma separated across channels; space separated across outputs")    
     tiledbgroup.add_argument("--tdb_output_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_output_max",nargs="*", default=None)        
-    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",type=int,help="flank around bin center to use in generating outputs")
+    tiledbgroup.add_argument("--tdb_output_flank",nargs="+",help="flank around bin center to use in generating outputs")
     tiledbgroup.add_argument("--tdb_output_aggregation",nargs="+",default=None,help="method for output aggreagtion; one of None, 'avg','max'")
     tiledbgroup.add_argument("--tdb_output_transformation",nargs="+",default=None,help="method for output transformation; one of None, 'log','log10','asinh'")
+
     tiledbgroup.add_argument("--tdb_input_source_attribute",nargs="+",help="attribute to use for generating model input, or 'seq' for one-hot-encoded sequence")
     tiledbgroup.add_argument("--tdb_input_min",nargs="*", default=None)
     tiledbgroup.add_argument("--tdb_input_max",nargs="*", default=None)    
-
-    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",type=int,help="length of sequence around bin center to use for input")
+    tiledbgroup.add_argument("--tdb_input_datasets",nargs="+",default=None,help="dataset column from db_ingest; comma separated across channels; space separated across inputs")
+    tiledbgroup.add_argument("--tdb_input_flank",nargs="+",help="length of sequence around bin center to use for input")
     tiledbgroup.add_argument("--tdb_input_aggregation",nargs="+",default=None,help="method for input aggregation; one of 'None','avg','max'")
     tiledbgroup.add_argument("--tdb_input_transformation",nargs="+",default=None,help="method for input transformation; one of None, 'log','log10','asinh'")
     tiledbgroup.add_argument("--tdb_transformation_pseudocount",type=float,default=1)
     
     tiledbgroup.add_argument("--tdb_partition_attribute_for_upsample",default="idr_peak",help="tiledb attribute to use for upsampling, i.e. idr_peak")
     tiledbgroup.add_argument("--tdb_partition_thresh_for_upsample",type=float,default=1,help="values >= partition_thresh_for_upsample within the partition_attribute_for_upsample will be upsampled during training")
+    tiledbgroup.add_argument("--tdb_partition_datasets_for_upsample",nargs="+")
+    
     tiledbgroup.add_argument("--upsample_ratio_list_predict",type=float,nargs="*")
     tiledbgroup.add_argument("--tdb_ambig_attribute",default=None,help="attribute indicating ambiguous regions to not train on")
     tiledbgroup.add_argument("--chrom_sizes",default=None,help="chromsizes file for use with tiledb generator")
@@ -97,7 +102,6 @@ def parse_args():
     model_params.add_argument('--json',help='json file for the model')
     model_params.add_argument('--functional',default=False,help='use this flag if your model is a functional model',action="store_true")
     model_params.add_argument('--squeeze_input_for_gru',action='store_true')
-    model_params.add_argument("--expand_dims",default=True)
     model_params.add_argument("--num_inputs",type=int)
     model_params.add_argument("--num_outputs",type=int)
     model_params.add_argument("--num_gpus",type=int,default=1)
@@ -241,6 +245,7 @@ def get_tiledb_predict_generator(args):
                                           tdb_array=args.tdb_array,
                                           tdb_partition_attribute_for_upsample=args.tdb_partition_attribute_for_upsample,
                                           tdb_partition_thresh_for_upsample=args.tdb_partition_thresh_for_upsample,
+                                          tdb_partition_datasets_for_upsample=args.tdb_partition_datasets_for_upsample,
                                           upsample_ratio=upsample_ratio_predict,
                                           num_threads=args.upsample_threads,
                                           tdb_ambig_attribute=args.tdb_ambig_attribute,
@@ -262,8 +267,8 @@ def get_tiledb_predict_generator(args):
                                           tiledb_stride=args.tiledb_stride,
                                           chrom_sizes=args.chrom_sizes,
                                           chroms=predict_chroms,
-                                          tasks=args.datasets,
-                                          task_indices=args.dataset_indices,
+                                          tdb_input_datasets=args.tdb_input_datasets,
+                                          tdb_output_datasets=args.tdb_output_datasets,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
                                           bed_regions=args.bed_regions,
