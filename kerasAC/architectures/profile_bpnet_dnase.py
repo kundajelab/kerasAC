@@ -69,12 +69,12 @@ def getModelGivenModelOptionsAndWeightInits(args):
     
     #read in arguments
     seed=args.seed
-    init_weights=args.init_weights 
-    sequence_flank=args.tdb_input_flank[0]
+    init_weights=args.init_weights
+    sequence_flank=int(args.tdb_input_flank[0].split(',')[0])
     num_tasks=args.num_tasks
     
     seq_len=2*sequence_flank
-    out_flank=args.tdb_output_flank[0]
+    out_flank=int(args.tdb_output_flank[0].split(',')[0])
     out_pred_len=2*out_flank
     print(seq_len)
     print(out_pred_len)
