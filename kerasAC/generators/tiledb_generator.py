@@ -568,8 +568,7 @@ class TiledbGenerator(Sequence):
     def get_tdb_vals(self,tdb_batch_indices,attribute,flank,dataset_index):
         flattened_batch_indices=[slice(i-flank,i+flank-1) for i in tdb_batch_indices]
         vals=self.tdb_array.query(attrs=[attribute]).multi_index[flattened_batch_indices,dataset_index][attribute]
-        vals=np.reshape(vals,(-1,len(tdb_batch_indices)))
-        vals=np.transpose(vals)
+        vals=np.reshape(vals,(len(tdb_batch_indices),-1))
         vals=np.expand_dims(vals,axis=-1)
         return vals
 
