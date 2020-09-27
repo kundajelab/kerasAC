@@ -89,7 +89,6 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
     pearson_cor=pearsonr(prep1_vals,prep2_vals)[0]
     density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2')
     plt.suptitle("counts:"+str(title)+" \n spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
-    plt.legend(loc='best')    
     plt.savefig(outf+".counts.pseudorep.png",format='png',dpi=300)
     return spearman_cor, pearson_cor
     
@@ -196,14 +195,13 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     plt.legend(loc='best')
     plt.savefig(outf_prefix+".jsd.png",format='png',dpi=300)
     if prep_jsd is not None:
-        density_scatter(np.nan_tonum(np.asarray(region_jsd)),
+        density_scatter(np.nan_to_num(np.asarray(region_jsd)),
                         np.nan_to_num(np.asarray(pseudorep_jsd)),
                         xlab='JSD Predict vs Labels',
                         ylab='JSD Pseudoreps',
                         xlim=(0,1),
                         ylim=(0,1))
         plt.title('JSD vs Pseudoreps:'+title)
-        plt.legend(loc='best')
         plt.savefig(outf_prefix+".jsd.pseudorep.png",format='png',dpi=300)
     
     #get mean and std
