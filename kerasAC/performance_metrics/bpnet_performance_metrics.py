@@ -41,7 +41,7 @@ def parse_args():
     return parser.parse_args() 
 
 
-def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(-7,11),ylim=(-7,11)):
     """
     Scatter plot colored by 2d histogram
     """
@@ -68,8 +68,8 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20):
     cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    plt.xlim(-7,11)
-    plt.ylim(-7,11)
+    plt.xlim(xlim)
+    plt.ylim(ylim)
     return ax
 
 
@@ -196,10 +196,12 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     plt.legend(loc='best')
     plt.savefig(outf_prefix+".jsd.png",format='png',dpi=300)
     if prep_jsd is not None:
-        density_scatter(np.asarray(region_jsd),
-                        np.asarray(pseudorep_jsd),
+        density_scatter(np.nan_tonum(np.asarray(region_jsd)),
+                        np.nan_to_num(np.asarray(pseudorep_jsd)),
                         xlab='JSD Predict vs Labels',
-                        ylab='JSD Pseudoreps')
+                        ylab='JSD Pseudoreps',
+                        xlim=(0,1),
+                        ylim=(0,1))
         plt.title('JSD vs Pseudoreps:'+title)
         plt.legend(loc='best')
         plt.savefig(outf_prefix+".jsd.pseudorep.png",format='png',dpi=300)
