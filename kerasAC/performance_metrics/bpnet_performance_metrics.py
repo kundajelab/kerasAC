@@ -79,14 +79,18 @@ def get_pseudorep_counts_cor(pseudoreps,coords,title,outf,flank=500):
     prep2_vals=[] 
     for coord in coords:
         chrom=coord[0]
-        center=coord[1]
+        center=int(coord[1])
+        flank=int(flank)
         start=center-flank
         end=center+flank
         prep1_vals.append(np.log(np.sum(np.nan_to_num(pseudoreps[0].values(chrom,start,end)))+1))
         prep2_vals.append(np.log(np.sum(np.nan_to_num(pseudoreps[1].values(chrom,start,end)))+1))
     spearman_cor=spearmanr(prep1_vals,prep2_vals)[0]
     pearson_cor=pearsonr(prep1_vals,prep2_vals)[0]
-    density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2',title="counts:"+str(title)+" \n spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)),figtitle=outf+".counts.pseudorep.png")
+    density_scatter(np.asarray(prep1_vals), np.asarray(prep2_vals) ,xlab='Log Count Labels Pseudorep1',ylab='Log Count Labels Pseudorep 2')
+    plt.suptitle("counts:"+str(title)+" \n spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3)))
+    plt.legend(loc='best')    
+    plt.savefig(outf+".counts.pseudorep.png",format='png',dpi=300)
     return spearman_cor, pearson_cor
     
 def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
@@ -141,7 +145,7 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     for region_index in range(num_regions):
         coord=coords[region_index]
         chrom=coord[0]
-        bp=coord[1]
+        bp=int(coord[1])
         denominator=np.nansum(profile_labels[region_index,:])
         if denominator!=0:
             cur_profile_labels_prob=profile_labels[region_index,:]/denominator
@@ -195,9 +199,10 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
         density_scatter(np.asarray(region_jsd),
                         np.asarray(pseudorep_jsd),
                         xlab='JSD Predict vs Labels',
-                        ylab='JSD Pseudoreps',
-                        title='JSD vs Pseudoreps:'+title,
-                        figtitle=outf_prefix+".jsd.pseudorep.png")
+                        ylab='JSD Pseudoreps')
+        plt.title('JSD vs Pseudoreps:'+title)
+        plt.legend(loc='best')
+        plt.savefig(outf_prefix+".jsd.pseudorep.png",format='png',dpi=300)
     
     #get mean and std
     if len(pseudorep_jsd)>0:

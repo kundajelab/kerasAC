@@ -6,7 +6,7 @@ from matplotlib import cm
 from matplotlib.colors import Normalize 
 from scipy.interpolate import interpn
 
-def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,s=0.3):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,s=0.3,xlim=(2.3,11),ylim=(2.3,11)):
     """
     Scatter plot colored by 2d histogram
     """
@@ -33,8 +33,8 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,s=0.3):
     #cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    plt.xlim(2.3,11)
-    plt.ylim(2.3,11)
+    plt.xlim(xlim[0],xlim[1])
+    plt.ylim(ylim[0],ylim[1])
     return ax
 
 
