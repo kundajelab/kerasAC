@@ -16,6 +16,10 @@ ltrdict = {'a':[1,0,0,0],
            'G':[0,0,1,0],
            'T':[0,0,0,1],
            'N':[0,0,0,0]}
+reverse_dict={}
+for key in ltrdict:
+    cur_val=ltrdict[key]
+    reverse_dict[tuple(cur_val)]=key
 
 def one_hot_encode(seqs):
     return np.array([[ltrdict.get(x,[0,0,0,0]) for x in seq] for seq in seqs])

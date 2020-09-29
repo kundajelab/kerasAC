@@ -41,7 +41,7 @@ def parse_args():
     return parser.parse_args() 
 
 
-def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(-7,11),ylim=(-7,11)):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(4,12),ylim=(4,12)):
     """
     Scatter plot colored by 2d histogram
     """
@@ -138,7 +138,12 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     #put the counts in probability space to use jsd
     num_regions=profile_labels.shape[0]
     region_jsd=[]
-    pseudorep_jsd=[] 
+    pseudorep_jsd=[]
+    shuffled_labels_jsd=[] #shuffled labels vs observed labels
+    labels_vs_mean_label_jsd=[] #jsd of label with mean of all summit-centered labels 
+    mean_profile_label=np.nanmean(profile_labels,axis=0)
+    mean_profile_label_prob=mean_profile_label/np.nansum(mean_profile_label)
+    
     outf=open(outf_prefix+".jsd.txt",'w')
     outf.write('Region\tJSD\tPseudorepJSD\tNLL\n')
     for region_index in range(num_regions):
@@ -150,10 +155,15 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
             cur_profile_labels_prob=profile_labels[region_index,:]/denominator
         else:
             cur_profile_labels_prob=profile_labels[region_index,:]
-        cur_profile_preds_softmax=profile_preds_softmax[region_index,:]
-        
+        cur_profile_preds_softmax=profile_preds_softmax[region_index,:]        
         cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
         region_jsd.append(cur_jsd)
+        #get the jsd of shuffled label with true label 
+        shuffled_labels=np.random.permutation(profile_labels[region_index,:])
+        shuffled_labels_prob=shuffled_labels/np.nansum(shuffled_labels)
+        shuffled_labels_jsd.append(jensenshannon(cur_profile_labels_prob,shuffled_labels_prob))
+        labels_vs_mean_label_jsd.append(jensenshannon(cur_profile_labels_prob,mean_profile_label_prob))
+                                   
         if pseudoreps is not None:
             prep1_vals=np.nan_to_num(pseudoreps[0].values(chrom,bp-flank,bp+flank,numpy=True))
             prep2_vals=np.nan_to_num(pseudoreps[1].values(chrom,bp-flank,bp+flank,numpy=True))
@@ -190,6 +200,9 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     n,bins,patches=plt.hist(region_jsd,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
     if prep_jsd is not None:
         n2,bins2,patches2=plt.hist(pseudorep_jsd,num_bins,facecolor='red',alpha=0.5,label="Pseudoreps")
+    n3,bins3,patches3=plt.hist(shuffled_labels_jsd,num_bins,facecolor='black',alpha=0.5,label='Labels vs Shuffled Labels')
+    n4,bins4,patches4=plt.hist(labels_vs_mean_label_jsd,num_bins,facecolor='green',alpha=0.5,label='Labels vs Mean Summit-Centered Label')
+    
     plt.xlabel('Jensen Shannon Distance Profile Labels and Preds in Probability Space')
     plt.title("JSD Dist.:"+title)
     plt.legend(loc='best')
