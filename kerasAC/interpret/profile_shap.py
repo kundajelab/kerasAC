@@ -1,3 +1,4 @@
+import pdb 
 from .helpers import dinuc_shuffle 
 import shap
 import tensorflow as tf
@@ -91,8 +92,7 @@ def combine_mult_and_diffref_chip(mult, orig_inp, bg_data):
     input_seq_bg, cont_profs_bg = bg_data
     # Allocate array to store hypothetical scores, one set for each background
     # reference (i.e. each difference-from-reference)
-    input_seq_hyp_scores_eachdiff = np.empty_like(input_seq_bg)
-    
+    input_seq_hyp_scores_eachdiff = np.empty_like(input_seq_bg,dtype='float64')
     # Loop over the 4 input bases
     for i in range(input_seq.shape[-1]):
         # Create hypothetical input of all one type of base
@@ -109,7 +109,6 @@ def combine_mult_and_diffref_chip(mult, orig_inp, bg_data):
         # Sum across bases axis; this computes the actual importance score AS IF
         # the target sequence were all that base
         input_seq_hyp_scores_eachdiff[:, :, i] = np.sum(contrib, axis=-1)
-
     # Average hypothetical scores across background
     # references/diff-from-references
     input_seq_hyp_scores = np.mean(input_seq_hyp_scores_eachdiff, axis=0)
@@ -208,7 +207,7 @@ def create_explainer(model, ischip, task_index=None):
     probs = tf.nn.softmax(logits_stopgrad, axis=1)
 
     logits_weighted = logits * probs  # Shape: B x T x O x 2
-    if task_index:
+    if task_index is not None:
         logits_weighted = logits_weighted[:,:, task_index : task_index + 1]
     prof_sum = tf.reduce_sum(logits_weighted, axis=(1, 2))
     if ischip==True:
