@@ -14,8 +14,8 @@ def get_probability_track_from_bpnet(profile_preds):
 def get_logit_label_track(profile_labels,pseudocount=1e-4):
     return logit(profile_labels+pseudocount)
 
-def get_probability_label_track(labels,axis):
-    return normalize(labels,norm='l1',axis=axis)
+def get_probability_label_track(labels):
+    return normalize(labels,norm='l1')
 
 def get_model_outputs_to_plot(preds,coords=None):
     #label sum
