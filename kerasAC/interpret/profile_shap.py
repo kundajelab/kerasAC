@@ -152,7 +152,7 @@ def combine_mult_and_diffref_atac(mult, orig_inp, bg_data):
     input_seq_bg = bg_data[0]
     # Allocate array to store hypothetical scores, one set for each background
     # reference (i.e. each difference-from-reference)
-    input_seq_hyp_scores_eachdiff = np.empty_like(input_seq_bg)
+    input_seq_hyp_scores_eachdiff = np.empty_like(input_seq_bg,dtype='float64')
     
     # Loop over the 4 input bases
     for i in range(input_seq.shape[-1]):
