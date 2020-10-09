@@ -123,7 +123,6 @@ def parse_args():
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    epoch_params.add_argument("--shuffle_epoch_start",action='store_true',default=False)
     epoch_params.add_argument("--shuffle_epoch_end",action='store_true', default=False)
     
     #add functionality to train on individuals' allele frequencies
@@ -192,7 +191,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
                         workers=args.threads,
                         max_queue_size=args.max_queue_size,
                         callbacks=cur_callbacks,
-                        shuffle=False)
+                        shuffle=True)
     print('fit_generator complete') 
     model.save_weights(model_output_path_weights_name)
     print('weights saved') 
@@ -294,7 +293,7 @@ def initialize_generators_tiledb(args):
     train_chroms=get_chroms(args,split='train')
     train_generator=TiledbGenerator(chroms=train_chroms,
                                     ref_fasta=args.ref_fasta,
-                                    shuffle_epoch_start=args.shuffle_epoch_start,
+                                    shuffle_epoch_start=True,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
                                     tdb_array=args.tdb_array,
@@ -332,7 +331,7 @@ def initialize_generators_tiledb(args):
     valid_chroms=get_chroms(args,split='valid')
     valid_generator=TiledbGenerator(chroms=valid_chroms,
                                     ref_fasta=args.ref_fasta,
-                                    shuffle_epoch_start=args.shuffle_epoch_start,
+                                    shuffle_epoch_start=True,
                                     shuffle_epoch_end=args.shuffle_epoch_end,
                                     batch_size=args.batch_size,
                                     tdb_array=args.tdb_array,

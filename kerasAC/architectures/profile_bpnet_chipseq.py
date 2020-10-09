@@ -77,8 +77,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     
     #define inputs
     inp = Input(shape=(seq_len, 4),name='sequence')    
-    bias_counts_input=Input(shape=(2,),name='control_logcount')
-    bias_profile_input=Input(shape=(out_pred_len,2),name='control_profile')
+    bias_counts_input=Input(shape=(num_tasks,),name='control_logcount')
+    bias_profile_input=Input(shape=(out_pred_len,num_tasks),name='control_profile')
                             
     # first convolution without dilation
     first_conv = Conv1D(filters,
