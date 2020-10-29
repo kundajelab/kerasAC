@@ -59,21 +59,57 @@ def multinomial_nll(true_counts, logits):
     return (-tf.reduce_sum(dist.log_prob(true_counts)) / 
             tf.cast(tf.shape(true_counts)[0], dtype=tf.float32))
 
+def custom_mse(y_true, y_pred):
+    # calculating squared difference between target and predicted values 
+    loss = K.square(y_pred - y_true)  # (batch_size, 2)
+    # summing both loss values along batch dimension 
+    loss = K.sum(loss, axis=1)        # (batch_size,)
+    return loss
+
 #from https://github.com/kundajelab/basepair/blob/cda0875571066343cdf90aed031f7c51714d991a/basepair/losses.py#L87
 class MultichannelMultinomialNLL(object):
-    def __init__(self, n):
+    def __init__(self, n, weights=None):
         self.__name__ = "MultichannelMultinomialNLL"
         self.n = n
+        if weights is None:
+            self.weights = [1]*self.n
+        else:
+            self.weights = weights
+        print(self.weights, self.n)
+
 
     def __call__(self, true_counts, logits):
         for i in range(self.n):
             loss = multinomial_nll(true_counts[..., i], logits[..., i])
+            print(loss)
             if i == 0:
-                total = loss
+                total = self.weights[i]*loss
             else:
-                total += loss
+                total += self.weights[i]*loss
         return total
 
     def get_config(self):
-        return {"n": self.n}
+        return {"n": self.n, "weights":self.weights}
+
+class MultichannelMultinomialMSE(object):
+    def __init__(self, n, weights):
+        self.__name__ = "MultichannelMultinomialMSE"
+        self.n = n
+        self.weights = weights
+        print(self.weights, self.n)
+        self.mse = tf.keras.losses.MeanSquaredError()
+
+    def __call__(self, true_counts, logits):
+        for i in range(self.n):
+            #print(true_counts[..., i], logits[..., i])
+            loss = self.mse(true_counts[..., i], logits[..., i])
+            print(loss, self.n)
+            if i == 0:
+                total = self.weights[i]*loss
+            else:
+                total += self.weights[i]*loss
+        return total
+
+    def get_config(self):
+        return {"n": self.n, "weights":self.weights}
 

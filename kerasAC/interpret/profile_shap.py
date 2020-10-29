@@ -34,6 +34,14 @@ def create_background_chip(model_inputs, bg_size=10, seed=1234):
     cont_prof_bg = np.tile(cont_profs, (bg_size, 1, 1))
     return [input_seq_bg, cont_prof_bg]
 
+def create_background_chip_1(model_inputs, bg_size=1, seed=1234):
+    input_seq=model_inputs[0]
+    cont_profs = model_inputs[1]
+    rng = np.random.RandomState(seed)
+    input_seq_bg = dinuc_shuffle(input_seq, bg_size, rng=rng)
+    cont_prof_bg = np.tile(cont_profs, (bg_size, 1, 1))
+    return [input_seq_bg, cont_prof_bg]
+
 def create_background_atac(model_inputs, bg_size=10, seed=1234):
     """
     From a pair of single inputs to the model, generates the set of background
@@ -49,6 +57,12 @@ def create_background_atac(model_inputs, bg_size=10, seed=1234):
     original sequence. The background for the control profiles is the same as
     the originals.
     """
+    input_seq= model_inputs[0]
+    rng = np.random.RandomState(seed)    
+    input_seq_bg = dinuc_shuffle(input_seq, bg_size, rng=rng)
+    return [input_seq_bg]
+
+def create_background_atac_1(model_inputs, bg_size=1, seed=1234):
     input_seq= model_inputs[0]
     rng = np.random.RandomState(seed)    
     input_seq_bg = dinuc_shuffle(input_seq, bg_size, rng=rng)
@@ -177,7 +191,7 @@ def combine_mult_and_diffref_atac(mult, orig_inp, bg_data):
     return [input_seq_hyp_scores]
 
 
-def create_explainer(model, ischip, task_index=None):
+def create_explainer(model, ischip, task_index=None,bg_size=10):
     """
     Given a trained Keras model, creates a Shap DeepExplainer that returns
     hypothetical scores for the input sequence.
@@ -211,11 +225,17 @@ def create_explainer(model, ischip, task_index=None):
         logits_weighted = logits_weighted[:,:, task_index : task_index + 1]
     prof_sum = tf.reduce_sum(logits_weighted, axis=(1, 2))
     if ischip==True:
-        create_background=create_background_chip
+        if bg_size==10:
+            create_background=create_background_chip
+        elif bg_size==1:
+            create_background=create_background_chip_1
         combine_mult_and_diffref=combine_mult_and_diffref_chip
         model_input=[model.input[0],model.input[1]]
     else:
-        create_background=create_background_atac
+        if bg_size==10:
+            create_background=create_background_atac
+        elif bg_size==1:
+            create_background=create_background_atac_1
         combine_mult_and_diffref=combine_mult_and_diffref_atac
         model_input=model.input
 
