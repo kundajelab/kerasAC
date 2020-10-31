@@ -104,6 +104,8 @@ def counts_metrics(labels,preds,outf,title,pseudoreps,flank):
     spearman_cor=spearmanr(labels[0].values,preds[0].values)[0]
     pearson_cor=pearsonr(labels[0].values,preds[0].values)[0]
     mse=((labels[0].values - preds[0].values)**2).mean(axis=0)
+    
+    
     plt.rcParams["figure.figsize"]=8,8
     plt.figure()
     density_scatter(labels[0].values,
@@ -147,7 +149,9 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     #put the counts in probability space to use jsd
     num_regions=profile_labels.shape[0]
     region_jsd=[]
-    pseudorep_jsd=[] 
+    pseudorep_jsd=[]
+    shuffled_labels_jsd=[] #shuffled labels vs observed labels
+
     outf=open(outf_prefix+".jsd.txt",'w')
     outf.write('Region\tJSD\tPseudorepJSD\tNLL\n')
     for i in range(num_regions):
@@ -159,7 +163,11 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
         cur_profile_preds_softmax=profile_preds_softmax[i,:]
         cur_jsd=jensenshannon(cur_profile_labels_prob,cur_profile_preds_softmax)
         region_jsd.append(cur_jsd)
-        
+        #get the jsd of shuffled label with true label 
+        shuffled_labels=np.random.permutation(profile_labels[i,:])
+        shuffled_labels_prob=shuffled_labels/np.nansum(shuffled_labels)
+        shuffled_labels_jsd.append(jensenshannon(cur_profile_labels_prob,shuffled_labels_prob))
+
         if pseudoreps is not None:
             prep1_vals=np.nan_to_num(pseudoreps[0].values(chroms[i],summits[i]-flank,summits[i]+flank,numpy=True))
             prep2_vals=np.nan_to_num(pseudoreps[1].values(chroms[i],summits[i]-flank,summits[i]+flank,numpy=True))
@@ -195,6 +203,7 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     n,bins,patches=plt.hist(region_jsd,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
     if prep_jsd is not None:
         n2,bins2,patches2=plt.hist(pseudorep_jsd,num_bins,facecolor='red',alpha=0.5,label="Pseudoreps")
+    n3,bins3,patches3=plt.hist(shuffled_labels_jsd,num_bins,facecolor='black',alpha=0.5,label='Labels vs Shuffled Labels')
     plt.xlabel('Jensen Shannon Distance Profile Labels and Preds in Probability Space')
     plt.title("JSD Dist.:"+title)
     plt.legend(loc='best')
@@ -210,9 +219,9 @@ def profile_metrics(profile_labels,profile_preds,counts_labels,counts_preds,outf
     
     #get mean and std
     if len(pseudorep_jsd)>0:
-        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd)
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), nanmean(pseudorep_jsd), nanstd(pseudorep_jsd), nanmean(shuffled_labels_jsd), nanstd(shuffled_labels_jsd)
     else:
-        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), None, None
+        return nanmean(region_jsd), nanstd(region_jsd), nanmean(mnnll_vals), nanstd(mnnll_vals), None, None, nanmean(shuffled_labels_jsd), nanstd(shuffled_labels_jsd)
     
 def get_performance_metrics_profile_wrapper(args):
     if type(args)==type({}):
@@ -252,7 +261,7 @@ def get_performance_metrics_profile_wrapper(args):
                                                                                  labels_and_preds['counts']['predictions'],
                                                                                  args.outf,args.title,pseudoreps,args.flank)
     
-    mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd = profile_metrics(labels_and_preds['profile']['labels'],
+    mean_jsd, std_jsd, mean_nll, std_nll, mean_pr_jsd, std_pr_jsd , mean_shuf_jsd, std_shuf_jsd = profile_metrics(labels_and_preds['profile']['labels'],
                                                                                     labels_and_preds['profile']['predictions'],
                                                                                     labels_and_preds['counts']['labels'],
                                                                                     labels_and_preds['counts']['predictions'],
@@ -261,8 +270,8 @@ def get_performance_metrics_profile_wrapper(args):
                                                                                     args.smooth_predicted_profile,
                                                                                     args.smooth_preps)
     outf=open(args.outf+".summary.txt",'w')
-    outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\n')
-    outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\n')
+    outf.write('Title\tPearson\tSpearman\tMSE\tPseudorepPearson\tPseudorepSpearman\tMeanJSD\tStdJSD\tMeanPseudorepJSD\tStdPseudorepJSD\tMeanMNNLL\tStdMNNLL\tMeanShuffledJSD\tStdShuffledJSDn')
+    outf.write(args.title+'\t'+str(pearson_cor)+'\t'+str(spearman_cor)+'\t'+str(mse)+'\t'+str(pearson_cor_ps)+'\t'+str(spearman_cor_ps)+'\t'+str(mean_jsd)+'\t'+str(std_jsd)+'\t'+str(mean_pr_jsd)+'\t'+str(std_pr_jsd)+'\t'+str(mean_nll)+'\t'+str(std_nll)+'\t'+str(mean_shuf_jsd)+'\t'+str(std_shuf_jsd)+'\n')
     outf.close() 
 
 def main():
