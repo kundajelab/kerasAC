@@ -35,7 +35,7 @@ def get_model_param_dict(param_file):
 def getModelGivenModelOptionsAndWeightInits(args):
     #default params (can be overwritten by providing model_params file as input to the training function)
     filters=500
-    n_dil_layers=6
+    n_dil_layers=8
     conv1_kernel_size=21
     profile_kernel_size=75
     control_smoothing=[1, 50]
@@ -76,8 +76,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     seq_len=2*sequence_flank
     out_flank=int(args.tdb_output_flank[0].split(',')[0])
     out_pred_len=2*out_flank
-    print(seq_len)
-    print(out_pred_len)
+    print("seq_len:"+str(seq_len))
+    print("out_pred_len:"+str(out_pred_len))
     #define inputs
     inp = Input(shape=(seq_len, 4),name='sequence')    
 
@@ -138,6 +138,9 @@ def getModelGivenModelOptionsAndWeightInits(args):
     #            difference of 346 is required between input seq len and ouput len
     profile_out_prebias_shape =int_shape(profile_out_prebias)
     cropsize = int(profile_out_prebias_shape[1]/2)-int(out_pred_len/2)
+    assert cropsize>=0
+    profile_out_prebias = Cropping1D(cropsize,
+                                     name='prof_out_crop2match_output')(profile_out_prebias)
 
     # Step 1.4 - Final 1x1 convolution
     profile_out = Conv1D(filters=num_tasks,
@@ -168,8 +171,8 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description="view model arch")
     parser.add_argument("--seed",type=int,default=1234)
     parser.add_argument("--init_weights",default=None)
-    parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
-    parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
+    parser.add_argument("--tdb_input_flank",nargs="+",default=["1057"])
+    parser.add_argument("--tdb_output_flank",nargs="+",default=["500"])
     parser.add_argument("--num_tasks",type=int,default=1)
     parser.add_argument("--model_params",default=None)
     

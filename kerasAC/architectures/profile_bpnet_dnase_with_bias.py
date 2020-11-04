@@ -4,9 +4,7 @@ from keras.backend import int_shape
 from sklearn.metrics import average_precision_score
 from kerasAC.metrics import * 
 from kerasAC.custom_losses import *
-
 import keras;
-
 #import the various keras layers 
 from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D, Add
 from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
@@ -32,16 +30,38 @@ def get_model_param_dict(param_file):
         params[tokens[0]]=tokens[1]
     return params 
 
+def load_pretrained_bias(model_hdf5):
+    from keras.models import load_model
+    from keras.utils.generic_utils import get_custom_objects
+    custom_objects={"recall":recall,
+                    "sensitivity":recall,
+                    "specificity":specificity,
+                    "fpr":fpr,
+                    "fnr":fnr,
+                    "precision":precision,
+                    "f1":f1,
+                    "ambig_binary_crossentropy":ambig_binary_crossentropy,
+                    "ambig_mean_absolute_error":ambig_mean_absolute_error,
+                    "ambig_mean_squared_error":ambig_mean_squared_error,
+                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL}
+    get_custom_objects().update(custom_objects)
+    pretrained_bias_model=load_model(model_hdf5)
+    #freeze the model
+    num_layers=len(pretrained_bias_model.layers)
+    for i in range(num_layers):
+        pretrained_bias_model.layers[i].trainable=False 
+    return pretrained_bias_model 
+
+
 def getModelGivenModelOptionsAndWeightInits(args):
     #default params (can be overwritten by providing model_params file as input to the training function)
-    filters=300
-    n_dil_layers=6
+    filters=500
+    n_dil_layers=8
     conv1_kernel_size=21
     profile_kernel_size=75
     control_smoothing=[1, 50]
     counts_loss_weight=1
     profile_loss_weight=1
-    kernel_size_post_bias=1
     
     model_params=get_model_param_dict(args.model_params)
     if 'filters' in model_params:
@@ -58,9 +78,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
         counts_loss_weight=float(model_params['counts_loss_weight'])
     if 'profile_loss_weight' in model_params:
         profile_loss_weight=float(model_params['profile_loss_weight'])
-    if 'kernel_size_post_bias' in model_params:
-        kernel_size_post_bias=int(model_params['kernel_size_post_bias'])
-        
+
     print("params:")
     print("filters:"+str(filters))
     print("n_dil_layers:"+str(n_dil_layers))
@@ -71,23 +89,23 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("profile_loss_weight:"+str(profile_loss_weight))
     
     #read in arguments
-    seed=args.seed
+    seed=int(args.seed)
     init_weights=args.init_weights 
-    sequence_flank=args.tdb_input_flank[0]
-    num_tasks=args.num_tasks
+    sequence_flank=int(args.tdb_input_flank[0])
+    num_tasks=int(args.num_tasks)
     
     seq_len=2*sequence_flank
-    out_flank=args.tdb_output_flank[0]
+    out_flank=int(args.tdb_output_flank[0])
     out_pred_len=2*out_flank
     print(seq_len)
     print(out_pred_len)
+
+    #load the pretrained bias model
+    pretrained_bias_model=load_pretrained_bias(model_params['pretrained_bias_model'])
+    
     #define inputs
     inp = Input(shape=(seq_len, 4),name='sequence')    
 
-    bias_counts_input =Input(shape=(1, ),name="bias_logcount")
-    #bias_profile_input = Input(shape=(out_pred_len,len(control_smoothing)),name="bias_profile")
-    bias_profile_input = Input(shape=(out_pred_len,1),name="bias_profile")
-    # end inputs
     # first convolution without dilation
     first_conv = Conv1D(filters,
                         kernel_size=conv1_kernel_size,
@@ -97,14 +115,13 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # 6 dilated convolutions with resnet-style additions
     # each layer receives the sum of feature maps 
     # from all previous layers
-    res_layers = [(first_conv, '1stconv')] # on a quest to have meaninful
-                                           # layer names
-    layer_names = ['2nd', '3rd', '4th', '5th', '6th', '7th']
+    res_layers = [(first_conv, '0_non_dil')] 
+    layer_names = [str(i)+"_dil" for i in range(1,n_dil_layers+1)]
     for i in range(1, n_dil_layers + 1):
         if i == 1:
             res_layers_sum = first_conv
         else:
-            res_layers_sum = Add(name='add_{}'.format(i))([l for l, _ in res_layers])
+            res_layers_sum = Add(name='add'+str(i))([l for l, _ in res_layers])
 
         # dilated convolution
         conv_layer_name = '{}conv'.format(layer_names[i-1])
@@ -134,9 +151,6 @@ def getModelGivenModelOptionsAndWeightInits(args):
     # the final output from the 6 dilated convolutions 
     # with resnet-style connections
     combined_conv = Add(name='combined_conv')([l for l, _ in res_layers])
-
-    # Branch 1. Profile prediction
-    # Step 1.1 - 1D convolution with a very large kernel
     profile_out_prebias = Conv1D(filters=num_tasks,
                                  kernel_size=profile_kernel_size,
                                  padding='valid',
@@ -145,29 +159,24 @@ def getModelGivenModelOptionsAndWeightInits(args):
     #            difference of 346 is required between input seq len and ouput len
     profile_out_prebias_shape =int_shape(profile_out_prebias)
     cropsize = int(profile_out_prebias_shape[1]/2)-int(out_pred_len/2)
-    profile_out_prebias = Cropping1D(cropsize,name='prof_out_crop2match_output')(profile_out_prebias)
-    # Step 1.3 - concatenate with the control profile 
-    concat_pop_bpi = Concatenate(axis=-1,name="concat_with_bias_prof")([profile_out_prebias,bias_profile_input])
+    assert cropsize>=0
+    profile_out_prebias = Cropping1D(cropsize,
+                                     name='prof_out_crop2match_output')(profile_out_prebias)
 
-    # Step 1.4 - Final 1x1 convolution
+    #ADD IN THE BIAS
+    bias_output=pretrained_bias_model(inp)
+    #concatenate bias output with profile_out_prebias
+    concat_with_bias_prof=Concatenate(axis=-1)([profile_out_prebias,bias_output[0]])
     profile_out = Conv1D(filters=num_tasks,
-                         kernel_size=kernel_size_post_bias,
-                         name="profile_predictions")(concat_pop_bpi)
-    # Branch 2. Counts prediction
-    # Step 2.1 - Global average pooling along the "length", the result
-    #            size is same as "filters" parameter to the BPNet function
-    gap_combined_conv = GlobalAveragePooling1D(name='gap')(combined_conv) # acronym - gapcc
-
-    # Step 2.2 Concatenate the output of GAP with bias counts
-    concat_gapcc_bci = Concatenate(axis=-1,name="concat_with_bias_cnts")([gap_combined_conv, bias_counts_input])
-    
-    # Step 2.3 Dense layer to predict final counts
-    count_out = Dense(num_tasks, name="logcount_predictions")(concat_gapcc_bci)
-    
-
-    # instantiate keras Model with inputs and outputs
-    model = Model(inputs=[inp, bias_counts_input, bias_profile_input],
-                         outputs=[profile_out, count_out])
+                         kernel_size=1,
+                         name="profile_predictions")(concat_with_bias_prof)
+    #COUNTS ARM 
+    gap_combined_conv = GlobalAveragePooling1D(name='gap')(combined_conv)
+    #concatenate gap_combined_conv with bias output
+    concat_with_bias_count=Concatenate(axis=-1)([gap_combined_conv,bias_output[1]])
+    count_out = Dense(num_tasks, name="logcount_predictions")(concat_with_bias_count)
+    model=Model(inputs=[inp],outputs=[profile_out,
+                                     count_out])
     print("got model") 
     model.compile(optimizer=Adam(),
                     loss=[MultichannelMultinomialNLL(1),'mse'],
@@ -181,10 +190,11 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description="view model arch")
     parser.add_argument("--seed",type=int,default=1234)
     parser.add_argument("--init_weights",default=None)
-    parser.add_argument("--tdb_input_flank",nargs="+",default=[673])
+    parser.add_argument("--tdb_input_flank",nargs="+",default=[1020])
     parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
     parser.add_argument("--num_tasks",type=int,default=1)
     parser.add_argument("--model_params",default=None)
+    
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())
