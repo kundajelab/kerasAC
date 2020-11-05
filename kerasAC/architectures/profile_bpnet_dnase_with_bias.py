@@ -190,8 +190,8 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description="view model arch")
     parser.add_argument("--seed",type=int,default=1234)
     parser.add_argument("--init_weights",default=None)
-    parser.add_argument("--tdb_input_flank",nargs="+",default=[1020])
-    parser.add_argument("--tdb_output_flank",nargs="+",default=[500])
+    parser.add_argument("--tdb_input_flank",nargs="+",default=["1057"])
+    parser.add_argument("--tdb_output_flank",nargs="+",default=["500"])
     parser.add_argument("--num_tasks",type=int,default=1)
     parser.add_argument("--model_params",default=None)
     

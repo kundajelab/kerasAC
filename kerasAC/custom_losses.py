@@ -1,4 +1,3 @@
-import keras.backend as K
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -14,20 +13,20 @@ def get_weighted_binary_crossentropy(w0_weights, w1_weights,ambig_val=np.nan):
         weightsPerTaskRep = y_true*w1_weights[None,:] + (1-y_true)*w0_weights[None,:]
         nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
         nonAmbigTimesWeightsPerTask = tf.boolean_mask(weightsPerTaskRep,nonAmbig)
-        return K.mean(K.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig),tf.boolean_mask(y_pred,nonAmbig))*nonAmbigTimesWeightsPerTask, axis=-1);
+        return tf.mean(tf.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig),tf.boolean_mask(y_pred,nonAmbig))*nonAmbigTimesWeightsPerTask, axis=-1);
     return weighted_binary_crossentropy; 
 
 def ambig_binary_crossentropy(y_true,y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return K.mean(K.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)), axis=-1);
+    return tf.mean(tf.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)), axis=-1);
 
 def ambig_mean_squared_error(y_true, y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return K.mean(K.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
+    return tf.mean(tf.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
 
 def ambig_mean_absolute_error(y_true, y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return K.mean(K.abs(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
+    return tf.mean(tf.abs(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
 
 def ambig_log_poisson(y_true,y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
@@ -61,9 +60,9 @@ def multinomial_nll(true_counts, logits):
 
 def custom_mse(y_true, y_pred):
     # calculating squared difference between target and predicted values 
-    loss = K.square(y_pred - y_true)  # (batch_size, 2)
+    loss = tf.square(y_pred - y_true)  # (batch_size, 2)
     # summing both loss values along batch dimension 
-    loss = K.sum(loss, axis=1)        # (batch_size,)
+    loss = tf.sum(loss, axis=1)        # (batch_size,)
     return loss
 
 #from https://github.com/kundajelab/basepair/blob/cda0875571066343cdf90aed031f7c51714d991a/basepair/losses.py#L87

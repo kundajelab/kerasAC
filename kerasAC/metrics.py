@@ -1,6 +1,5 @@
-#Note: this is ugly w/ use of tf & K --> needed to avoid custom keras modifications 
 import tensorflow as tf
-import keras.backend as K
+
 
 pseudocount=0.01
 
@@ -8,18 +7,18 @@ pseudocount=0.01
 def contingency_table(y, z):
     """Note:  if y and z are not rounded to 0 or 1, they are ignored
     """
-    y = K.cast(K.round(y), K.floatx())
-    z = K.cast(K.round(z), K.floatx())
+    y = tf.cast(tf.round(y), tf.floatx())
+    z = tf.cast(tf.round(z), tf.floatx())
     
     def count_matches(y, z):
-        return K.sum(K.cast(y, K.floatx()) * K.cast(z, K.floatx()))
+        return tf.sum(tf.cast(y, tf.floatx()) * tf.cast(z, tf.floatx()))
     
-    ones = K.ones_like(y)
-    zeros = K.zeros_like(y)
-    y_ones = K.equal(y, ones)
-    y_zeros = K.equal(y, zeros)
-    z_ones = K.equal(z, ones)
-    z_zeros = K.equal(z, zeros)
+    ones = tf.ones_like(y)
+    zeros = tf.zeros_like(y)
+    y_ones = tf.equal(y, ones)
+    y_zeros = tf.equal(y, zeros)
+    z_ones = tf.equal(z, ones)
+    z_zeros = tf.equal(z, zeros)
     
     tp = count_matches(y_ones, z_ones)
     tn = count_matches(y_zeros, z_zeros)
