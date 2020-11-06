@@ -10,7 +10,8 @@ keras accessibility models for genomic data
 * psutil
 * tables
 * numpy>=1.9
-* keras>=2.2
+* keras>=2.4 (for tag 2.5; earlier keras can be used for tag<=2.4)
+* tensorflow>=2.3 (for tag 2.5; earlier tensorflow can be used for tag<=2.4) 
 * h5py
 * pandas
 * pybigwig (I had had errors with the pip version, recommend bioconda:https://anaconda.org/bioconda/pybigwig)
