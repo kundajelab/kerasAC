@@ -45,7 +45,7 @@ def get_w1_w0_prediction(args):
     return w1,w0
 
 def get_model(args):
-    from keras.utils.generic_utils import get_custom_objects
+    from tensorflow.keras.utils.generic_utils import get_custom_objects
     custom_objects={"recall":recall,
                     "sensitivity":recall,
                     "specificity":specificity,
@@ -64,7 +64,7 @@ def get_model(args):
     get_custom_objects().update(custom_objects)
     
     if args.yaml!=None:
-        from keras.models import model_from_yaml
+        from tensorflow.keras.models import model_from_yaml
         #load the model architecture from yaml
         if args.yaml.startswith('s3://'):
             yaml_string=read_s3_file_contents(args.yaml)
@@ -72,7 +72,7 @@ def get_model(args):
             yaml_string=open(args.yaml,'r').read()
         model=model_from_yaml(yaml_string)#,custom_objects=custom_objects) 
     elif args.json!=None:
-        from keras.models import model_from_json
+        from tensorflow.keras.models import model_from_json
         #load the model architecture from json
         if args.json.startswith('s3://'):
             json_string=read_s3_file_contents(args.json)
@@ -81,7 +81,7 @@ def get_model(args):
         model=model_from_json(json_string)#,custom_objects=custom_objects)
     elif args.load_model_hdf5!=None: 
         #load from the hdf5
-        from keras.models import load_model
+        from tensorflow.keras.models import load_model
         if args.load_model_hdf5.startswith("s3://"):
             model_hdf5=download_s3_file(args.load_model_hdf5)
         else:
