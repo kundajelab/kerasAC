@@ -119,7 +119,7 @@ def load_model_weights(weight_file,model):
         s3_model_weights=weight_file
     import  h5py
     try:
-        model.load_weights(s3_model_weights,by_name=True)
+        model.load_weights(s3_model_weights)#,by_name=True)
     except:
         with h5py.File(s3_model_weights,'r') as file:
             weight_file=file['model_1']

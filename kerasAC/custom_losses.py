@@ -74,13 +74,13 @@ class MultichannelMultinomialNLL(object):
             self.weights = [1]*self.n
         else:
             self.weights = weights
-        print(self.weights, self.n)
+        #print(self.weights, self.n)
 
 
     def __call__(self, true_counts, logits):
         for i in range(self.n):
             loss = multinomial_nll(true_counts[..., i], logits[..., i])
-            print(loss)
+            #print(loss)
             if i == 0:
                 total = self.weights[i]*loss
             else:
@@ -95,14 +95,14 @@ class MultichannelMultinomialMSE(object):
         self.__name__ = "MultichannelMultinomialMSE"
         self.n = n
         self.weights = weights
-        print(self.weights, self.n)
+        #print(self.weights, self.n)
         self.mse = tf.keras.losses.MeanSquaredError()
 
     def __call__(self, true_counts, logits):
         for i in range(self.n):
             #print(true_counts[..., i], logits[..., i])
             loss = self.mse(true_counts[..., i], logits[..., i])
-            print(loss, self.n)
+            #print(loss, self.n)
             if i == 0:
                 total = self.weights[i]*loss
             else:

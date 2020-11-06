@@ -164,9 +164,9 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
         model_output_path_weights_name=model_output_path_string+".weights"
 
     
-    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True)
+    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True,save_weights_only=False)
     try:
-        earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1,restore_best_weights=True)
+        earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1, restore_best_weights=True)
     except:
         #compatibility with keras <  2.2. 
         earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1)
@@ -198,7 +198,7 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     architecture_string=model.to_json()
     with open(model_output_path_arch_name,'w') as outf:
         outf.write(architecture_string)
-    print('saved model architecture') 
+    print('saved model architecture')
     #sync to s3 if needed
     if args.model_prefix.startswith('s3://'):
         #sync log, model hdf5, weight file, arch file
