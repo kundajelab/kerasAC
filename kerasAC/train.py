@@ -16,8 +16,8 @@ from .get_model import *
 from .splits import * 
 from . import config
 import pdb
-from keras.callbacks import *
-from keras.utils import multi_gpu_model
+from tensorflow.keras.callbacks import *
+from tensorflow.keras.utils import multi_gpu_model
 import gc
 import multiprocessing
 import pandas as pd
@@ -175,23 +175,23 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.4,patience=args.patience_lr, min_lr=0.00000001)
     cur_callbacks=[checkpointer,earlystopper,csvlogger,reduce_lr,history]
     if args.tensorboard==True:
-        from keras.callbacks import TensorBoard
+        from tensorflow.keras.callbacks import TensorBoard
         cur_logdir='/'.join([args.tensorboard_logdir,model_output_path_string.split('/')[-1]+'.tb'])
         if not os.path.exists(cur_logdir):
                 os.makedirs(cur_logdir)
         tensorboard_visualizer=TensorBoard(log_dir=cur_logdir, histogram_freq=0, batch_size=500, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         cur_callbacks.append(tensorboard_visualizer)
-    model.fit_generator(train_gen,
-                        validation_data=valid_gen,
-                        steps_per_epoch=args.num_train/args.batch_size,
-                        validation_steps=args.num_valid/args.batch_size,
-                        epochs=args.epochs,
-                        verbose=1,
-                        use_multiprocessing=args.use_multiprocessing,
-                        workers=args.threads,
-                        max_queue_size=args.max_queue_size,
-                        callbacks=cur_callbacks,
-                        shuffle=True)
+    model.fit(train_gen,
+              validation_data=valid_gen,
+              steps_per_epoch=args.num_train/args.batch_size,
+              validation_steps=args.num_valid/args.batch_size,
+              epochs=args.epochs,
+              verbose=1,
+              use_multiprocessing=args.use_multiprocessing,
+              workers=args.threads,
+              max_queue_size=args.max_queue_size,
+              callbacks=cur_callbacks,
+              shuffle=True)
     print('fit_generator complete') 
     model.save_weights(model_output_path_weights_name)
     print('weights saved') 

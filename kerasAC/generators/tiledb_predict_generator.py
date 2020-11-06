@@ -1,5 +1,5 @@
 #predictions from tiledb
-from keras.utils import Sequence
+from tensorflow.keras.utils import Sequence
 import pandas as pd
 import numpy as np
 import random
