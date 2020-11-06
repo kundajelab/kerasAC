@@ -4,7 +4,7 @@ config = {
     'include_package_data': True,
     'description': 'keras Accessibility Models (kerasAC)',
     'download_url': 'https://github.com/kundajelab/kerasAC',
-    'version': '2.5.1',
+    'version': '2.5.2',
     'packages': ['kerasAC'],
     'setup_requires': [],
     'install_requires': ['tensorflow-gpu>=2.3','pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.4', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3'],
