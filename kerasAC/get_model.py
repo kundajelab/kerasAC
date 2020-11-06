@@ -45,7 +45,7 @@ def get_w1_w0_prediction(args):
     return w1,w0
 
 def get_model(args):
-    from tensorflow.keras.utils.generic_utils import get_custom_objects
+    from tensorflow.keras.utils import get_custom_objects
     custom_objects={"recall":recall,
                     "sensitivity":recall,
                     "specificity":specificity,
