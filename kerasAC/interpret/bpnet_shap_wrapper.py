@@ -154,7 +154,7 @@ def main():
         model_wrapper_for_counts=([model.input[0],model.input[2]],model.outputs[1][:,args.task_index:args.task_index+1])
     else:
         create_background_counts=create_background_atac 
-        model_wrapper_for_counts=(model.input, model.outputs[1][:,task_index:task_index+1])    
+        model_wrapper_for_counts=(model.input, model.outputs[1][:,args.task_index:args.task_index+1])    
     count_explainer=shap.DeepExplainer(model_wrapper_for_counts,data=create_background_counts,combine_mult_and_diffref=combine_mult_and_diffref_1d)
     print("got count explainer") 
     prof_explainer = create_explainer(model,ischip=args.chipseq,task_index=args.task_index)
