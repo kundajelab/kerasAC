@@ -244,8 +244,12 @@ class TiledbGenerator(Sequence):
                     pos=random.randint(start,end) 
                     tdb_index=self.chrom_to_indices[chrom][0]+pos
                     self.coord.append([chrom,pos])
-                    self.tdb_indices.append(tdb_index)                 
-                    
+                    self.tdb_indices.append(tdb_index)
+        #shuffle the jittered bed regions, preserving correspondence of self.tdb_indices & self.coord
+        temp = list(zip(self.coord, self.tdb_indices)) 
+        random.shuffle(temp) 
+        self.coord, self.tdb_indices = zip(*temp)
+        
     def get_chrom_index_ranges(self,chroms_to_use):
         '''
         find tdb indices corresponding to the used chromosomes 
