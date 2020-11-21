@@ -360,13 +360,13 @@ class TiledbGenerator(Sequence):
     def __len__(self):
         #we have an explict set of regions
         if self.bed_regions is not None:
-            return int(floor(self.bed_regions.shape[0]/self.batch_size))
+            return int(ceil(len(self.tdb_indices)/self.batch_size))
         #we are only training on peak regions
         elif (self.upsample_ratio is not None) and (self.upsample_ratio==1):
-            return int(floor(self.upsampled_indices_len/self.upsampled_batch_size))
+            return int(ceil(self.upsampled_indices_len/self.upsampled_batch_size))
         else:
         #training on peak and non-peak regions 
-            return int(floor(self.num_indices/self.batch_size))
+            return int(ceil(self.num_indices/self.batch_size))
     
 
     def __getitem__(self,idx):

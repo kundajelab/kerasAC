@@ -132,7 +132,7 @@ class TiledbPredictGenerator(TiledbGenerator):
     def __len__(self):
         #we have an explict set of regions
         if self.bed_regions is not None:
-            return int(ceil(self.bed_regions.shape[0]/self.batch_size))
+            return int(ceil(len(self.tdb_indices)/self.batch_size))
         elif len(self.upsampled_indices) is 0: 
             return int(ceil(self.num_indices/(self.batch_size*self.tiledb_stride)))
         else:
