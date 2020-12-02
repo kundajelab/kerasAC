@@ -48,7 +48,9 @@ class SNPGenerator(Sequence):
         gc=[]
         rsids=[]
         for index,entry in cur_entries.iterrows():
-            cur_chrom=entry[self.chrom_col]
+            cur_chrom=str(entry[self.chrom_col])
+            if cur_chrom.startswith('chr')==False:
+                cur_chrom='chr'+cur_chrom
             cur_pos=entry[self.pos_col]
             left_flank_start=max([0,cur_pos-self.flank_size])
             left_flank_end=cur_pos

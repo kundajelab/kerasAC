@@ -191,7 +191,7 @@ def combine_mult_and_diffref_atac(mult, orig_inp, bg_data):
     return [input_seq_hyp_scores]
 
 
-def create_explainer(model, ischip, task_index=None,bg_size=10):
+def create_explainer(model, ischip, task_index=None,bg_size=10,session=None):
     """
     Given a trained Keras model, creates a Shap DeepExplainer that returns
     hypothetical scores for the input sequence.
@@ -242,7 +242,8 @@ def create_explainer(model, ischip, task_index=None,bg_size=10):
     explainer = shap.DeepExplainer(
         model=(model_input, prof_sum),
         data=create_background,
-        combine_mult_and_diffref=combine_mult_and_diffref
+        combine_mult_and_diffref=combine_mult_and_diffref,
+        session=session
     )
 
     def explain_fn(input_seqs,control_profile):
