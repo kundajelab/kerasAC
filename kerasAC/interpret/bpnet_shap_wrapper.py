@@ -118,16 +118,10 @@ def get_interpretations(gen, model, count_explainer, prof_explainer,task_index,c
             control_profile=None
             count_explanations=count_explainer.shap_values(X)[0]
         profile_explanations=prof_explainer(seq_input, control_profile)
-        #print(str(len(profile_explanations)))
-        #print(str(profile_explanations[0].shape))
-        #print(str(profile_explanations[1].shape))
-        #print(str(len(count_explanations)))
-        #print(str(count_explanations[0].shape))
-        #print(str(count_explanations[1].shape))
 
         #get explanations relative to input sequence, the bias track is in index 1
-        profile_explanations=profile_explanations[0]
-        count_explanations=count_explanations[0]        
+        profile_explanations=profile_explanations
+        count_explanations=count_explanations       
         #store outputs in dictionary 
         for coord_index in range(len(coords)): 
             cur_coord=coords[coord_index][0:2]
@@ -139,7 +133,7 @@ def get_interpretations(gen, model, count_explainer, prof_explainer,task_index,c
             pred_count_dict[cur_coord]=pred_sum[coord_index]
             profile_shap_dict[cur_coord]=profile_explanations[coord_index,:]
             count_shap_dict[cur_coord]=count_explanations[coord_index,:]
-            seq_dict[cur_coord]=X[0][coord_index]    
+            seq_dict[cur_coord]=X[0][coord_index]
     return label_prof_dict, label_count_dict,pred_prof_dict,pred_count_dict, profile_shap_dict, count_shap_dict, seq_dict
 
 def main():
