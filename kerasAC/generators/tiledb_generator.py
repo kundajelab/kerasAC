@@ -237,6 +237,17 @@ class TiledbGenerator(Sequence):
                 tdb_index=self.chrom_to_indices[chrom][0]+pos
                 self.coord.append([chrom,pos])
                 self.tdb_indices.append(tdb_index)                 
+            elif self.bed_regions_center == "edges":
+                ## this mode is introuduced to test at edges on CHIP-seq
+                ## assuming the same outputlength in  multi task output
+                pos=start+row[9]-self.tdb_output_flank[0]
+                tdb_index=self.chrom_to_indices[chrom][0]+pos
+                self.coord.append([chrom,pos])
+                self.tdb_indices.append(tdb_index)                 
+                pos=start+row[9]+self.tdb_output_flank[0]
+                tdb_index=self.chrom_to_indices[chrom][0]+pos
+                self.coord.append([chrom,pos])
+                self.tdb_indices.append(tdb_index)                 
             else:
                 assert self.bed_regions_center =="random"
                 #select n=bed_regions_jitter bases from each peak to center the training/validation interval
@@ -247,7 +258,8 @@ class TiledbGenerator(Sequence):
                     self.tdb_indices.append(tdb_index)
         #shuffle the jittered bed regions, preserving correspondence of self.tdb_indices & self.coord
         temp = list(zip(self.coord, self.tdb_indices)) 
-        random.shuffle(temp) 
+        if self.shuffle_epoch_start==True:
+            random.shuffle(temp) 
         self.coord, self.tdb_indices = zip(*temp)
         
     def get_chrom_index_ranges(self,chroms_to_use):
