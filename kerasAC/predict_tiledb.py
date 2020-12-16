@@ -240,6 +240,8 @@ def get_tiledb_predict_generator(args):
         predict_chroms=args.predict_chroms
     else:
         predict_chroms=get_chroms(args,split='test')
+    bed_regions=pd.read_csv(args.bed_regions,header=None,sep='\t')
+    bed_regions_test=get_bed_regions_for_fold_split(bed_regions,args.genome,args.fold,'test')
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
                                           tdb_array=args.tdb_array,
@@ -271,7 +273,7 @@ def get_tiledb_predict_generator(args):
                                           tdb_output_datasets=args.tdb_output_datasets,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
-                                          bed_regions=args.bed_regions,
+                                          bed_regions=bed_regions_test,
                                           bed_regions_center=args.bed_regions_center,
                                           add_revcomp=args.revcomp)
     print("created TiledbPredictGenerator")    
