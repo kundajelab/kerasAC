@@ -51,9 +51,9 @@ def getModelGivenModelOptionsAndWeightInits(args):
     if 'profile_kernel_size' in model_params:
         profile_kernel_size=int(model_params['profile_kernel_size'])
     if 'counts_loss_weight' in model_params:
-        counts_loss_weight=float(model_params['counts_loss_weight'])
+        counts_loss_weights=[float(i) for i in model_params['counts_loss_weight'].strip().split(",")]
     if 'profile_loss_weight' in model_params:
-        profile_loss_weight=float(model_params['profile_loss_weight'])
+        profile_loss_weights=[float(i) for i in model_params['profile_loss_weight'].strip().split(",")]
 
     print("params:")
     print("filters:"+str(filters))
@@ -164,8 +164,10 @@ def getModelGivenModelOptionsAndWeightInits(args):
                          outputs=[profile_out, count_out])
     print("got model") 
     model.compile(optimizer=Adam(),
-                    loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
-                    loss_weights=[profile_loss_weight,counts_loss_weight])
+                    loss=[MultichannelMultinomialNLL(num_tasks, profile_loss_weights), MultichannelMultinomialMSE(num_tasks, counts_loss_weights)])
+    #model.compile(optimizer=Adam(),
+    #                loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
+    #                loss_weights=[profile_loss_weight,counts_loss_weight])    
     print("compiled model")
     return model 
 
