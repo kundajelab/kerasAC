@@ -91,10 +91,13 @@ class MultichannelMultinomialNLL(object):
         return {"n": self.n, "weights":self.weights}
 
 class MultichannelMultinomialMSE(object):
-    def __init__(self, n, weights):
+    def __init__(self, n, weights=None):
         self.__name__ = "MultichannelMultinomialMSE"
         self.n = n
-        self.weights = weights
+        if weights is None:
+            self.weights = [1]*self.n
+        else:
+            self.weights = weights
         #print(self.weights, self.n)
         self.mse = tf.keras.losses.MeanSquaredError()
 
