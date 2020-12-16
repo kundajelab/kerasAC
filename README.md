@@ -2,7 +2,12 @@
 keras accessibility models for genomic data 
 
 ### See full workflow example here: https://github.com/kundajelab/cardiogenesis
-
+## Quick Links
+-[Dependencies](#dependencies)
+-[Installation](#installation)
+-[Model Inputs](#model-inputs)
+-[Commands](#commands)
+-[Discussion](#discussion)
 
 ## dependencies ## 
 * pysam
@@ -215,3 +220,4 @@ CUDA_VISIBLE_DEVICES=3 kerasAC_bpnet_shap_wrapper \
 
 
 
+## Discussion
