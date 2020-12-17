@@ -9,7 +9,8 @@ keras accessibility models for genomic data
 - [Commands](#commands)
 - [Discussion](#discussion)
 
-## dependencies ## 
+## Dependencies ## 
+
 * pysam
 * tiledb>=0.5.2
 * psutil
@@ -221,3 +222,9 @@ CUDA_VISIBLE_DEVICES=3 kerasAC_bpnet_shap_wrapper \
 
 
 ## Discussion
+
+#### Understanding data generators in kerasAC
+
+kerasAC allows you to load the profile data using the following two settings, here is a brief descrption of the settings and the dataset distribution generated
+
+- 
