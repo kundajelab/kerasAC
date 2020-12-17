@@ -227,7 +227,7 @@ CUDA_VISIBLE_DEVICES=3 kerasAC_bpnet_shap_wrapper \
 
 kerasAC allows you to load the training profile data using the following two settings, here is a brief description of the settings and the dataset distribution generated
 
-- Setting 1 - Training on the full genome, with some degree of upsampling of positive regions. Example script - `https://github.com/kundajelab/kerasAC/blob/master/examples/tiledb_train_examples/train.sh`. Here tha arguments provided are as follows -
+- Setting 1 - Training on the full genome, with some degree of upsampling of positive regions. Example script - https://github.com/kundajelab/kerasAC/blob/master/examples/tiledb_train_examples/train.sh . Here the arguments provided are as follows -
 
 ```
 --tdb_partition_attribute_for_upsample overlap_peak 
@@ -238,7 +238,7 @@ kerasAC allows you to load the training profile data using the following two set
 
 This means that the code finds all genomic coordinates where idr_peak>=1 (i.e. there is a peak covering that position).  When generating a batch of data for training, 80% of the batch will be sampled from this list of positive regions, and 20% will be sampled at random from the genome. Typically for BPNET, we train only on peaks, so we have been using --upsample_ratio_list_train 1, --upsample_ratio_list_eval 1 : this means the code just finds all bases where there is a peak present and shuffles them to serve as a pool of indices for batch creation. For example, consider we have three peaks in our dataset with corresponding widths as mentioned as follows - Peak 1 : 100 bases width, Peak 2: 200 bases width and Peak 3: 300 bases width. Using this setting we first generate 100+200+300 candidate regions and then sample 80% of data points from these candidate regions.
 
-- Setting 2 - Training on bed regions. Example script - `https://github.com/kundajelab/chrombpnet/blob/master/k562_dnase/bpnet/joint_tier1_train/train.sh`. Here the arguments provided are as follows -
+- Setting 2 - Training on bed regions. Example script - https://github.com/kundajelab/chrombpnet/blob/master/k562_dnase/bpnet/joint_tier1_train/train.sh . Here the arguments provided are as follows -
 
 ```
 --bed_regions /srv/scratch/annashch/deeplearning/profile/joint_peak_set/dnase/dnase.tier1.overlap.merged.bed 
@@ -247,7 +247,7 @@ This means that the code finds all genomic coordinates where idr_peak>=1 (i.e. t
 
 ```
 
-This setting overrides setting 1 whenever used. In this workflow, the peak indices will be used to train from the bed regions file. In addition to the provided peak indices, the code will add some amount of additional regions for jittering, based on the `--bed_regions_jitter parameter`. Consider the same example as above read in from the bed file provided - Peak 1 : 100 bases width, Peak 2: 200 bases width and Peak 3: 300 bases width. Here we sample 5 regions at random from each peak widtth generating 15 data points. In this case all these points will be used for training. Refer to the kerasAC/train.py` file for other avialble setting of `bed_regions_center`.
+This setting overrides setting 1 whenever used. In this workflow, the peak indices will be used to train from the bed regions file. In addition to the provided peak indices, the code will add some amount of additional regions for jittering, based on the `--bed_regions_jitter parameter`. Consider the same example as above read in from the bed file provided - Peak 1 : 100 bases width, Peak 2: 200 bases width and Peak 3: 300 bases width. Here we sample 5 regions at random from each peak widtth generating 15 data points. In this case all these points will be used for training. Refer to the `kerasAC/train.py` file for other available options for `bed_regions_center`.
 
 
 NOTE: If you are testing data distribution is only summit centered regions then Setting 1 will create a dataset bias where longer profiles will dominate the dataset.
