@@ -56,7 +56,8 @@ def get_model(args):
                     "ambig_binary_crossentropy":ambig_binary_crossentropy,
                     "ambig_mean_absolute_error":ambig_mean_absolute_error,
                     "ambig_mean_squared_error":ambig_mean_squared_error,
-                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL}        
+                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL,        
+                    "MultichannelMultinomialMSE":MultichannelMultinomialMSE}        
     w1,w0=get_w1_w0_prediction(args)
     if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)

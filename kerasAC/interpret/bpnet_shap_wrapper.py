@@ -120,8 +120,8 @@ def get_interpretations(gen, model, count_explainer, prof_explainer,task_index,c
         profile_explanations=prof_explainer(seq_input, control_profile)
 
         #get explanations relative to input sequence, the bias track is in index 1
-        profile_explanations=profile_explanations
-        count_explanations=count_explanations       
+        profile_explanations=profile_explanations[task_index]
+        count_explanations=count_explanations[task_index]       
         #store outputs in dictionary 
         for coord_index in range(len(coords)): 
             cur_coord=coords[coord_index][0:2]
