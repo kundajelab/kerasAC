@@ -189,6 +189,22 @@ class TiledbGenerator(Sequence):
         else:
             self.bed_regions=None 
             self.coord=None
+            if (upsample_ratio is not None) and (upsample_ratio > 0):
+                assert type(upsample_ratio)==float
+            self.upsample_ratio=upsample_ratio
+            if (self.upsample_ratio is not None) and (upsample_ratio >0):
+                #get indices for dataset used for upsamples
+                self.partition_thresh_dataset_indices=list(set(itertools.chain.from_iterable(self.get_dataset_indices(tdb_partition_datasets_for_upsample))))
+                print("identified upsampling dataset indices:"+str(self.partition_thresh_dataset_indices))
+                self.get_upsampled_indices()
+                self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
+            else:
+                self.upsampled_batch_size=0
+                self.upsampled_indices_len=0
+                self.upsampled_indices=[]
+            
+            self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
+
             
         #identify min/max values
         self.tdb_input_min=transform_data_type_min(tdb_input_min,self.num_inputs)
@@ -200,21 +216,7 @@ class TiledbGenerator(Sequence):
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
         self.tdb_partition_datasets_for_upsample=tdb_partition_datasets_for_upsample,
-        if (upsample_ratio is not None) and (upsample_ratio > 0):
-            assert type(upsample_ratio)==float
-        self.upsample_ratio=upsample_ratio
-        if (self.upsample_ratio is not None) and (upsample_ratio >0):
-            #get indices for dataset used for upsamples
-            self.partition_thresh_dataset_indices=list(set(itertools.chain.from_iterable(self.get_dataset_indices(tdb_partition_datasets_for_upsample))))
-            print("identified upsampling dataset indices:"+str(self.partition_thresh_dataset_indices))
-            self.get_upsampled_indices()
-            self.upsampled_batch_size=math.ceil(self.upsample_ratio*self.batch_size)
-        else:
-            self.upsampled_batch_size=0
-            self.upsampled_indices_len=0
-            self.upsampled_indices=[]
-            
-        self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
+
         self.pseudocount=pseudocount
         self.return_coords=return_coords
         print('created generator')
@@ -633,6 +635,12 @@ class TiledbGenerator(Sequence):
     
     def on_epoch_end(self):
         if self.shuffle_epoch_end==True:
-            print("WARNING: SHUFFLING ON EPOCH END MAYBE SLOW:"+str(self.upsampled_indices.shape))
-            self.upsampled_indices=self.upsampled_indices.sample(frac=1)
+            if self.bed_regions is not None:
+                temp = list(zip(self.coord, self.tdb_indices))
+                random.shuffle(temp)
+                self.coord, self.tdb_indices = zip(*temp)
+            else:
+                #print("WARNING: SHUFFLING ON EPOCH END MAYBE SLOW:"+str(self.upsampled_indices.shape))
+                #self.upsampled_indices=self.upsampled_indices.sample(frac=1)
+                np.random.shuffle(self.upsampled_indices)
 
