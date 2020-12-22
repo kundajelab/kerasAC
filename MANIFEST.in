@@ -1,2 +1,3 @@
 recursive-include scripts *
+include requirements.txt
 

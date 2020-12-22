@@ -1,0 +1,13 @@
+tensorflow-gpu>=2.3
+pysam
+tiledb>=0.5.2
+psutil
+tables
+numpy>=1.9
+keras>=2.4
+h5py
+pandas
+pybigwig
+deeplift
+abstention
+boto3
