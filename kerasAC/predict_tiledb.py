@@ -240,11 +240,6 @@ def get_tiledb_predict_generator(args):
         predict_chroms=args.predict_chroms
     else:
         predict_chroms=get_chroms(args,split='test')
-    if args.bed_regions is not None:
-        bed_regions=pd.read_csv(args.bed_regions,header=None,sep='\t')
-        bed_regions_test=get_bed_regions_for_fold_split(bed_regions,args.genome,args.fold,'test')
-    else:
-        bed_regions_test=args.bed_regions
     test_generator=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
                                           batch_size=args.batch_size,
                                           tdb_array=args.tdb_array,
