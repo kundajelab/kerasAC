@@ -173,6 +173,19 @@ class TiledbGenerator(Sequence):
         self.tdb_output_flank=[[int(j) for j in  i.split(',')] for i in tdb_output_flank]
         self.tdb_output_aggregation=[[str(j) for j in  i.split(',')] for i in tdb_output_aggregation]
         self.tdb_output_transformation=[[str(j) for j in  i.split(',')] for i in tdb_output_transformation]
+
+
+        #identify min/max values
+        self.tdb_input_min=transform_data_type_min(tdb_input_min,self.num_inputs)
+        self.tdb_input_max=transform_data_type_max(tdb_input_max,self.num_inputs)
+        self.tdb_output_min=transform_data_type_min(tdb_output_min,self.num_outputs)
+        self.tdb_output_max=transform_data_type_max(tdb_output_max,self.num_outputs)
+                
+        #identify upsampled genome indices for model training
+        self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
+        self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
+        self.tdb_partition_datasets_for_upsample=tdb_partition_datasets_for_upsample,
+
     
         #handle the option of training/predicting on pre-specified bed regions
         if bed_regions is not None:
@@ -205,20 +218,9 @@ class TiledbGenerator(Sequence):
             
             self.non_upsampled_batch_size=self.batch_size-self.upsampled_batch_size        
 
-            
-        #identify min/max values
-        self.tdb_input_min=transform_data_type_min(tdb_input_min,self.num_inputs)
-        self.tdb_input_max=transform_data_type_max(tdb_input_max,self.num_inputs)
-        self.tdb_output_min=transform_data_type_min(tdb_output_min,self.num_outputs)
-        self.tdb_output_max=transform_data_type_max(tdb_output_max,self.num_outputs)
-                
-        #identify upsampled genome indices for model training
-        self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
-        self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
-        self.tdb_partition_datasets_for_upsample=tdb_partition_datasets_for_upsample,
-
         self.pseudocount=pseudocount
         self.return_coords=return_coords
+            
         print('created generator')
         
     def map_regions_to_tdb_index(self):
