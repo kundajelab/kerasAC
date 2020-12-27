@@ -193,7 +193,7 @@ class TiledbGenerator(Sequence):
                 self.bed_regions=pd.read_csv(bed_regions,header=None,sep='\t')
             else:
                 self.bed_regions=bed_regions
-            self.bed_regions=self.bed_regions[self.bed_regions[0].isin(self.chroms_to_use)
+            self.bed_regions=self.bed_regions[self.bed_regions[0].isin(self.chroms_to_use)]
             self.bed_regions_center=bed_regions_center
             if self.bed_regions_center=="random":
                 self.bed_regions_jitter=bed_regions_jitter
