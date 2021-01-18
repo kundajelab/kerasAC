@@ -45,10 +45,10 @@ def get_ism_scrambled_region(model,seq,prof_pred,count_pred,mask_size=5):
    
     seq_onehot=np.squeeze(one_hot_encode([seq]))
     ism_count_track=np.expand_dims(placeholder_count_normed,axis=1)*seq_onehot
-    return np.squeeze(ism_count_track).flatten(), np.squeeze(placeholder_prof_normed).flatten() 
+    return np.squeeze(ism_count_track), np.squeeze(placeholder_prof_normed)
 
 
-def get_ism_single_bp_sub(model,seq,prof_pred,count_pred): 
+def get_ism_single_bp(model,seq,prof_pred,count_pred): 
     #expand default preds to match dimensions for ISM 
     default_prof_expanded=np.zeros((len(seq),1000,4))
     default_count_expanded=np.zeros((len(seq),4))
@@ -86,7 +86,7 @@ def get_ism_single_bp_sub(model,seq,prof_pred,count_pred):
     #observed base heatmap
     ism_mat_observed=np.sum(np.expand_dims(np.squeeze(seq_onehot),axis=1)*placeholder_prof_normed,axis=2)
     
-    return  np.squeeze(ism_count_track).flatten(), np.squeeze(ism_mat_observed).flatten()
+    return  np.squeeze(ism_count_track), np.squeeze(ism_mat_observed)
 
 def analyze_background(ref,
             chrom,
