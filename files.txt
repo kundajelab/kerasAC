@@ -1,0 +1,72 @@
+Processing /mnt/lab_data2/kmualim/ChromAtlas_BPNet/experiments/kerasAC
+Requirement already satisfied: tensorflow-gpu>=2.3 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (2.4.1)
+Requirement already satisfied: pysam in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (0.16.0.1)
+Requirement already satisfied: tiledb>=0.5.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (0.8.0)
+Requirement already satisfied: psutil in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (5.8.0)
+Requirement already satisfied: tables in /users/kmualim/.local/lib/python3.6/site-packages (from kerasAC==2.5.4) (3.6.1)
+Requirement already satisfied: numpy>=1.9 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (1.19.5)
+Requirement already satisfied: keras>=2.4 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (2.4.3)
+Requirement already satisfied: h5py in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (2.10.0)
+Requirement already satisfied: pandas in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (1.1.5)
+Requirement already satisfied: pybigwig in /users/kmualim/.local/lib/python3.6/site-packages (from kerasAC==2.5.4) (0.3.17)
+Requirement already satisfied: deeplift in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (0.6.13.0)
+Requirement already satisfied: abstention in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (0.1.3.1)
+Requirement already satisfied: boto3 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from kerasAC==2.5.4) (1.16.63)
+Requirement already satisfied: pyyaml in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from keras>=2.4->kerasAC==2.5.4) (5.4.1)
+Requirement already satisfied: scipy>=0.14 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from keras>=2.4->kerasAC==2.5.4) (1.5.4)
+Requirement already satisfied: wrapt~=1.12.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.12.1)
+Requirement already satisfied: google-pasta~=0.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.2.0)
+Requirement already satisfied: opt-einsum~=3.3.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.3.0)
+Requirement already satisfied: gast==0.3.3 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.3.3)
+Requirement already satisfied: tensorboard~=2.4 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (2.4.1)
+Requirement already satisfied: tensorflow-estimator<2.5.0,>=2.4.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (2.4.0)
+Requirement already satisfied: six~=1.15.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.15.0)
+Requirement already satisfied: keras-preprocessing~=1.1.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.1.2)
+Requirement already satisfied: flatbuffers~=1.12.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.12)
+Requirement already satisfied: termcolor~=1.1.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.1.0)
+Requirement already satisfied: absl-py~=0.10 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.11.0)
+Requirement already satisfied: wheel~=0.35 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.36.2)
+Requirement already satisfied: typing-extensions~=3.7.4 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.7.4.3)
+Requirement already satisfied: grpcio~=1.32.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.32.0)
+Requirement already satisfied: astunparse~=1.6.3 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.6.3)
+Requirement already satisfied: protobuf>=3.9.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.14.0)
+Requirement already satisfied: tensorboard-plugin-wit>=1.6.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.8.0)
+Requirement already satisfied: setuptools>=41.0.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (49.6.0.post20210108)
+Requirement already satisfied: markdown>=2.6.8 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.3.3)
+Requirement already satisfied: google-auth-oauthlib<0.5,>=0.4.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.4.2)
+Requirement already satisfied: requests<3,>=2.21.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (2.25.1)
+Requirement already satisfied: google-auth<2,>=1.6.3 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.24.0)
+Requirement already satisfied: werkzeug>=0.11.15 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.0.1)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.2.8)
+Requirement already satisfied: cachetools<5.0,>=2.0.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (4.2.1)
+Requirement already satisfied: rsa<5,>=3.1.4 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (4.7)
+Requirement already satisfied: requests-oauthlib>=0.7.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from google-auth-oauthlib<0.5,>=0.4.1->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.3.0)
+Requirement already satisfied: importlib-metadata in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from markdown>=2.6.8->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.4.0)
+Requirement already satisfied: pyasn1<0.5.0,>=0.4.6 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from pyasn1-modules>=0.2.1->google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (0.4.8)
+Requirement already satisfied: idna<3,>=2.5 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from requests<3,>=2.21.0->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (2.10)
+Requirement already satisfied: urllib3<1.27,>=1.21.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from requests<3,>=2.21.0->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (1.26.3)
+Requirement already satisfied: certifi>=2017.4.17 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from requests<3,>=2.21.0->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (2020.12.5)
+Requirement already satisfied: chardet<5,>=3.0.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from requests<3,>=2.21.0->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (4.0.0)
+Requirement already satisfied: oauthlib>=3.0.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from requests-oauthlib>=0.7.0->google-auth-oauthlib<0.5,>=0.4.1->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.1.0)
+Requirement already satisfied: scikit-learn>=0.20.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from abstention->kerasAC==2.5.4) (0.24.1)
+Requirement already satisfied: threadpoolctl>=2.0.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from scikit-learn>=0.20.0->abstention->kerasAC==2.5.4) (2.1.0)
+Requirement already satisfied: joblib>=0.11 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from scikit-learn>=0.20.0->abstention->kerasAC==2.5.4) (1.0.0)
+Requirement already satisfied: botocore<1.20.0,>=1.19.63 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from boto3->kerasAC==2.5.4) (1.19.63)
+Requirement already satisfied: s3transfer<0.4.0,>=0.3.0 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from boto3->kerasAC==2.5.4) (0.3.4)
+Requirement already satisfied: jmespath<1.0.0,>=0.7.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from boto3->kerasAC==2.5.4) (0.10.0)
+Requirement already satisfied: python-dateutil<3.0.0,>=2.1 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from botocore<1.20.0,>=1.19.63->boto3->kerasAC==2.5.4) (2.8.1)
+Requirement already satisfied: zipp>=0.5 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from importlib-metadata->markdown>=2.6.8->tensorboard~=2.4->tensorflow-gpu>=2.3->kerasAC==2.5.4) (3.4.0)
+Requirement already satisfied: pytz>=2017.2 in /software/miniconda3/envs/chrom_atlas/lib/python3.6/site-packages (from pandas->kerasAC==2.5.4) (2020.5)
+Requirement already satisfied: numexpr>=2.6.2 in /users/kmualim/.local/lib/python3.6/site-packages (from tables->kerasAC==2.5.4) (2.7.1)
+Building wheels for collected packages: kerasAC
+  Building wheel for kerasAC (setup.py): started
+  Building wheel for kerasAC (setup.py): finished with status 'done'
+  Created wheel for kerasAC: filename=kerasAC-2.5.4-py3-none-any.whl size=34613 sha256=6d1bfd84e4c2fb37c7efee3b6a4fd30917b6b367fe4616171b0beb962f7c26e9
+  Stored in directory: /tmp/pip-ephem-wheel-cache-qumgkbm0/wheels/fe/15/c3/c232e27063b651cf504f64c68bab87be83499de9c834e5d2cd
+Successfully built kerasAC
+Installing collected packages: kerasAC
+  Attempting uninstall: kerasAC
+    Found existing installation: kerasAC 2.5.4
+    Uninstalling kerasAC-2.5.4:
+      Successfully uninstalled kerasAC-2.5.4
+Successfully installed kerasAC-2.5.4

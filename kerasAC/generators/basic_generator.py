@@ -8,7 +8,9 @@ import numpy as np
 import random
 import math
 import pysam
-from ..util import *
+import sys
+sys.path.append("//mnt/lab_data2/kmualim/ChromAtlas_BPNet/experiments/kerasAC/kerasAC/")
+from util import *
 import threading
 import pickle
 import pdb

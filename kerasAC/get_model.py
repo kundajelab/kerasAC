@@ -1,9 +1,9 @@
 import importlib
 import imp
 
-from .s3_sync import *
-from .custom_losses import *
-from .metrics import *
+from s3_sync import *
+from custom_losses import *
+from metrics import *
 
 def get_w1_w0_training(args,train_generator):
     w1=args.w1

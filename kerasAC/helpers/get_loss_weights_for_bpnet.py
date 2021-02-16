@@ -1,5 +1,5 @@
 import tiledb
-from ..tiledb_config import * 
+from tiledb_config import * 
 from multiprocessing import Pool
 import argparse
 import os

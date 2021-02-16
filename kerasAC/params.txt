@@ -1,0 +1,4 @@
+counts_loss_weight	134.4, 134.4
+profile_loss_weight	1, 1
+filters	200
+n_dil_layers	14

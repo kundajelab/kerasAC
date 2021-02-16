@@ -7,17 +7,17 @@ import tempfile
 import argparse
 import numpy as np
 import h5py
-from .s3_sync import *
-from .generators.basic_generator import *
-from .generators.tiledb_generator import *
-from .custom_callbacks import * 
-from .tiledb_config import *
-from .get_model import *
-from .splits import * 
-from . import config
+from s3_sync import *
+from generators.basic_generator import *
+from generators.tiledb_generator import *
+from custom_callbacks import * 
+from tiledb_config import *
+from get_model import *
+from splits import * 
+from config import *
 import pdb
 from tensorflow.keras.callbacks import *
-from tensorflow.keras.utils import multi_gpu_model
+#from tensorflow.keras.utils import multi_gpu_model
 import gc
 import multiprocessing
 import pandas as pd
