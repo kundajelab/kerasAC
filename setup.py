@@ -7,7 +7,7 @@ config = {
     'version': '2.5.4',
     'packages': ['kerasAC'],
     'setup_requires': [],
-    'install_requires': ['tensorflow-gpu>=2.3','pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.4', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3'],
+    'install_requires': ['tensorflow-gpu>=2.4','pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.4', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3', 'six>=0.11', 'tensorflow-probability'],
     'scripts': [],
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict_hdf5=kerasAC.predict_hdf5:main',
