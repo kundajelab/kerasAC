@@ -9,7 +9,6 @@ import random
 import math
 import pysam
 import sys
-from util import *
 import threading
 import pickle
 import pdb
