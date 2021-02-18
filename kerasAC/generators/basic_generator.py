@@ -9,7 +9,6 @@ import random
 import math
 import pysam
 import sys
-sys.path.append("//mnt/lab_data2/kmualim/ChromAtlas_BPNet/experiments/kerasAC/kerasAC/")
 from util import *
 import threading
 import pickle
