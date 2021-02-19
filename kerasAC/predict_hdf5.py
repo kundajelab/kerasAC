@@ -40,7 +40,7 @@ import numpy as np
 import tensorflow.keras as keras 
 from keras.losses import *
 from keras.models import Model
-from keras.utils import multi_gpu_model
+#from keras.utils import multi_gpu_model
 from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random

@@ -17,7 +17,7 @@ from .splits import *
 from . import config
 import pdb
 from tensorflow.keras.callbacks import *
-from tensorflow.keras.utils import multi_gpu_model
+#from tensorflow.keras.utils import multi_gpu_model
 import gc
 import multiprocessing
 import pandas as pd
