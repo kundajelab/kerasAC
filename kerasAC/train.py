@@ -12,16 +12,15 @@ from .generators.basic_generator import *
 from .generators.tiledb_generator import *
 from .custom_callbacks import * 
 from .tiledb_config import *
-from .get_models import *
+from .get_model import *
 from .splits import * 
-from . import *
+from . import config
 import pdb
 from tensorflow.keras.callbacks import *
 #from tensorflow.keras.utils import multi_gpu_model
 import gc
 import multiprocessing
 import pandas as pd
-
 #multiprocessing.set_start_method('forkserver', force=True)
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -425,7 +424,6 @@ def train(args):
     run_cleanup()
     
 def main():
-    print("num gpus available: ", len(tf.config.experimental.list_physical_devices('gpu'))) 
     gc.freeze()
     args=parse_args()
     train(args)

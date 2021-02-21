@@ -11,14 +11,12 @@ import threading
 from random import shuffle 
 import math
 from math import ceil, floor
-import pysam, sys
-sys.path.append("//mnt/lab_data2/kmualim/ChromAtlas_BPNet/experiments/kerasAC/kerasAC/")
-from util import *
-sys.path.append("/mnt/lab_data2/kmualim/ChromAtlas_BPNet/experiments/kerasAC/kerasAC/helpers")
-from tiledb_config import * 
+import pysam
+from ..util import *
+from ..tiledb_config import * 
 import tiledb
 import pdb
-from s3_sync import * 
+from ..s3_sync import * 
 from collections import OrderedDict
 import gc
 import pdb             
