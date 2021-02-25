@@ -40,7 +40,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
     profile_kernel_size=75
     counts_loss_weight=1
     profile_loss_weight=1
-    
+    learning_rate=0.001
+
     model_params=get_model_param_dict(args.model_params)
     if 'filters' in model_params:
         filters=int(model_params['filters'])
@@ -56,6 +57,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
         profile_loss_weights=[float(i) for i in model_params['profile_loss_weight'].strip().split(",")]
     if 'learning_rate' in model_params:
         learning_rate = float(model_params['learning_rate'])
+    
     print("params:")
     print("filters:"+str(filters))
     print("n_dil_layers:"+str(n_dil_layers))
