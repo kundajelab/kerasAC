@@ -107,7 +107,8 @@ def parse_args():
     arch_params.add_argument("--num_tasks",type=int)
     arch_params.add_argument("--datasets",nargs="*",default=None,help="list of tasks to train on, by name")
     arch_params.add_argument("--dataset_indices",nargs="*",default=None,help="list of tasks to train on, by index of their position in tdb matrix")
-    
+    arch_params.add_argument("--learning_rate", default=0.001, help="Learning rate for optimizer")
+
     batch_params=parser.add_argument_group("batch_params")
     batch_params.add_argument("--batch_size",type=int,default=1000)
     batch_params.add_argument("--revcomp",action="store_true")

@@ -62,6 +62,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("profile_kernel_size:"+str(profile_kernel_size))
     print("counts_loss_weight:"+str(counts_loss_weight))
     print("profile_loss_weight:"+str(profile_loss_weight))
+    print("learning_rate:"+str(args.learning_rate))
     
     #read in arguments
     seed=args.seed
@@ -163,7 +164,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     model = Model(inputs=[inp,  bias_profile_input, bias_counts_input],
                          outputs=[profile_out, count_out])
     print("got model") 
-    model.compile(optimizer=Adam(),
+    model.compile(optimizer=Adam(learning_rate=args.learning_rate),
                     loss=[MultichannelMultinomialNLL(num_tasks, profile_loss_weights), MultichannelMultinomialMSE(num_tasks, counts_loss_weights)])
     #model.compile(optimizer=Adam(),
     #                loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
