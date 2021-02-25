@@ -54,7 +54,8 @@ def getModelGivenModelOptionsAndWeightInits(args):
         counts_loss_weights=[float(i) for i in model_params['counts_loss_weight'].strip().split(",")]
     if 'profile_loss_weight' in model_params:
         profile_loss_weights=[float(i) for i in model_params['profile_loss_weight'].strip().split(",")]
-
+    if 'learning_rate' in model_params:
+        learning_rate = float(model_params['learning_rate'])
     print("params:")
     print("filters:"+str(filters))
     print("n_dil_layers:"+str(n_dil_layers))
@@ -62,7 +63,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     print("profile_kernel_size:"+str(profile_kernel_size))
     print("counts_loss_weight:"+str(counts_loss_weight))
     print("profile_loss_weight:"+str(profile_loss_weight))
-    print("learning_rate:"+str(args.learning_rate))
+    print("learning_rate:"+str(learning_rate))
     
     #read in arguments
     seed=args.seed
@@ -164,7 +165,7 @@ def getModelGivenModelOptionsAndWeightInits(args):
     model = Model(inputs=[inp,  bias_profile_input, bias_counts_input],
                          outputs=[profile_out, count_out])
     print("got model") 
-    model.compile(optimizer=Adam(learning_rate=args.learning_rate),
+    model.compile(optimizer=Adam(learning_rate=learning_rate),
                     loss=[MultichannelMultinomialNLL(num_tasks, profile_loss_weights), MultichannelMultinomialMSE(num_tasks, counts_loss_weights)])
     #model.compile(optimizer=Adam(),
     #                loss=[MultichannelMultinomialNLL(num_tasks),'mse'],
@@ -182,6 +183,7 @@ if __name__=="__main__":
     parser.add_argument("--tdb_output_flank",nargs="+",default=['500'])
     parser.add_argument("--num_tasks",type=int,default=2)
     parser.add_argument("--model_params",default=None)
+    parser.add_argument("--learning_rate", default=0.001)
     args=parser.parse_args()
     model=getModelGivenModelOptionsAndWeightInits(args)
     print(model.summary())
