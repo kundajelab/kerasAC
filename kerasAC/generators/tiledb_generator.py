@@ -12,11 +12,11 @@ from random import shuffle
 import math
 from math import ceil, floor
 import pysam
-from ..util import *
-from ..tiledb_config import * 
+from util import *
+from tiledb_config import * 
 import tiledb
 import pdb
-from ..s3_sync import * 
+from s3_sync import * 
 from collections import OrderedDict
 import gc
 import pdb             
@@ -97,15 +97,19 @@ class TiledbGenerator(Sequence):
                  num_threads=1,
                  bed_regions=None,
                  bed_regions_center=None,
-                 bed_regions_jitter=1):
+                 bed_regions_jitter=1,
+                 num_max=119667750):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
         tdb_partition_thresh_for_upsample -- threshold for determinining samples to upsample (generally 1) 
         tdb_input_aggregation/ tdb_output_aggregation -- one of 'average','max','binary_max','sum',None
         '''
+        # setting num_max here to the max of chromosomes 
+        # TODO: need to set num_max as an option instead of setting a default there 
         self.num_threads=num_threads
         self.shuffle_epoch_start=shuffle_epoch_start
         self.shuffle_epoch_end=shuffle_epoch_end
+        self.num_max=num_max
 
         #get local copy of s3 reference sequence
         if ref_fasta.startswith('s3://'):
@@ -405,6 +409,8 @@ class TiledbGenerator(Sequence):
             cur_x=None
             #iterate through the stacked channels of the current input
             for cur_input_channel_index in range(len(cur_input)):
+                tdb_batch_indices = [i for i in tdb_batch_indices if (i-self.tdb_input_flank[cur_input_index][cur_input_channel_index]) >= 0]
+                tdb_batch_indices = [i for i in tdb_batch_indices if (i+self.tdb_input_flank[cur_input_index][cur_input_channel_index])+1 <= self.num_max]
                 cur_input_channel=cur_input[cur_input_channel_index]
                 if cur_input_channel=="seq":                
                     #get the one-hot encoded sequence
@@ -436,6 +442,8 @@ class TiledbGenerator(Sequence):
             cur_y=None
             cur_output=self.tdb_output_source_attribute[cur_output_index]
             for cur_output_channel_index in range(len(cur_output)):
+                tdb_batch_indices = [i for i in tdb_batch_indices if (i-self.tdb_input_flank[cur_input_index][cur_input_channel_index]) >= 0]
+                tdb_batch_indices = [i for i in tdb_batch_indices if (i+self.tdb_input_flank[cur_input_index][cur_input_channel_index])+1 <= self.num_max]
                 cur_output_channel=cur_output[cur_output_channel_index]
                 if cur_output_channel=="seq":
                     #get the one-hot encoded sequence

@@ -102,7 +102,19 @@ splits['mm9']=mm10_splits
 chroms['mm10']=mm10_splits
 chroms['mm9']=mm10_splits
 
-
+tair10=['chr1','chr2','chr3','chr4','chr5', 'chloroplast', 'mitochondria']
+tair10_splits = {}
+tair10_splits[1] = {'test':['chr2'],
+                    'valid':['chr1'],
+                    'train':['chr3','chr4','chr5','chloroplast', 'mitochondria']}
+tair10_splits[2] = {'test':['chr3'],
+                    'valid':['chr2'],
+                    'train':['chr1','chr4','chr5','chloroplast', 'mitochondria']}
+tair10_splits[5] = {'test':['chr4'],
+                    'valid':['chr5'],
+                    'train':['chr1','chr2','chr3','chloroplast', 'mitochondria']}
+splits['tair10']=tair10_splits
+chroms['tair10']=tair10
 def get_chroms(args,split):
     if split=="train":
         if args.train_chroms is not None:
