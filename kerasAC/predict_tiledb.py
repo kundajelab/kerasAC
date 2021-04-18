@@ -271,7 +271,7 @@ def get_tiledb_predict_generator(args):
                                           tdb_output_datasets=args.tdb_output_datasets,
                                           tdb_config=tdb_config,
                                           tdb_ctx=tdb_ctx,
-                                          bed_regions=bed_regions_test,
+                                          bed_regions=args.bed_regions,
                                           bed_regions_center=args.bed_regions_center,
                                           add_revcomp=args.revcomp)
     print("created TiledbPredictGenerator")    
