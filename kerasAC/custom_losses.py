@@ -13,20 +13,20 @@ def get_weighted_binary_crossentropy(w0_weights, w1_weights,ambig_val=np.nan):
         weightsPerTaskRep = y_true*w1_weights[None,:] + (1-y_true)*w0_weights[None,:]
         nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
         nonAmbigTimesWeightsPerTask = tf.boolean_mask(weightsPerTaskRep,nonAmbig)
-        return tf.mean(tf.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig),tf.boolean_mask(y_pred,nonAmbig))*nonAmbigTimesWeightsPerTask, axis=-1);
+        return tf.math.reduce_mean(tf.keras.losses.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig),tf.boolean_mask(y_pred,nonAmbig))*nonAmbigTimesWeightsPerTask);
     return weighted_binary_crossentropy; 
 
 def ambig_binary_crossentropy(y_true,y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return tf.mean(tf.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)), axis=-1);
+    return tf.math.reduce_mean(tf.keras.losses.binary_crossentropy(tf.boolean_mask(y_true,nonAmbig), tf.boolean_mask(y_pred,nonAmbig)));
 
 def ambig_mean_squared_error(y_true, y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return tf.mean(tf.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
+    return tf.math.reduce_mean(tf.math.square(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)))
 
 def ambig_mean_absolute_error(y_true, y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
-    return tf.mean(tf.abs(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)), axis=-1)
+    return tf.math.reduce_mean(tf.abs(tf.boolean_mask(y_pred,nonAmbig) - tf.boolean_mask(y_true,nonAmbig)))
 
 def ambig_log_poisson(y_true,y_pred):
     nonAmbig=tf.math.logical_not(tf.math.is_nan(y_true))
@@ -64,6 +64,18 @@ def custom_mse(y_true, y_pred):
     # summing both loss values along batch dimension 
     loss = tf.sum(loss, axis=1)        # (batch_size,)
     return loss
+
+# COUNT LOSS #
+def poisson_nll(true_counts, logits):
+    """Compute the poisson negative log-likelihood
+    Args:
+    true_counts : observed count values 
+    logits: predicted logit values 
+    """
+    counts_per_example = tf.reduce_sum(true_counts, axis=-1)
+    loss = tf.keras.losses.poisson(counts_per_example, logits)
+    return tf.reduce_sum(loss)
+
 
 #from https://github.com/kundajelab/basepair/blob/cda0875571066343cdf90aed031f7c51714d991a/basepair/losses.py#L87
 class MultichannelMultinomialNLL(object):
@@ -115,3 +127,24 @@ class MultichannelMultinomialMSE(object):
     def get_config(self):
         return {"n": self.n, "weights":self.weights}
 
+class MultichannelPoissonNLL(object):
+    def __init__(self, n, weights=None):
+        self.__name__="MultichannelPoissonNLL"
+        self.n = n
+        if weights is None:
+            self.weights = [1]*self.n
+        else:
+            self.weights = weights
+        #self.poisson = tf.keras.losses.Poisson()
+
+    def __call__(self, true_counts, logits):
+        for i in range(self.n):
+            loss = poisson_nll(true_counts[..., i], logits[..., i])
+            if i == 0:
+                total = self.weights[i]*loss
+            else:
+                total += self.weights[i]*loss
+        return total
+    
+    def get_config(self):
+        return {"n": self.n, "weights":self.weights} 
