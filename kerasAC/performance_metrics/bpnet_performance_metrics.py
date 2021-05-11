@@ -41,7 +41,7 @@ def parse_args():
     return parser.parse_args() 
 
 
-def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(4,12),ylim=(4,12)):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(0,10),ylim=(0,10)):
     """
     Scatter plot colored by 2d histogram
     """
@@ -68,8 +68,8 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(4,
     cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    #plt.xlim(xlim)
-    #plt.ylim(ylim)
+    plt.xlim(xlim)
+    plt.ylim(ylim)
     return ax
 
 
@@ -107,7 +107,7 @@ def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
                     preds,
                     xlab='Log Count Labels',
                     ylab='Log Count Predictions')
-    plt.suptitle(str(task_index)+":"+" counts:"+title+" spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3))+", mse="+str(round(mse,3)))
+    plt.suptitle("spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3))+", mse="+str(round(mse,3))+", n="+str(len(preds)))
     plt.legend(loc='best')
     plt.savefig(outf+'.png',format='png',dpi=300)
     
