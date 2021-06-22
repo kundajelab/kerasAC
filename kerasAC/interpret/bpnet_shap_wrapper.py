@@ -54,7 +54,8 @@ def load_model_wrapper(args):
                         "ambig_binary_crossentropy":ambig_binary_crossentropy,
                         "ambig_mean_absolute_error":ambig_mean_absolute_error,
                         "ambig_mean_squared_error":ambig_mean_squared_error,
-                        "MultichannelMultinomialNLL":MultichannelMultinomialNLL}
+                        "MultichannelMultinomialNLL":MultichannelMultinomialNLL,
+                        "MultichannelMultinomialMSE":MultichannelMultinomialMSE}
     get_custom_objects().update(custom_objects)
     model=load_model(args.model_hdf5)
     return model
@@ -144,7 +145,7 @@ def main():
     model=load_model_wrapper(args)
     print("loaded model")    
     if args.chipseq is True:
-        create_background_counts=create_background_counts_chip
+        create_background_counts=create_background_counts_chip_1
         model_wrapper_for_counts=([model.input[0],model.input[2]],model.outputs[1][:,args.task_index:args.task_index+1])
     else:
         create_background_counts=create_background_atac 

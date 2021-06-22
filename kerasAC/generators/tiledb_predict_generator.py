@@ -94,6 +94,9 @@ class TiledbPredictGenerator(TiledbGenerator):
     def precompute_idx_to_tdb_index(self):
         self.idx_to_tdb_index={}
         cur_chrom_index=0
+        print(self.chrom_indices[cur_chrom_index])
+        print(self.tdb_input_flank)
+        print(self.chrom_indices[cur_chrom_index][0],self.tdb_input_flank[0])
         next_coord=self.chrom_indices[cur_chrom_index][0]+self.tdb_input_flank[0] #first tdb coord for chromosome,this is next batch's start coord 
         cur_chrom_end=self.chrom_indices[cur_chrom_index][1]-self.tdb_input_flank[0] #final tdb coordinate for this chromsome
         print("mapping idx to tiledb indices") 

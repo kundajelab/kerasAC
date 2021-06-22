@@ -58,6 +58,27 @@ def multinomial_nll(true_counts, logits):
     return (-tf.reduce_sum(dist.log_prob(true_counts)) / 
             tf.cast(tf.shape(true_counts)[0], dtype=tf.float32))
 
+
+
+def multinomial_nll_masked(true_counts, logits):
+    """Compute the multinomial negative log-likelihood
+    Args:
+      true_counts: observed count values
+      logits: predicted logit values
+    """
+    counts_per_example = tf.reduce_sum(true_counts, axis=-1)
+    mask = counts_per_example >= 4.6
+
+    counts_per_example1 = tf.boolean_mask(counts_per_example,mask)
+    logits1 = tf.boolean_mask(logits,mask,axis=0)
+    true_counts1 = tf.boolean_mask(true_counts,mask,axis=0)
+
+    dist = tfp.distributions.Multinomial(total_count=counts_per_example1,
+                                         logits=logits1)
+    #print(mask)
+    return (-tf.reduce_sum(dist.log_prob(true_counts1)) / 
+            tf.cast(tf.shape(true_counts1)[0], dtype=tf.float32))
+
 def custom_mse(y_true, y_pred):
     # calculating squared difference between target and predicted values 
     loss = tf.square(y_pred - y_true)  # (batch_size, 2)
@@ -80,6 +101,30 @@ class MultichannelMultinomialNLL(object):
     def __call__(self, true_counts, logits):
         for i in range(self.n):
             loss = multinomial_nll(true_counts[..., i], logits[..., i])
+            #print(loss)
+            if i == 0:
+                total = self.weights[i]*loss
+            else:
+                total += self.weights[i]*loss
+        return total
+
+    def get_config(self):
+        return {"n": self.n, "weights":self.weights}
+
+class MultichannelMultinomialMaskedNLL(object):
+    def __init__(self, n, weights=None):
+        self.__name__ = "MultichannelMultinomialMaskedNLL"
+        self.n = n
+        if weights is None:
+            self.weights = [1]*self.n
+        else:
+            self.weights = weights
+        #print(self.weights, self.n)
+
+
+    def __call__(self, true_counts, logits):
+        for i in range(self.n):
+            loss = multinomial_nll_masked(true_counts[..., i], logits[..., i])
             #print(loss)
             if i == 0:
                 total = self.weights[i]*loss

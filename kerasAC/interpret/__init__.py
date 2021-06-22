@@ -18,6 +18,7 @@ from ..custom_losses import *
 from ..config import args_object_from_args_dict
 from ..get_model import * 
 from .ism import *
+from .ism_bulk import *
 from .deeplift import *
 from .deepshap import *
 from .input_grad import * 

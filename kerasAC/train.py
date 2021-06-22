@@ -159,12 +159,14 @@ def fit_and_evaluate(model,train_gen,valid_gen,args):
     else: 
         model_output_path_string = args.model_prefix
         model_output_path_hdf5_name=model_output_path_string+".hdf5"
+        model_output_path_tf_name=model_output_path_string+".tf"
         model_output_path_logs_name=model_output_path_string+".log"
         model_output_path_arch_name=model_output_path_string+".arch"
         model_output_path_weights_name=model_output_path_string+".weights"
 
     
-    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True,save_weights_only=False)
+    checkpointer = ModelCheckpoint(filepath=model_output_path_tf_name, verbose=1, save_best_only=True,save_weights_only=False)
+#    checkpointer = ModelCheckpoint(filepath=model_output_path_hdf5_name, verbose=1, save_best_only=True,save_weights_only=False)
     try:
         earlystopper = EarlyStopping(monitor='val_loss', patience=args.patience, verbose=1, restore_best_weights=True)
     except:

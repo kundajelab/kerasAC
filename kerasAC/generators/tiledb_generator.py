@@ -416,6 +416,8 @@ class TiledbGenerator(Sequence):
                         cur_x=np.concatenate((cur_x,cur_seq),axis=-1)
                 else:
                     #extract values from tdb
+                    #print(tdb_batch_indices)
+                    #print(cur_input_channel,self.tdb_input_flank,cur_input_index,cur_input_channel_index,self.input_dataset_indices)
                     cur_vals=self.get_tdb_vals(tdb_batch_indices,cur_input_channel,self.tdb_input_flank[cur_input_index][cur_input_channel_index],self.input_dataset_indices[cur_input_index][cur_input_channel_index])
                     aggregate_vals=self.aggregate_vals(cur_vals,self.tdb_input_aggregation[cur_input_index][cur_input_channel_index])
                     transformed_vals=self.transform_vals(aggregate_vals,self.tdb_input_transformation[cur_input_index][cur_input_channel_index])

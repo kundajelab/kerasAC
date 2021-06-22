@@ -33,8 +33,8 @@ def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,s=0.3,xl
     #cbar.ax.set_ylabel('Density')
     plt.xlabel(xlab)
     plt.ylabel(ylab)
-    plt.xlim(xlim[0],xlim[1])
-    plt.ylim(ylim[0],ylim[1])
+#    plt.xlim(xlim[0],xlim[1])
+#    plt.ylim(ylim[0],ylim[1])
     return ax
 
 

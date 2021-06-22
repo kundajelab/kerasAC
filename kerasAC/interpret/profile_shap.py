@@ -4,7 +4,15 @@ import shap
 import tensorflow as tf
 import numpy as np
 
-def create_background_counts_chip(model_inputs,bg_size=10,seed=1234):
+def create_background_counts_chip(model_inputs,bg_size=3,seed=1234):
+    input_seq=model_inputs[0]
+    cont_counts = model_inputs[1]
+    rng = np.random.RandomState(seed)
+    input_seq_bg = dinuc_shuffle(input_seq, bg_size, rng=rng)
+    cont_counts_bg = np.tile(cont_counts, (bg_size, 1))
+    return [input_seq_bg, cont_counts_bg]
+
+def create_background_counts_chip_1(model_inputs,bg_size=1,seed=1234):
     input_seq=model_inputs[0]
     cont_counts = model_inputs[1]
     rng = np.random.RandomState(seed)
@@ -225,6 +233,7 @@ def create_explainer(model, ischip, task_index=None,bg_size=10,session=None):
         logits_weighted = logits_weighted[:,:, task_index : task_index + 1]
     prof_sum = tf.reduce_sum(logits_weighted, axis=(1, 2))
     if ischip==True:
+        bg_size=1
         if bg_size==10:
             create_background=create_background_chip
         elif bg_size==1:
