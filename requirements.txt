@@ -1,4 +1,4 @@
-tensorflow-gpu>=2.3
+tensorflow-gpu>=2.1
 pysam
 tiledb>=0.5.2
 psutil
