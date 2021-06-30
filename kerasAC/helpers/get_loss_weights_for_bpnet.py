@@ -100,7 +100,7 @@ def get_region_counts(inputs):
     print("got indices for region")
     for index in indices_for_training:
         if index%1000==0:
-            print(str(index))
+            #print(str(index))
         try:
             counts.append(np.sum(label_vals[index-flank:index+flank]))
         except:
