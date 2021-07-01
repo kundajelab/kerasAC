@@ -99,8 +99,6 @@ def get_region_counts(inputs):
             indices_for_training=np.random.choice(np.arange(label_vals.shape[0]),sample_size)
     print("got indices for region")
     for index in indices_for_training:
-        if index%1000==0:
-            #print(str(index))
         try:
             counts.append(np.sum(label_vals[index-flank:index+flank]))
         except:
