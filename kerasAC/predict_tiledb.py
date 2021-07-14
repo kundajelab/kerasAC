@@ -32,9 +32,9 @@ import h5py
 import pickle
 import numpy as np 
 import tensorflow.keras as keras 
-from keras.losses import *
-from keras.models import Model
-from keras.utils import multi_gpu_model
+from tensorflow.keras.losses import *
+from tensorflow.keras.models import Model
+from tensorflow.keras.utils import multi_gpu_model
 from kerasAC.custom_losses import *
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import random
@@ -298,7 +298,7 @@ def predict_on_batch_wrapper(args,model,test_generator):
     return
 
 def get_model_layer_functor(model,target_layer_idx):
-    from keras import backend as K
+    from tensorflow.keras import backend as K
     inp=model.input
     outputs=model.layers[target_layer_idx].output
     functor=K.function([inp], [outputs])

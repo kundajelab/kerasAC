@@ -1,18 +1,18 @@
 import numpy as np ;
-from keras.constraints import max_norm
+from tensorflow.keras.constraints import max_norm
 from kerasAC.metrics import *
 from kerasAC.custom_losses import get_weighted_binary_crossentropy, get_ambig_binary_crossentropy
 from kerasAC.metrics import recall, specificity, fpr, fnr, precision, f1
 import keras;
-from keras.models import Sequential
-from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-from keras.layers.convolutional import Conv2D, MaxPooling2D
-from keras.optimizers import Adadelta, SGD, RMSprop;
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+from tensorflow.keras.layers.convolutional import Conv2D, MaxPooling2D
+from tensorflow.keras.optimizers import Adadelta, SGD, RMSprop;
 import keras.losses;
-from keras.constraints import maxnorm;
-from keras.layers.normalization import BatchNormalization
-from keras.regularizers import l1, l2    
-from keras import backend as K
+from tensorflow.keras.constraints import maxnorm;
+from tensorflow.keras.layers.normalization import BatchNormalization
+from tensorflow.keras.regularizers import l1, l2    
+from tensorflow.keras import backend as K
 K.set_image_data_format('channels_last')
 print(K.image_data_format())
 

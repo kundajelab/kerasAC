@@ -7,20 +7,20 @@ from kerasAC.custom_losses import *
 import keras;
 
 #import the various keras layers 
-from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D
-from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-from keras.layers.convolutional import Conv1D
-from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling1D
-from keras.layers.normalization import BatchNormalization
+from tensorflow.keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D
+from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+from tensorflow.keras.layers.convolutional import Conv1D
+from tensorflow.keras.layers.pooling import GlobalMaxPooling1D,MaxPooling1D
+from tensorflow.keras.layers.normalization import BatchNormalization
 
-from keras.optimizers import Adam
-from keras.constraints import maxnorm;
-from keras.regularizers import l1, l2    
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.constraints import maxnorm;
+from tensorflow.keras.regularizers import l1, l2    
 
-from keras.models import Model
+from tensorflow.keras.models import Model
 
 def BatchNormalization_mod(conv, bn_flag=True):
-    from keras.layers.normalization import BatchNormalization
+    from tensorflow.keras.layers.normalization import BatchNormalization
     if bn_flag:
         return BatchNormalization()(conv)
     else:

@@ -56,7 +56,8 @@ def get_model(args):
                     "ambig_binary_crossentropy":ambig_binary_crossentropy,
                     "ambig_mean_absolute_error":ambig_mean_absolute_error,
                     "ambig_mean_squared_error":ambig_mean_squared_error,
-                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL}        
+                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL,        
+                    "MultichannelMultinomialMSE":MultichannelMultinomialMSE}        
     w1,w0=get_w1_w0_prediction(args)
     if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)
@@ -89,6 +90,8 @@ def get_model(args):
         model=load_model(model_hdf5)
     else:
         #initialize model from user-supplied architecture
+        import tensorflow as tf
+        tf.compat.v1.disable_eager_execution()
         try:
             if (args.architecture_from_file!=None):
                 architecture_module=imp.load_source('',args.architecture_from_file)

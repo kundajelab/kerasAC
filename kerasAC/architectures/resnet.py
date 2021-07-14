@@ -1,17 +1,17 @@
 import numpy as np
 from kerasAC.metrics import *
 import keras;
-from keras.models import Model
-from keras.layers import Input
-from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-from keras.layers.convolutional import Conv2D, MaxPooling2D
-from keras.layers.merge import Add 
-from keras.optimizers import Adadelta, SGD, RMSprop;
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+from tensorflow.keras.layers.convolutional import Conv2D, MaxPooling2D
+from tensorflow.keras.layers.merge import Add 
+from tensorflow.keras.optimizers import Adadelta, SGD, RMSprop;
 import keras.losses;
-from keras.constraints import maxnorm;
-from keras.layers.normalization import BatchNormalization
-from keras.regularizers import l1, l2
-from keras import backend as K
+from tensorflow.keras.constraints import maxnorm;
+from tensorflow.keras.layers.normalization import BatchNormalization
+from tensorflow.keras.regularizers import l1, l2
+from tensorflow.keras import backend as K
 
 def l1_block(x):
     tmp=Conv2D(filters=64,kernel_size=(1,3),padding="same")(x)

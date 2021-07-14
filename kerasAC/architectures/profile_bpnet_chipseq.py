@@ -1,6 +1,6 @@
 import pdb 
 import numpy as np ;
-from keras.backend import int_shape
+from tensorflow.keras.backend import int_shape
 from sklearn.metrics import average_precision_score
 from kerasAC.metrics import * 
 from kerasAC.custom_losses import *
@@ -8,17 +8,17 @@ from kerasAC.custom_losses import *
 import keras;
 
 #import the various keras layers 
-from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D, Add
-from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-from keras.layers.convolutional import Conv1D
-from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling1D,GlobalAveragePooling1D
-from keras.layers.normalization import BatchNormalization
+from tensorflow.keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D, Add
+from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+from tensorflow.keras.layers.convolutional import Conv1D
+from tensorflow.keras.layers.pooling import GlobalMaxPooling1D,MaxPooling1D,GlobalAveragePooling1D
+from tensorflow.keras.layers.normalization import BatchNormalization
 
-from keras.optimizers import Adam
-from keras.constraints import maxnorm;
-from keras.regularizers import l1, l2    
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.constraints import maxnorm;
+from tensorflow.keras.regularizers import l1, l2    
 
-from keras.models import Model
+from tensorflow.keras.models import Model
 
 def get_model_param_dict(param_file):
     '''

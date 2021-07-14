@@ -90,6 +90,8 @@ def get_model(args):
         model=load_model(model_hdf5)
     else:
         #initialize model from user-supplied architecture
+        import tensorflow as tf
+        tf.compat.v1.disable_eager_execution()
         try:
             if (args.architecture_from_file!=None):
                 architecture_module=imp.load_source('',args.architecture_from_file)

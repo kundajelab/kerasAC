@@ -17,7 +17,7 @@ from .splits import *
 from . import config
 import pdb
 from tensorflow.keras.callbacks import *
-from tensorflow.keras.utils import multi_gpu_model
+#from tensorflow.keras.utils import multi_gpu_model
 import gc
 import multiprocessing
 import pandas as pd
@@ -123,7 +123,7 @@ def parse_args():
     epoch_params.add_argument("--epochs",type=int,default=40)
     epoch_params.add_argument("--patience",type=int,default=3)
     epoch_params.add_argument("--patience_lr",type=int,default=2,help="number of epochs with no drop in validation loss after which to reduce lr")
-    epoch_params.add_argument("--shuffle_epoch_end",action='store_true', default=False)
+    epoch_params.add_argument("--shuffle_epoch_end",action='store_true', default=True)
     
     #add functionality to train on individuals' allele frequencies
     snp_params=parser.add_argument_group("snp_params")

@@ -11,21 +11,21 @@ def getModelGivenModelOptionsAndWeightInits(args):
     
     np.random.seed(seed)
     import keras;
-    from keras.layers import (
+    from tensorflow.keras.layers import (
         Activation, AveragePooling1D, BatchNormalization,
         Conv1D, Conv2D, Dense, Dropout, Flatten, Input,
         MaxPooling1D, MaxPooling2D, Reshape,
         PReLU, Add
     )
-    from keras.models import Model
-    #from keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
-    #from keras.layers.convolutional import Conv2D, MaxPooling2D
-    from keras.optimizers import Adadelta, SGD, RMSprop;
+    from tensorflow.keras.models import Model
+    #from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+    #from tensorflow.keras.layers.convolutional import Conv2D, MaxPooling2D
+    from tensorflow.keras.optimizers import Adadelta, SGD, RMSprop;
     import keras.losses;
-    from keras.constraints import maxnorm;
-    from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1, l2    
-    from keras import backend as K
+    from tensorflow.keras.constraints import maxnorm;
+    from tensorflow.keras.layers.normalization import BatchNormalization
+    from tensorflow.keras.regularizers import l1, l2    
+    from tensorflow.keras import backend as K
     #K.set_image_data_format('channels_last')
     print(K.image_data_format())
 

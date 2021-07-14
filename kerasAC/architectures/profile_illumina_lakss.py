@@ -11,7 +11,7 @@ bn_true=True
 
 
 def BatchNormalization_mod(conv, bn_flag=True):
-    from keras.layers.normalization import BatchNormalization
+    from tensorflow.keras.layers.normalization import BatchNormalization
     if bn_flag:
         return BatchNormalization()(conv)
     else:
@@ -41,14 +41,14 @@ def get_conv1d(num_filter,f_width,d_rate,s_rate,layer_name,conv,layer_activation
 def build1d_model_residual(input_width,input_dimension,number_of_convolutions,filters,filter_dim,dilation,activations,bn_true=True,max_flag=True):
     import tensorflow as tf
     import keras
-    from keras import backend as K
-    from keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
-    from keras.models import Sequential,Model
-    from keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
-    from keras.layers.convolutional import Conv1D,Conv2D
-    from keras.layers.normalization import BatchNormalization
-    from keras.regularizers import l1,l2
-    from keras.optimizers import SGD,RMSprop,Adam
+    from tensorflow.keras import backend as K
+    from tensorflow.keras.layers.pooling import GlobalMaxPooling1D,MaxPooling2D,MaxPooling1D
+    from tensorflow.keras.models import Sequential,Model
+    from tensorflow.keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Embedding, LSTM, Dense,Concatenate
+    from tensorflow.keras.layers.convolutional import Conv1D,Conv2D
+    from tensorflow.keras.layers.normalization import BatchNormalization
+    from tensorflow.keras.regularizers import l1,l2
+    from tensorflow.keras.optimizers import SGD,RMSprop,Adam
     from sklearn.metrics import average_precision_score
     input1=Input(shape=(input_width,4), name='sequence')
     conv=get_conv1d(32,1,1,1,'upsampling',input1,'relu','same')

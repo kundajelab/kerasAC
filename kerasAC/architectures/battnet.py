@@ -2,18 +2,18 @@ import numpy as np
 from kerasAC.metrics import *
 import keras;
 import pdb;
-from keras.models import Model
-from keras.layers import Input, Bidirectional
-from keras.layers.merge import Add, Multiply, Dot
-from keras.layers.recurrent import GRU
-from keras.layers.core import Dropout, Dense, Activation, Reshape
-from keras.optimizers import Adam;
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Bidirectional
+from tensorflow.keras.layers.merge import Add, Multiply, Dot
+from tensorflow.keras.layers.recurrent import GRU
+from tensorflow.keras.layers.core import Dropout, Dense, Activation, Reshape
+from tensorflow.keras.optimizers import Adam;
 import keras.losses;
 import keras.activations
-from keras.layers.normalization import BatchNormalization
-from keras import backend as K
+from tensorflow.keras.layers.normalization import BatchNormalization
+from tensorflow.keras import backend as K
 
-from keras.activations import softmax
+from tensorflow.keras.activations import softmax
 
 def softMaxAxis1(x):
     return softmax(x,axis=1)

@@ -4,7 +4,7 @@ tiledb>=0.5.2
 psutil
 tables
 numpy>=1.9
-keras>=2.4
+keras>=2.3
 h5py
 pandas
 pybigwig
