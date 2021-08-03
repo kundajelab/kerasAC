@@ -1,6 +1,7 @@
 #utilities for running in-silico mutagenesis within dragonn.
 import numpy as np
-from keras.models import Model
+import tensorflow as tf 
+from tensorflow.keras.models import Model
 
 def ism_wrapper(inputs):
         X=inputs[0]
