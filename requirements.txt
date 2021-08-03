@@ -1,4 +1,4 @@
-tensorflow-gpu>=2.1
+tensorflow-gpu>=2.5
 pysam
 tiledb>=0.5.2
 psutil
@@ -11,3 +11,5 @@ pybigwig
 deeplift
 abstention
 boto3
+matplotlib
+tensorflow_probability
