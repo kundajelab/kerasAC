@@ -1,6 +1,6 @@
 #import keras functions
-import keras 
-from keras.models import Model 
+import tensorflow
+from tensorflow.keras.models import Model 
 
 def input_grad_wrapper(inputs):
     X=inputs[0]
@@ -13,7 +13,7 @@ def input_grad_wrapper(inputs):
 #(see thread here: https://github.com/tensorflow/tensorflow/issues/4897) 
 def get_input_grad_function(model,target_layer_idx=-2):
     print("WARNING: this function provides aggregated gradients across tasks. Not recommended for multi-tasked models")
-    from keras import backend as K
+    from tensorflow.keras import backend as K
     fn = K.function(model.inputs, K.gradients(model.layers[target_layer_idx].output, model.inputs))
     return fn
 
