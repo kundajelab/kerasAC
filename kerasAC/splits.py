@@ -99,8 +99,8 @@ mm10_splits[9] = {'test':['chr10','chr8'],
 #mm9 & mm10 splits are the same
 splits['mm10']=mm10_splits
 splits['mm9']=mm10_splits
-chroms['mm10']=mm10_splits
-chroms['mm9']=mm10_splits
+chroms['mm10']=mm10_chroms
+chroms['mm9']=mm10_chroms
 
 
 def get_chroms(args,split):
