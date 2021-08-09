@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument("--upsample_thresh",type=float,default=None)
     parser.add_argument("--flank",type=int,default=500)
     parser.add_argument("--sample_size",type=int,default=None)
+    parser.add_argument("--title",type=str,default="") 
     return parser.parse_args()
     
 
@@ -98,8 +99,6 @@ def get_region_counts(inputs):
             indices_for_training=np.random.choice(np.arange(label_vals.shape[0]),sample_size)
     print("got indices for region")
     for index in indices_for_training:
-        if index%1000==0:
-            print(str(index))
         try:
             counts.append(np.sum(label_vals[index-flank:index+flank]))
         except:
@@ -153,7 +152,7 @@ def main():
                                               upsample_attribute=args.upsample_attribute,
                                               flank=args.flank,
                                               sample_size=args.sample_size)
-    print("counts_loss_weight:"+str(counts_loss_weight))
+    print(args.title+":"+"counts_loss_weight:"+str(counts_loss_weight))
     
 
 if __name__=="__main__":

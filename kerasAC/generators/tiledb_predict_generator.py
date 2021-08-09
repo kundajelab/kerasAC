@@ -96,8 +96,8 @@ class TiledbPredictGenerator(TiledbGenerator):
     def precompute_idx_to_tdb_index(self):
         self.idx_to_tdb_index={}
         cur_chrom_index=0
-        next_coord=self.chrom_indices[cur_chrom_index][0]+self.tdb_input_flank[0] #first tdb coord for chromosome,this is next batch's start coord 
-        cur_chrom_end=self.chrom_indices[cur_chrom_index][1]-self.tdb_input_flank[0] #final tdb coordinate for this chromsome
+        next_coord=self.chrom_indices[cur_chrom_index][0]+self.tdb_input_flank[0][0] #first tdb coord for chromosome,this is next batch's start coord 
+        cur_chrom_end=self.chrom_indices[cur_chrom_index][1]-self.tdb_input_flank[0][0] #final tdb coordinate for this chromsome
         print("mapping idx to tiledb indices") 
         for idx in range(0,self.__len__()):
             self.idx_to_tdb_index[idx]=[]
@@ -105,8 +105,8 @@ class TiledbPredictGenerator(TiledbGenerator):
                 if next_coord > cur_chrom_end:
                     try:
                         cur_chrom_index+=1
-                        next_coord=self.chrom_indices[cur_chrom_index][0]+self.tdb_input_flank[0] 
-                        cur_chrom_end=self.chrom_indices[cur_chrom_index][1]-self.tdb_input_flank[0] 
+                        next_coord=self.chrom_indices[cur_chrom_index][0]+self.tdb_input_flank[0][0] 
+                        cur_chrom_end=self.chrom_indices[cur_chrom_index][1]-self.tdb_input_flank[0][0] 
                     except:
                         #we are in the last batch, which may not be full-sized, we cannot increment to the next chromosome. 
                         continue 
