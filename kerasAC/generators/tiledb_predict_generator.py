@@ -48,6 +48,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                  num_threads=1,
                  bed_regions=None,
                  bed_regions_center=None,
+                 shuffle=False,
                  add_revcomp=False):
         
         TiledbGenerator.__init__(self,          
@@ -86,6 +87,7 @@ class TiledbPredictGenerator(TiledbGenerator):
                                  tdb_output_datasets=tdb_output_datasets,
                                  num_threads=num_threads,
                                  bed_regions=bed_regions,
+                                 shuffle=shuffle,
                                  bed_regions_center=bed_regions_center)
         self.tiledb_stride=tiledb_stride
         self.idx_to_tdb_index=None

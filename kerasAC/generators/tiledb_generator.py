@@ -97,6 +97,7 @@ class TiledbGenerator(Sequence):
                  num_threads=1,
                  bed_regions=None,
                  bed_regions_center=None,
+                 shuffle=False,
                  bed_regions_jitter=1):
         '''
         tdb_partition_attribute_for_upsample -- attribute in tiledb array used for determining which bases to upsample (usu. 'idr_peak') 
@@ -184,8 +185,9 @@ class TiledbGenerator(Sequence):
         #identify upsampled genome indices for model training
         self.tdb_partition_attribute_for_upsample=tdb_partition_attribute_for_upsample
         self.tdb_partition_thresh_for_upsample=tdb_partition_thresh_for_upsample
-        self.tdb_partition_datasets_for_upsample=tdb_partition_datasets_for_upsample,
+        self.tdb_partition_datasets_for_upsample=tdb_partition_datasets_for_upsample
 
+        self.shuffle=shuffle
     
         #handle the option of training/predicting on pre-specified bed regions
         if bed_regions is not None:
@@ -557,8 +559,21 @@ class TiledbGenerator(Sequence):
             raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none")
         return tdb_batch_indices
     
-     
+    def dinuc_shuffle(seq):
+        #get list of dinucleotides
+        nucs=[]
+        for i in range(0,len(seq),2):
+            nucs.append(seq[i:i+2])
+        #generate a random permutation
+        #set the seed so this shuffling is reproducible for a given sequence
+        random.seed(1234)
+        random.shuffle(nucs)
+        return ''.join(nucs)
+
     def get_seq(self,coords,flank):
+        print()
+        print("Shuffle is: ", self.shuffle)
+        print()
         seqs=[]
         for coord in coords:
             chrom=coord[0]
@@ -566,6 +581,8 @@ class TiledbGenerator(Sequence):
             end_pos=coord[1]+flank 
             try:
                 seq=self.ref.fetch(chrom,start_pos,end_pos)
+                if self.shuffle:
+                    seq=dinuc_shuffle(seq)
                 if len(seq)<2*flank:
                     delta=2*flank-len(seq)
                     seq=seq+"N"*delta
