@@ -41,7 +41,7 @@ def parse_args():
     return parser.parse_args() 
 
 
-def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(0,10),ylim=(0,10)):
+def density_scatter(x, y, xlab, ylab, ax = None, sort = True, bins = 20,xlim=(-1,11),ylim=(-1,11)):
     """
     Scatter plot colored by 2d histogram
     """
@@ -107,7 +107,7 @@ def counts_metrics(labels,preds,coords,task_index,outf,title,pseudoreps,flank):
                     preds,
                     xlab='Log Count Labels',
                     ylab='Log Count Predictions')
-    plt.suptitle("spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3))+", mse="+str(round(mse,3))+", n="+str(len(preds)))
+    plt.suptitle("Spearman R="+str(round(spearman_cor,3))+", Pearson R="+str(round(pearson_cor,3))+", MSE="+str(round(mse,3))+", N="+str(len(preds)))
     plt.legend(loc='best')
     plt.savefig(outf+'.png',format='png',dpi=300)
     
@@ -191,7 +191,7 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     plt.figure()
     n,bins,patches=plt.hist(mnnll_vals,num_bins,facecolor='blue',alpha=0.5,label="Predicted vs Labels")
     plt.xlabel('Multinomial Negative LL Profile Labels and Preds in Probability Space')
-    plt.title("MNNLL:"+title)
+    plt.title("MNNLL Mean=" + str(round(nanmean(mnnll_vals),3)) + ", StDev=" + str(round(nanstd(mnnll_vals),3)))
     plt.legend(loc='best')
     plt.savefig(outf_prefix+".mnnll.png",format='png',dpi=300)
     
@@ -204,7 +204,7 @@ def profile_metrics(profile_labels,profile_preds,coords,task_index,counts_labels
     n4,bins4,patches4=plt.hist(labels_vs_mean_label_jsd,num_bins,facecolor='green',alpha=0.5,label='Labels vs Mean Summit-Centered Label')
     
     plt.xlabel('Jensen Shannon Distance Profile Labels and Preds in Probability Space')
-    plt.title("JSD Dist.:"+title)
+    plt.title("JSD Mean=" + str(round(nanmean(region_jsd),3)) + ", StDev=" + str(round(nanstd(region_jsd),3)))
     plt.legend(loc='best')
     plt.savefig(outf_prefix+".jsd.png",format='png',dpi=300)
     if prep_jsd is not None:

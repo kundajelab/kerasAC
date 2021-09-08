@@ -559,7 +559,7 @@ class TiledbGenerator(Sequence):
             raise Exception("both upsampled_batch_indices and non_upsampled_batch_indices appear to be none")
         return tdb_batch_indices
     
-    def dinuc_shuffle(seq):
+    def dinuc_shuffle_local(self,seq):
         #get list of dinucleotides
         nucs=[]
         for i in range(0,len(seq),2):
@@ -571,9 +571,9 @@ class TiledbGenerator(Sequence):
         return ''.join(nucs)
 
     def get_seq(self,coords,flank):
-        print()
-        print("Shuffle is: ", self.shuffle)
-        print()
+        #print()
+        #print("Shuffle is: ", self.shuffle)
+        #print()
         seqs=[]
         for coord in coords:
             chrom=coord[0]
@@ -581,11 +581,15 @@ class TiledbGenerator(Sequence):
             end_pos=coord[1]+flank 
             try:
                 seq=self.ref.fetch(chrom,start_pos,end_pos)
+                #if chrom == 'chr18' and coord[1] == 3274840:
+                #    print('Ref:', seq)
                 if self.shuffle:
-                    seq=dinuc_shuffle(seq)
+                    seq=self.dinuc_shuffle_local(seq)
                 if len(seq)<2*flank:
                     delta=2*flank-len(seq)
                     seq=seq+"N"*delta
+                #if chrom == 'chr18' and coord[1] == 3274840:
+                #    print('Shuf:', seq)
             except:
                 seq="N"*2*flank
             seqs.append(seq) 
