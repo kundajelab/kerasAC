@@ -6,7 +6,7 @@ from kerasAC.metrics import *
 from kerasAC.custom_losses import *
 #import the various keras layers 
 from tensorflow.keras.layers import Dense,Activation,Dropout,Flatten,Reshape,Input, Concatenate, Cropping1D, Add
-from tensorflow.keras.layers.core import Dropout, Reshape, Dense, Activation, Flatten
+from tensorflow.keras.layers import Dropout, Reshape, Dense, Activation, Flatten
 from tensorflow.keras.layers.convolutional import Conv1D
 from tensorflow.keras.layers.pooling import GlobalMaxPooling1D,MaxPooling1D,GlobalAveragePooling1D
 from tensorflow.keras.layers.normalization import BatchNormalization
