@@ -6,7 +6,7 @@ from .custom_losses import *
 from .metrics import *
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Model
-from tensorflow.keras.utils.generic_utils import get_custom_objects
+from tensorflow.keras.utils import get_custom_objects
 from abstention.calibration import PlattScaling, IsotonicRegression 
 import argparse
 def parse_args():
