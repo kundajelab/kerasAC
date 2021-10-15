@@ -119,7 +119,7 @@ def fetch_args():
     args = parser.parse_args()
     return args
 
-if __name__=="__main__":
+def main(): 
     args = fetch_args()
     f = h5py.File(args.modisco_h5py, 'r')
     print("opened modisco inputs file") 
@@ -176,3 +176,5 @@ if __name__=="__main__":
                     f.write("\t\t"*(args.top_n_matches-len(r)))
                 f.write("\n")
 
+if __name__=="__main__":
+    main()

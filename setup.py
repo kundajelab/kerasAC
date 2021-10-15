@@ -25,7 +25,10 @@ config = {
                                          'kerasAC_bigwigs_from_io=kerasAC.helpers.generate_bigwigs_from_bpnet_io:main',
                                          'kerasAC_aggregate_summaries=kerasAC.helpers.aggregate_summaries:main',
                                          'kerasAC_form_modisco_inputs=kerasAC.interpret.form_modisco_inputs:main',
-                                         'kerasAC_run_modisco=kerasAC.interpret.run_modisco:main']},
+                                         'kerasAC_run_modisco=kerasAC.interpret.run_modisco:main',
+                                         'kerasAC_trim_modisco=kerasAC.helpers.trim_modisco:main',
+                                         'kerasAC_tomtom_scan_modisco=kerasAC.helpers.fetch_tomtom:main',
+                                         'kerasAC_aggregate_tomtom_motifs=kerasAC.helpers.aggregate_modisco_meme_motifs:main']},
     'name': 'kerasAC'
 }
 

@@ -2,7 +2,7 @@ import argparse
 import h5py
 import numpy as np
 from matplotlib import pyplot as plt 
-import viz_sequence
+from kerasAC.vis import viz_sequence
 
 def parse_args():
     parser=argparse.ArgumentParser(description="trim modisco hits to regions with high signal")
