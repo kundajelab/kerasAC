@@ -23,6 +23,7 @@ config = {
                                          'kerasAC_cross_validate=kerasAC.cross_validate:main',
                                          'kerasAC_loss_weights_bpnet=kerasAC.helpers.get_loss_weights_for_bpnet:main',
                                          'kerasAC_bigwigs_from_io=kerasAC.helpers.generate_bigwigs_from_bpnet_io:main',
+                                         'kerasAC_bigwigs_from_deepshap=kerasAC.helpers.deepshap_to_bigwig:main',
                                          'kerasAC_aggregate_summaries=kerasAC.helpers.aggregate_summaries:main',
                                          'kerasAC_form_modisco_inputs=kerasAC.interpret.form_modisco_inputs:main',
                                          'kerasAC_run_modisco=kerasAC.interpret.run_modisco:main',
