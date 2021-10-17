@@ -21,6 +21,8 @@ def parse_args():
     parser.add_argument("--ref_fasta")
     parser.add_argument("--chipseq",action='store_true',default=False) 
     parser.add_argument("--model_hdf5")
+    parser.add_argument("--json_path",default=None)
+    parser.add_argument("--weights_path",default=None) 
     parser.add_argument("--bed_regions")
     parser.add_argument("--bed_regions_center",choices=['summit','center'])
     parser.add_argument("--tdb_array")
@@ -56,8 +58,29 @@ def load_model_wrapper(args):
                         "ambig_mean_squared_error":ambig_mean_squared_error,
                         "MultichannelMultinomialNLL":MultichannelMultinomialNLL}
     get_custom_objects().update(custom_objects)
+    
     model=load_model(args.model_hdf5)
     return model
+
+
+def load_model_wrapper_json(json_path,weights_path):
+    custom_objects={"recall":recall,
+                    "sensitivity":recall,
+                    "specificity":specificity,
+                    "fpr":fpr,
+                    "fnr":fnr,
+                    "precision":precision,
+                    "f1":f1,
+                    "ambig_binary_crossentropy":ambig_binary_crossentropy,
+                    "ambig_mean_absolute_error":ambig_mean_absolute_error,
+                    "ambig_mean_squared_error":ambig_mean_squared_error,
+                    "MultichannelMultinomialNLL":MultichannelMultinomialNLL}
+    get_custom_objects().update(custom_objects)
+    from keras.models import model_from_json 
+    model=model_from_json(open(json_path,'r').read())
+    model.load_weights(weights_path) 
+    return model
+    
 
 def get_generator(args):
     gen=TiledbPredictGenerator(ref_fasta=args.ref_fasta,
@@ -141,7 +164,11 @@ def main():
     gen=get_generator(args)
     print("created generator")
     #load the model
-    model=load_model_wrapper(args)
+    if args.json_path is not None:
+        model=load_model_wrapper_json(args.json_path,args.weights_path)
+    else: 
+        model=load_model_wrapper(args)
+    print("loaded model") 
     print("loaded model")    
     if args.chipseq is True:
         create_background_counts=create_background_counts_chip
