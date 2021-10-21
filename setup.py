@@ -30,7 +30,8 @@ config = {
                                          'kerasAC_trim_modisco=kerasAC.helpers.trim_modisco:main',
                                          'kerasAC_tomtom_scan_modisco=kerasAC.helpers.fetch_tomtom:main',
                                          'kerasAC_aggregate_tomtom_motifs=kerasAC.helpers.aggregate_modisco_meme_motifs:main',
-                                         'kerasAC_plot_motifs=kerasAC.helpers.make_motif_plots:main']},
+                                         'kerasAC_plot_motifs=kerasAC.helpers.make_motif_plots:main',
+                                         'kerasAC_html_modisco=kerasAC.helpers.make_html_modisco_vis:main']},
     'name': 'kerasAC'
 }
 

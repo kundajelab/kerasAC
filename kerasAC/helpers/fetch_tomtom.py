@@ -159,7 +159,7 @@ def main():
         f.write("Pattern")
         f.write("\tnum_seqlets")
         for i in range(args.top_n_matches):
-            f.write("\tmatch_{}\tq-value".format(i+1))
+            f.write("\tmatch_{}\tqvalue_{}".format(i+1,i+1))
         f.write("\n")
 
         for i,r in enumerate(res):
