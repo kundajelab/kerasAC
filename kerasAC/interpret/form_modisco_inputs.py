@@ -31,7 +31,7 @@ def parse_args():
     )
     parser.add_argument("--dinuc_shuffle_input",action='store_true',default=False) 
     parser.add_argument("--chrom_sizes", default="/data/hg38.chrom.sizes")
-    parser.add_argument("--flank_size", type=int, default=1057)
+    parser.add_argument("--flank_size", type=int, default=500)
     parser.add_argument("--batch_size",type=int,default=100)
     return parser.parse_args()
 
