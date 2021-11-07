@@ -32,6 +32,7 @@ def parse_args():
     parser.add_argument("--dinuc_shuffle_input",action='store_true',default=False) 
     parser.add_argument("--chrom_sizes", default="/data/hg38.chrom.sizes")
     parser.add_argument("--flank_size", type=int, default=500)
+    parser.add_argument("--seq_input_flank_size",type=int,default=1057,help='input flank size used for model training')
     parser.add_argument("--batch_size",type=int,default=100)
     return parser.parse_args()
 
@@ -131,22 +132,22 @@ def main():
         print(str(start_index)+":"+str(start_index+cur_batch_size))
         
         batch_chroms=peaks[0][start_index:start_index+cur_batch_size].tolist() 
-        batch_start_pos=peaks[1]+peaks[9]-args.flank_size
+        batch_start_pos=peaks[1]+peaks[9]-args.seq_input_flank_size
         batch_start_pos=batch_start_pos.tolist()
         batch_start_pos=[max(0,i) for i in batch_start_pos]
-        batch_start_pos=[min(batch_start_pos[i],chrom_size_dict[batch_chroms[i]]-2*args.flank_size) for i in range(cur_batch_size)]
-        seq_batch=[ref.fetch(batch_chroms[i],batch_start_pos[i],batch_start_pos[i]+2*args.flank_size) for i in range(cur_batch_size)]
+        batch_start_pos=[min(batch_start_pos[i],chrom_size_dict[batch_chroms[i]]-2*args.seq_input_flank_size) for i in range(cur_batch_size)]
+        seq_batch=[ref.fetch(batch_chroms[i],batch_start_pos[i],batch_start_pos[i]+2*args.seq_input_flank_size) for i in range(cur_batch_size)]
         if args.dinuc_shuffle_input is True:
             seq_batch=[dinuc_shuffle(i) for i in seq_batch]
         seq_batch=one_hot_encode(seq_batch)
             
 
-        seq[start_index:start_index+cur_batch_size,:,:]=seq_batch
+        seq[start_index:start_index+cur_batch_size,:,:]=seq_batch[:,args.seq_input_flank_size-args.flank_size:args.seq_input_flank_size+args.flank_size,:]
         #get the hypothetical scores for the batch
-        hypothetical_profile_scores[start_index:start_index+cur_batch_size,:,:]= prof_explainer(seq_batch, None)
-        observed_profile_scores[start_index:start_index+cur_batch_size,:,:]=hypothetical_profile_scores[start_index:start_index+cur_batch_size,:,:]*seq_batch
-        hypothetical_count_scores[start_index:start_index+cur_batch_size,:,:]= np.squeeze(count_explainer.shap_values(seq_batch)[0])
-        observed_count_scores[start_index:start_index+cur_batch_size,:,:]=hypothetical_count_scores[start_index:start_index+cur_batch_size,:,:]*seq_batch
+        hypothetical_profile_scores[start_index:start_index+cur_batch_size,:,:]= prof_explainer(seq_batch, None)[:,args.seq_input_flank_size-args.flank_size:args.seq_input_flank_size+args.flank_size,:]
+        observed_profile_scores[start_index:start_index+cur_batch_size,:,:]=hypothetical_profile_scores[start_index:start_index+cur_batch_size,:,:]*seq_batch[:,args.seq_input_flank_size-args.flank_size:args.seq_input_flank_size+args.flank_size,:]
+        hypothetical_count_scores[start_index:start_index+cur_batch_size,:,:]= np.squeeze(count_explainer.shap_values(seq_batch)[0])[:,args.seq_input_flank_size-args.flank_size:args.seq_input_flank_size+args.flank_size,:]
+        observed_count_scores[start_index:start_index+cur_batch_size,:,:]=hypothetical_count_scores[start_index:start_index+cur_batch_size,:,:]*seq_batch[:,args.seq_input_flank_size-args.flank_size:args.seq_input_flank_size+args.flank_size,:]
         start_index+=args.batch_size
     #save
     print("saving outputs") 
