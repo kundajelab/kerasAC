@@ -1,6 +1,6 @@
 import importlib
 import imp
-
+from tensorflow.math import reduce_logsumexp
 from .s3_sync import *
 from .custom_losses import *
 from .metrics import *
@@ -57,7 +57,8 @@ def get_model(args):
                     "ambig_mean_absolute_error":ambig_mean_absolute_error,
                     "ambig_mean_squared_error":ambig_mean_squared_error,
                     "MultichannelMultinomialNLL":MultichannelMultinomialNLL,        
-                    "MultichannelMultinomialMSE":MultichannelMultinomialMSE}        
+                    "MultichannelMultinomialMSE":MultichannelMultinomialMSE,
+                    "reduce_logsumexp":reduce_logsumexp}        
     w1,w0=get_w1_w0_prediction(args)
     if type(w1) in [np.ndarray, list]: 
         loss_function=get_weighted_binary_crossentropy(w0,w1)

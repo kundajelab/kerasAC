@@ -7,7 +7,7 @@ config = {
     'version': '2.5.4',
     'packages': ['kerasAC'],
     'setup_requires': [],
-    'install_requires': ['tensorflow-gpu>=2.3','pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.3', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3'],
+    'install_requires': ['tensorflow-gpu>=2.3','pysam', 'tiledb>=0.5.2','psutil','tables','numpy>=1.9', 'keras>=2.4', 'h5py', 'pandas','pybigwig','deeplift','abstention','boto3','modisco'],
     'scripts': [],
     'entry_points': {'console_scripts': ['kerasAC_train = kerasAC.train:main',
                                          'kerasAC_predict_hdf5=kerasAC.predict_hdf5:main',
@@ -23,7 +23,15 @@ config = {
                                          'kerasAC_cross_validate=kerasAC.cross_validate:main',
                                          'kerasAC_loss_weights_bpnet=kerasAC.helpers.get_loss_weights_for_bpnet:main',
                                          'kerasAC_bigwigs_from_io=kerasAC.helpers.generate_bigwigs_from_bpnet_io:main',
-                                         'kerasAC_aggregate_summaries=kerasAC.helpers.aggregate_summaries:main']},
+                                         'kerasAC_bigwigs_from_deepshap=kerasAC.helpers.deepshap_to_bigwig:main',
+                                         'kerasAC_aggregate_summaries=kerasAC.helpers.aggregate_summaries:main',
+                                         'kerasAC_form_modisco_inputs=kerasAC.interpret.form_modisco_inputs:main',
+                                         'kerasAC_run_modisco=kerasAC.interpret.run_modisco:main',
+                                         'kerasAC_trim_modisco=kerasAC.helpers.trim_modisco:main',
+                                         'kerasAC_tomtom_scan_modisco=kerasAC.helpers.fetch_tomtom:main',
+                                         'kerasAC_aggregate_tomtom_motifs=kerasAC.helpers.aggregate_modisco_meme_motifs:main',
+                                         'kerasAC_plot_motifs=kerasAC.helpers.make_motif_plots:main',
+                                         'kerasAC_html_modisco=kerasAC.helpers.make_html_modisco_vis:main']},
     'name': 'kerasAC'
 }
 
