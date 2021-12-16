@@ -110,6 +110,7 @@ def fetch_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--modisco_h5py", required=True, type=str)
     parser.add_argument("-o", "--outfile", required=True, type=str)
+    parser.add_argument("-of","--out_folder",required=True,type=str)
     parser.add_argument("-d", "--meme_motif_db", required=True, type=str)
     parser.add_argument("-n", "--top_n_matches", type=int, default=3, help="Max number of matches to return from TomTom")
     parser.add_argument("-tt", "--tomtom_exec", type=str, default='tomtom')
@@ -139,7 +140,7 @@ def main():
                 num_seqlets = len(metacluster['seqlets_to_patterns_result']['patterns']['pattern_{}'.format(i)]['seqlets_and_alnmts']['seqlets'])
                 ppms.append(ppm)
                 seqlet_tally.append(num_seqlets)
-                names.append(args.modisco_h5py.split('/')[-1]+'.'+str(metacluster_name)+".pattern_"+str(i)+".txt")
+                names.append(args.out_folder+'/'+args.modisco_h5py.split('/')[-1]+'.'+str(metacluster_name)+".pattern_"+str(i)+".txt")
                 cwm = np.array(metacluster['seqlets_to_patterns_result']['patterns']['pattern_{}'.format(i)]["task0_contrib_scores"]['fwd'])
                 cwms.append(cwm)
 
