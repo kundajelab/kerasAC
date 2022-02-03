@@ -31,15 +31,15 @@ def main():
         
         cur_pattern=row['Pattern']
         #get the forward cwm if it exists
-        forward_cwm_pattern_file='/'.join([args.modisco_plots_folder,'metacluster_1.'+cur_pattern+'.cwm.fwd.png'])
+        forward_cwm_pattern_file='/'.join([args.modisco_plots_folder,cur_pattern+'.cwm.fwd.png'])
         #get the reverse cwm if it exists
-        reverse_cwm_pattern_file='/'.join([args.modisco_plots_folder,'metacluster_1.'+cur_pattern+'.cwm.rev.png'])
+        reverse_cwm_pattern_file='/'.join([args.modisco_plots_folder,cur_pattern+'.cwm.rev.png'])
         if os.path.exists(forward_cwm_pattern_file):
             #store in df
-            tomtom_hits['modisco_cwm_fwd'][index]='/'.join([args.html_prefix_modisco_pngs,'metacluster_1.'+cur_pattern+'.cwm.fwd.png'])
+            tomtom_hits['modisco_cwm_fwd'][index]='/'.join([args.html_prefix_modisco_pngs,cur_pattern+'.cwm.fwd.png'])
         if os.path.exists(reverse_cwm_pattern_file):
             #store in df
-            tomtom_hits['modisco_cwm_rev'][index]='/'.join([args.html_prefix_modisco_pngs,'metacluster_1.'+cur_pattern+'.cwm.rev.png'])
+            tomtom_hits['modisco_cwm_rev'][index]='/'.join([args.html_prefix_modisco_pngs,cur_pattern+'.cwm.rev.png'])
         for i in range(args.max_tomtom_hits):
             #check if we have a hit and fetch the png if we do
             if pd.isna(row['match_'+str(i+1)]) is False: 
